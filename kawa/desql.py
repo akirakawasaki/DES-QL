@@ -166,21 +166,23 @@ class tlm():
         #print(self.TLM_TYPE)
         #print(self.BUFSIZE)
 
-        #PORT = 70
+        #self.PORT = 70
         if self.TLM_TYPE == 'smt':
-            PORT = 49157
+            self.PORT = 49157
+            self.DATA_PATH = './data_smt.xlsx'
         elif self.TLM_TYPE == 'pcm':
-            PORT = 49158
+            self.PORT = 49158
+            self.DATA_PATH = './data_pcm.xlsx'
         else:
             print('Error: Type of the telemeter is wrong!')
 
-        #print(PORT)
+        #print(self.PORT)
 
         # create a scoket for UPD/IP communication
         self.udpSoc = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         
         # bind a port
-        self.udpSoc.bind((self.HOST, PORT))
+        self.udpSoc.bind((self.HOST, self.PORT))
 
         # load configuration
         if self.TLM_TYPE == 'smt':
@@ -204,10 +206,7 @@ class tlm():
         self.udpSoc.close()
 
     def save(self):
-        if self.TLM_TYPE == 'smt':
-            self.df.to_excel('./data.xlsx', sheet_name='smt')
-        elif self.TLM_TYPE == 'pcm':
-            self.df.to_excel('./data.xlsx', sheet_name='pcm')
+        self.df.to_excel(self.DATA_PATH)
 
     def receive(self):
         #print('tlm.receive called')
@@ -362,7 +361,7 @@ smt = tlm('smt')
 NNN = 0
 #while NNN < 1:
 while NNN <= 500:
-#while NNN <= 10000:
+#while NNN <= 30000:
     ### STEP 1: data receive
     smt.receive()
 
@@ -412,7 +411,7 @@ while NNN <= 500:
     if NNN % 500 == 0:
         print(f"NNN : {NNN}")
         print(f"From: {smt.addr}")
-        print(f"To  : {socket.gethostbyname(smt.HOST)}")
+        #print(f"To  : {socket.gethostbyname(smt.HOST)}")
         print('')
         print(smt.df)
         smt.save()
