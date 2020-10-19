@@ -289,7 +289,8 @@ class ChartPanel(wx.Panel):
         self.SensorValue[i_sensor-self.p_number[0]+1].SetLabel('0.10')
         self.SensorValue[i_sensor-self.p_number[0]+2].SetLabel('0.10')
         for i_sensor in self.T_number:
-            self.SensorValue[i_sensor-self.T_number[0]+len(self.p_number)+2].SetLabel(str(np.round(self.df.iloc[-1, i_sensor])))
+            self.SensorValue[i_sensor-self.T_number[0]+len(self.p_number)+2].SetLabel(str(int(self.df.iloc[-1, i_sensor])))
+            #self.SensorValue[i_sensor-self.T_number[0]+len(self.p_number)+2].SetLabel(str(np.round(self.df.iloc[-1, i_sensor])))
 
         # Alert Pple,o (Threshold : 1.0 MPa)
         if self.df.iloc[-1, self.p_number[8]] > 1.0:
