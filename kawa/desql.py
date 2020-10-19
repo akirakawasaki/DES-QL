@@ -138,7 +138,7 @@ class tlm():
     '''
     def v2ohm(self, val):
         # Ref.: Converting NI 9213 Data (FPGA Interface)
-        return (1.0e4 * 32 * val) / (2.5 - 32 * val)
+        return (1.0e4 * 32.0 * val) / (2.5 - 32.0 * val)
 
     '''
     Convert thermistor resistance to temperature (in K)
@@ -360,8 +360,8 @@ smt = tlm('smt')
 
 NNN = 0
 #while NNN < 1:
-while NNN <= 500:
-#while NNN <= 30000:
+#while NNN <= 500:
+while NNN <= 10000:
     ### STEP 1: data receive
     smt.receive()
 
