@@ -1,11 +1,11 @@
 # standard libraries
-import decimal
-import math
-import socket
+#import decimal
+#import math
+#import socket
 
 # third-party libraries
-import numpy as np
-import pandas as pd
+#import numpy as np
+#import pandas as pd
 
 # local libraries
 from usrmod import tlm
@@ -23,10 +23,11 @@ def main():
     #smt = tlm.tlm('pcm')
     #pcm = tlm.tlm('pcm')
 
+    df_ui = smt.df_mf 
+
     NNN = 0
-    #while NNN < 1:
-    while NNN <= 500:
-    #while NNN <= 10000:
+    while True:
+       
         ### STEP 1: data receive
         smt.receive()
 
@@ -71,21 +72,24 @@ def main():
 
 
         ### STEP 3: data save
-        #if NNN % 1 == 0:
-        #if NNN % 100 == 0:
-        if NNN % 500 == 0:
-            print(f"NNN : {NNN}")
-            print(f"From: {smt.addr}")
-            #print(f"To  : {socket.gethostbyname(smt.HOST)}")
-            print('')
-            print(smt.df)
-            smt.save()
+        smt.append_to_file()
 
 
         ### STEP 4: data display
-        # N/A
+        if NNN % 10 == 0:
+            df_ui = smt.append_to_dataframe(df_ui)
+    
+
+        #if NNN == 0:
+        #if NNN >= 500:
+        #if NNN >= 10000:    # smt 20201020 shortened sequence
+        #if NNN >= 26000:    # pcm 20201020 shortened sequence
+        if NNN >= 20000:    # smt 20201021 full sequence
+        #if NNN >= 45000:    # pcm 20201021 full sequence
+            break
 
         NNN += 1
+
 
     # for debug
     '''
@@ -100,8 +104,7 @@ def main():
     '''
 
     ### STEP F: finalize
-    del smt
-    #del pcm
+    # N/A
 
 
 if __name__ == '__main__':

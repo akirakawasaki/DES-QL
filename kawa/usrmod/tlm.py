@@ -12,7 +12,9 @@ import pandas as pd
 
 
 class tlm():
-    
+    '''
+    Constant Definition
+    '''
     W2B = 2
 
     NUM_OF_FRAMES = 8
@@ -24,6 +26,223 @@ class tlm():
     #BUFSIZE = 1088
     #BUFSIZE = 1280
     #BUFSIZE = 2176
+
+
+    '''
+    Constractor
+    '''
+    def __init__(self, tlm_type):
+        self.TLM_TYPE = tlm_type
+        #print(self.TLM_TYPE)
+
+        #self.HOST = socket.gethostname()
+        self.HOST = ''
+        #print(self.BUFSIZE)
+
+        #self.PORT = 70
+        if self.TLM_TYPE == 'smt':
+            self.PORT = 49157
+            self.DATA_PATH = './data_smt.csv'
+        elif self.TLM_TYPE == 'pcm':
+            self.PORT = 49158
+            self.DATA_PATH = './data_pcm.csv'
+        else:
+            print('Error: Type of the telemeter is wrong!')
+        #print(self.PORT)
+
+        # load configuration
+        if self.TLM_TYPE == 'smt':
+            self.df_cfg = pd.read_excel('./config_tlm.xlsx', sheet_name='smt')
+        elif self.TLM_TYPE == 'pcm':
+            self.df_cfg = pd.read_excel('./config_tlm.xlsx', sheet_name='pcm')
+
+        self.NUM_OF_ITEMS = len(self.df_cfg.index)
+        self.MAX_SUP_COM = self.df_cfg['sup com'].max()
+        
+        # initialize
+        self.df_mf = pd.DataFrame(index=[], columns=self.df_cfg['item']) 
+        self.df_mf.to_csv(self.DATA_PATH, mode='w')
+
+        # initialize data index
+        self.iLine = 0
+
+
+    '''
+    Destractor
+    '''
+    def __del__(self):
+        self.udpSoc.close()
+
+
+    '''
+    Receive Telemeter Data 
+    '''
+    def receive(self):
+        #print('tlm.receive called')
+
+        # create a scoket for UPD/IP communication
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as self.udpSoc:
+            self.udpSoc.bind((self.HOST, self.PORT))
+            self.data, self.addr = self.udpSoc.recvfrom(self.BUFSIZE)
+
+
+    '''
+    Save Telemeter Data to File
+    '''
+    def append_to_file(self):
+        self.df_mf.to_csv(self.DATA_PATH, mode='a', header=False)
+        
+        #if self.iLine % 1 == 0:
+        #if self.iLine % 10 == 0:
+        if self.iLine % 200 == 0:
+            print(f"iLine: {self.iLine}")
+            print(f"From : {self.addr}")
+            #print(f"To   : {socket.gethostbyname(self.HOST)}")
+            print('')
+            print(self.df_mf)
+
+
+    '''
+    Pass Telemeter Data to UI
+    '''
+    def append_to_dataframe(self, df):
+        if len(df) > self.NUM_OF_FRAMES * 100:
+            df.drop(df.index[0:self.NUM_OF_FRAMES], inplace=True)
+
+        return df.append(self.df_mf)
+
+
+    '''
+    Reshape Telemeter Data 
+    '''
+    def reshape(self):
+        # sweep frames in a major frame
+        for iFrame in range(self.NUM_OF_FRAMES):
+            #print(f"iLine: {self.iLine}")
+
+            adrs_tmp = iFrame * self.W2B * (self.LEN_HEADER + self.LEN_PAYLOAD)
+            #print(f"adrs_tmp: {adrs_tmp}") 
+
+            # initialize the row by filling wit NaN
+            self.df_mf.loc[iFrame] = np.nan
+            
+
+            # pick up data from the datagram
+            '''
+            When w assgn < 0
+            '''
+            # Days from January 1st on GSE
+            adrs = adrs_tmp + self.W2B * 0
+            self.df_mf.iat[iFrame,0] =  (self.data[adrs]   >> 4  ) * 100 \
+                                      + (self.data[adrs]   & 0x0F) * 10  \
+                                      + (self.data[adrs+1] >> 4  ) * 1
+        
+            # GSE timestamp in [sec]
+            adrs = adrs_tmp + self.W2B * 0
+            self.df_mf.iat[iFrame,1] =  (self.data[adrs+1] & 0x0F) * 10  * 3600 \
+                                      + (self.data[adrs+2] >> 4  ) * 1   * 3600 \
+                                      + (self.data[adrs+2] & 0x0F) * 10  * 60   \
+                                      + (self.data[adrs+3] >> 4  ) * 1   * 60   \
+                                      + (self.data[adrs+3] & 0x0F) * 10         \
+                                      + (self.data[adrs+4] >> 4  ) * 1          \
+                                      + (self.data[adrs+4] & 0x0F) * 100 / 1000 \
+                                      + (self.data[adrs+5] >> 4  ) * 10  / 1000 \
+                                      + (self.data[adrs+5] & 0x0F) * 1   / 1000 
+
+            '''
+            When w assgn >= 0
+            '''   
+            for iItem in range(2, self.NUM_OF_ITEMS):
+                # designate byte addres with the datagram
+                adrs = adrs_tmp + self.W2B * (self.LEN_HEADER + self.df_cfg.at[iItem,'w assgn'])
+
+                # frame/loop counter
+                if self.df_cfg.at[iItem,'type'] == 'counter':
+                    self.df_mf.iat[iFrame,iItem] = \
+                        int.from_bytes((self.data[adrs], self.data[adrs+1]), 
+                                        byteorder='big', signed=False)
+                
+                # DES timestamp in [sec]
+                elif self.df_cfg.at[iItem,'type'] == 'des time':
+                    self.df_mf.iat[iFrame,iItem] = \
+                        int.from_bytes((self.data[adrs], self.data[adrs+1], self.data[adrs+2], self.data[adrs+3]), 
+                                        byteorder='big', signed=False) \
+                        / 1000.0
+
+                # pressure in [MPa]
+                elif self.df_cfg.at[iItem,'type'] == 'p':
+                    self.df_mf.iat[iFrame,iItem] = \
+                        self.df_cfg.at[iItem,'coeff a'] / 2**11 \
+                            * int.from_bytes((self.data[adrs], self.data[adrs+1]), 
+                                            byteorder='big', signed=True) \
+                        + self.df_cfg.at[iItem,'coeff b']
+                                    
+                # temperature in [K]
+                elif self.df_cfg.at[iItem,'type'] == 'T':
+                    # TC thermoelectric voltage in [uV]
+                    Vtc =  self.df_cfg.at[iItem,'coeff a'] / 2**18 * 1e6 \
+                            * int.from_bytes((self.data[adrs], self.data[adrs+1]), 
+                                            byteorder='big', signed=True) \
+                         + self.df_cfg.at[iItem,'coeff b']
+                    Ttc = self.uv2k(Vtc + Vcjc - Vaz, 'K')
+
+                    self.df_mf.iat[iFrame,iItem] = Ttc
+
+                # auto-zero coefficient in [uV]
+                elif self.df_cfg.at[iItem,'type'] == 'az':
+                    Vaz =  self.df_cfg.at[iItem,'coeff a'] / 2**18 * 1e6 \
+                            * int.from_bytes((self.data[adrs], self.data[adrs+1]), 
+                                            byteorder='big', signed=True) \
+                         + self.df_cfg.at[iItem,'coeff b']
+                    
+                    self.df_mf.iat[iFrame,iItem] = Vaz
+
+                # cold-junction compensation coefficient in [uV]
+                elif self.df_cfg.at[iItem,'type'] == 'cjc':
+                    cjc =  self.df_cfg.at[iItem,'coeff a'] / 2**18 \
+                            * int.from_bytes((self.data[adrs], self.data[adrs+1]), 
+                                            byteorder='big', signed=True) \
+                         + self.df_cfg.at[iItem,'coeff b']
+                    Rcjc = self.v2ohm(cjc)
+                    Tcjc = self.ohm2k(Rcjc)
+                    Vcjc = self.k2uv(Tcjc, 'K')
+
+                    self.df_mf.iat[iFrame,iItem] = Vcjc
+
+                # analog pressure in [MPa]
+                elif self.df_cfg.at[iItem,'type'] == 'p ana':
+                    if iFrame % self.df_cfg.at[iItem,'sub com mod'] != self.df_cfg.at[iItem,'sub com res']: continue
+                    
+                    self.df_mf.iat[iFrame,iItem] = \
+                          self.df_cfg.at[iItem,'coeff a'] / 2**16 * 5.0 \
+                            * int.from_bytes((self.data[adrs],self.data[adrs+1]), 
+                                            byteorder='big', signed=True) \
+                        + self.df_cfg.at[iItem,'coeff b']
+
+                # voltage in [V]
+                elif self.df_cfg.at[iItem,'type'] == 'V':
+                    self.df_mf.iat[iFrame,iItem] = \
+                          self.df_cfg.at[iItem,'coeff a'] \
+                            * int.from_bytes((self.data[adrs],self.data[adrs+1]), 
+                                            byteorder='big', signed=True) \
+                        + self.df_cfg.at[iItem,'coeff b']
+
+                # relay status (boolean)
+                elif self.df_cfg.at[iItem,'type'] == 'rel':
+                    self.df_mf.iat[iFrame,iItem] = \
+                        (self.data[adrs + self.df_cfg.at[iItem,'coeff b']] & int(self.df_cfg.at[iItem,'coeff a'])) \
+                            / self.df_cfg.at[iItem,'coeff a']
+
+                # others
+                else:
+                    self.df_mf.iat[iFrame,iItem] = \
+                          self.df_cfg.at[iItem,'coeff a'] \
+                            * int.from_bytes((self.data[adrs], self.data[adrs+1]), 
+                                            byteorder='big', signed=False) \
+                        + self.df_cfg.at[iItem,'coeff b']
+
+            self.iLine += 1
+
 
     '''
     Convert thermoelectric voltage (in uV) to temperature (in K)
@@ -154,196 +373,8 @@ class tlm():
             y = 273.15
         
         return y
-    
-    '''
-    Constractor
-    '''
-    def __init__(self, tlm_type):
-        #self.HOST = socket.gethostname()
-        self.HOST = ''
-        self.TLM_TYPE = tlm_type
 
-        #print(self.TLM_TYPE)
-        #print(self.BUFSIZE)
 
-        #self.PORT = 70
-        if self.TLM_TYPE == 'smt':
-            self.PORT = 49157
-            self.DATA_PATH = './data_smt.xlsx'
-        elif self.TLM_TYPE == 'pcm':
-            self.PORT = 49158
-            self.DATA_PATH = './data_pcm.xlsx'
-        else:
-            print('Error: Type of the telemeter is wrong!')
 
-        #print(self.PORT)
 
-        # create a scoket for UPD/IP communication
-        self.udpSoc = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        
-        # bind a port
-        self.udpSoc.bind((self.HOST, self.PORT))
 
-        # load configuration
-        if self.TLM_TYPE == 'smt':
-            self.df_cfg = pd.read_excel('./config_tlm.xlsx', sheet_name='smt')
-        elif self.TLM_TYPE == 'pcm':
-            self.df_cfg = pd.read_excel('./config_tlm.xlsx', sheet_name='pcm')
-
-        self.NUM_OF_ITEMS = len(self.df_cfg.index)
-        self.SUP_COM      = self.df_cfg['sup com'].max()
-        
-        # configure output file
-        self.df = pd.DataFrame(index=[], columns=self.df_cfg['item']) 
-        
-        # initialize data index
-        self.iData = 0
-
-    '''
-    Destractor
-    '''
-    def __del__(self):
-        self.udpSoc.close()
-
-    def save(self):
-        self.df.to_excel(self.DATA_PATH)
-
-    def receive(self):
-        #print('tlm.receive called')
-        self.data, self.addr = self.udpSoc.recvfrom(self.BUFSIZE)
-
-    def reshape(self):
-        # sweep frames in a major frame
-        for iFrame in range(self.NUM_OF_FRAMES):
-            #print(f"iData: {self.iData}")
-
-            adrs_tmp = iFrame * self.W2B * (self.LEN_HEADER + self.LEN_PAYLOAD)
-            #print(f"adrs_tmp: {adrs_tmp}") 
-
-            # initialize the row by filling wit NaN
-            self.df.loc[self.iData] = np.nan
-            
-            # pick up data from the datagram
-            '''
-            When w assgn < 0
-            '''
-            # Days from January 1st on GSE
-            adrs = adrs_tmp + self.W2B * 0
-            self.df.iat[self.iData,0] =  (self.data[adrs]   >> 4  ) * 100 \
-                                       + (self.data[adrs]   & 0x0F) * 10  \
-                                       + (self.data[adrs+1] >> 4  ) * 1
-        
-            # GSE timestamp in [sec]
-            adrs = adrs_tmp + self.W2B * 0
-            self.df.iat[self.iData,1] =  (self.data[adrs+1] & 0x0F) * 10  * 3600 \
-                                       + (self.data[adrs+2] >> 4  ) * 1   * 3600 \
-                                       + (self.data[adrs+2] & 0x0F) * 10  * 60   \
-                                       + (self.data[adrs+3] >> 4  ) * 1   * 60   \
-                                       + (self.data[adrs+3] & 0x0F) * 10         \
-                                       + (self.data[adrs+4] >> 4  ) * 1          \
-                                       + (self.data[adrs+4] & 0x0F) * 100 / 1000 \
-                                       + (self.data[adrs+5] >> 4  ) * 10  / 1000 \
-                                       + (self.data[adrs+5] & 0x0F) * 1   / 1000 
-
-            '''
-            When w assgn >= 0
-            '''   
-            for iItem in range(2, self.NUM_OF_ITEMS):
-                # designate byte addres with the datagram
-                adrs = adrs_tmp + self.W2B * (self.LEN_HEADER + self.df_cfg.at[iItem,'w assgn'])
-
-                # frame/loop counter
-                if self.df_cfg.at[iItem,'type'] == 'counter':
-                    self.df.iat[self.iData,iItem] = \
-                        int.from_bytes((self.data[adrs], self.data[adrs+1]), byteorder='big', signed=False)
-                    #self.df.iat[self.iData,iItem] =  self.data[adrs]   * 2**8 \
-                    #                               + self.data[adrs+1]
-                
-                # DES timestamp in [sec]
-                elif self.df_cfg.at[iItem,'type'] == 'des time':
-                    self.df.iat[self.iData,iItem] = \
-                        int.from_bytes((self.data[adrs], self.data[adrs+1], self.data[adrs+2], self.data[adrs+3]), 
-                                        byteorder='big', signed=False) \
-                            / 1000.0
-                    #self.df.iat[self.iData,iItem] = (  self.data[adrs]   * 2**(24) \
-                    #                                 + self.data[adrs+1] * 2**(16) \
-                    #                                 + self.data[adrs+2] * 2**(8)  \
-                    #                                 + self.data[adrs+3] * 2**(0)  ) / 1000.0
-
-                # pressure in [MPa]
-                elif self.df_cfg.at[iItem,'type'] == 'p':
-                    self.df.iat[self.iData,iItem] = \
-                          self.df_cfg.at[iItem,'coeff a'] / 2**11 \
-                            * int.from_bytes((self.data[adrs], self.data[adrs+1]), byteorder='big', signed=True) \
-                        + self.df_cfg.at[iItem,'coeff b']
-                                    
-                # temperature in [K]
-                elif self.df_cfg.at[iItem,'type'] == 'T':
-                    # TC thermoelectric voltage in [uV]
-                    Vtc =  self.df_cfg.at[iItem,'coeff a'] / 2**18 * 1e6 \
-                            * int.from_bytes((self.data[adrs], self.data[adrs+1]), byteorder='big', signed=True) \
-                         + self.df_cfg.at[iItem,'coeff b']
-                    Ttc = self.uv2k(Vtc + Vcjc - Vaz, 'K')
-
-                    self.df.iat[self.iData,iItem] = Ttc
-
-                    #print(f"Vtc : {Vtc}")
-                    #print(f"Vcjc: {Vcjc}")
-                    #print(f"Vaz : {Vaz}")
-
-                # auto-zero coefficient in [uV]
-                elif self.df_cfg.at[iItem,'type'] == 'az':
-                    Vaz =  self.df_cfg.at[iItem,'coeff a'] / 2**18 * 1e6 \
-                            * int.from_bytes((self.data[adrs], self.data[adrs+1]), byteorder='big', signed=True) \
-                         + self.df_cfg.at[iItem,'coeff b']
-                    
-                    self.df.iat[self.iData,iItem] = Vaz
-
-                # cold-junction compensation coefficient in [uV]
-                elif self.df_cfg.at[iItem,'type'] == 'cjc':
-                    cjc =  self.df_cfg.at[iItem,'coeff a'] / 2**18 \
-                            * int.from_bytes((self.data[adrs], self.data[adrs+1]), byteorder='big', signed=True) \
-                         + self.df_cfg.at[iItem,'coeff b']
-                    Rcjc = self.v2ohm(cjc)
-                    Tcjc = self.ohm2k(Rcjc)
-                    Vcjc = self.k2uv(Tcjc, 'K')
-
-                    #print(f"CJC : {cjc}")
-                    #print(f"Rcjc: {Rcjc}")
-                    #print(f"Tcjc: {Tcjc}")
-                    #print(f"Vcjc: {Vcjc}")
-
-                    self.df.iat[self.iData,iItem] = Vcjc
-
-                # analog pressure in [MPa]
-                elif self.df_cfg.at[iItem,'type'] == 'p ana':
-                    if iFrame % self.df_cfg.at[iItem,'sub com mod'] != self.df_cfg.at[iItem,'sub com res']: continue
-                    
-                    self.df.iat[self.iData,iItem] = \
-                          self.df_cfg.at[iItem,'coeff a'] / 2**16 * 5.0 \
-                            * int.from_bytes((self.data[adrs],self.data[adrs+1]), byteorder='big', signed=True) \
-                        + self.df_cfg.at[iItem,'coeff b']
-
-                # voltage in [V]
-                elif self.df_cfg.at[iItem,'type'] == 'V':
-                    self.df.iat[self.iData,iItem] = \
-                          self.df_cfg.at[iItem,'coeff a'] \
-                            * int.from_bytes((self.data[adrs],self.data[adrs+1]), byteorder='big', signed=True) \
-                        + self.df_cfg.at[iItem,'coeff b']
-
-                # relay status (boolean)
-                elif self.df_cfg.at[iItem,'type'] == 'rel':
-                    self.df.iat[self.iData,iItem] = \
-                        (self.data[adrs + self.df_cfg.at[iItem,'coeff b']] & int(self.df_cfg.at[iItem,'coeff a'])) \
-                            / self.df_cfg.at[iItem,'coeff a']
-                    #self.df.iat[self.iData,iItem] = \
-                    #   int.from_bytes((self.data[adrs],self.data[adrs+1]), byteorder='big', signed=False)
-
-                # others
-                else:
-                    self.df.iat[self.iData,iItem] = \
-                          self.df_cfg.at[iItem,'coeff a'] \
-                            * int.from_bytes((self.data[adrs], self.data[adrs+1]), byteorder='big', signed=False) \
-                        + self.df_cfg.at[iItem,'coeff b']
-
-            self.iData += 1
