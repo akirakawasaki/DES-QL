@@ -151,7 +151,7 @@ class tlm():
 
             '''
             When w assgn >= 0
-            '''   
+            '''
             for iItem in range(2, self.NUM_OF_ITEMS):
                 # designate byte addres with the datagram
                 adrs = adrs_tmp + self.W2B * (self.LEN_HEADER + self.df_cfg.at[iItem,'w assgn'])
@@ -169,7 +169,7 @@ class tlm():
                                         byteorder='big', signed=False) \
                         / 1000.0
 
-                # pressure in [MPa]
+                # pressure in [MPa] <S,16,5>
                 elif self.df_cfg.at[iItem,'type'] == 'p':
                     self.df_mf.iat[iFrame,iItem] = \
                         self.df_cfg.at[iItem,'coeff a'] / 2**11 \
@@ -209,6 +209,38 @@ class tlm():
 
                     self.df_mf.iat[iFrame,iItem] = Vcjc
 
+                # acceleration in [m/s2] <S,32,12>
+                elif self.df_cfg.at[iItem,'type'] == 'a':
+                    self.df_mf.iat[iFrame,iItem] = \
+                        self.df_cfg.at[iItem,'coeff a'] / 2**20 \
+                            * int.from_bytes((self.data[adrs], self.data[adrs+1], self.data[adrs+2], self.data[adrs+3] ), 
+                                            byteorder='big', signed=True) \
+                        + self.df_cfg.at[iItem,'coeff b']
+
+                # angular velocity in [rad/s] <S,32,12>
+                elif self.df_cfg.at[iItem,'type'] == 'omg':
+                    self.df_mf.iat[iFrame,iItem] = \
+                        self.df_cfg.at[iItem,'coeff a'] / 2**20 \
+                            * int.from_bytes((self.data[adrs], self.data[adrs+1], self.data[adrs+2], self.data[adrs+3] ), 
+                                            byteorder='big', signed=True) \
+                        + self.df_cfg.at[iItem,'coeff b']
+
+                # magnetic flux density in arbitrary unit
+                elif self.df_cfg.at[iItem,'type'] == 'B':
+                    self.df_mf.iat[iFrame,iItem] = \
+                        self.df_cfg.at[iItem,'coeff a'] \
+                            * int.from_bytes((self.data[adrs], self.data[adrs+1], self.data[adrs+2], self.data[adrs+3] ), 
+                                            byteorder='big', signed=True) \
+                        + self.df_cfg.at[iItem,'coeff b']
+
+                # Eular angle in [rad] <S,32,12>
+                elif self.df_cfg.at[iItem,'type'] == 'EA':
+                    self.df_mf.iat[iFrame,iItem] = \
+                        self.df_cfg.at[iItem,'coeff a'] / 2**20 \
+                            * int.from_bytes((self.data[adrs], self.data[adrs+1], self.data[adrs+2], self.data[adrs+3] ), 
+                                            byteorder='big', signed=True) \
+                        + self.df_cfg.at[iItem,'coeff b']
+
                 # analog pressure in [MPa]
                 elif self.df_cfg.at[iItem,'type'] == 'p ana':
                     if iFrame % self.df_cfg.at[iItem,'sub com mod'] != self.df_cfg.at[iItem,'sub com res']: continue
@@ -219,11 +251,11 @@ class tlm():
                                             byteorder='big', signed=True) \
                         + self.df_cfg.at[iItem,'coeff b']
 
-                # voltage in [V]
+                # voltage in [V] <S,16,5>
                 elif self.df_cfg.at[iItem,'type'] == 'V':
                     self.df_mf.iat[iFrame,iItem] = \
-                          self.df_cfg.at[iItem,'coeff a'] \
-                            * int.from_bytes((self.data[adrs],self.data[adrs+1]), 
+                        self.df_cfg.at[iItem,'coeff a'] / 2**11 \
+                            * int.from_bytes((self.data[adrs], self.data[adrs+1]), 
                                             byteorder='big', signed=True) \
                         + self.df_cfg.at[iItem,'coeff b']
 
@@ -232,6 +264,18 @@ class tlm():
                     self.df_mf.iat[iFrame,iItem] = \
                         (self.data[adrs + self.df_cfg.at[iItem,'coeff b']] & int(self.df_cfg.at[iItem,'coeff a'])) \
                             / self.df_cfg.at[iItem,'coeff a']
+
+                # SSD free space in [GB]
+                elif self.df_cfg.at[iItem,'type'] == 'disk space':
+                    self.df_mf.iat[iFrame,iItem] = \
+                            int.from_bytes((self.data[adrs], self.data[adrs+1]), 
+                                            byteorder='big', signed=True) / 2**17
+
+                # error code
+                elif self.df_cfg.at[iItem,'type'] == 'ec':
+                    self.df_mf.iat[iFrame,iItem] = \
+                        int.from_bytes((self.data[adrs], self.data[adrs+1], self.data[adrs+2], self.data[adrs+3] ), 
+                                        byteorder='big', signed=False)
 
                 # others
                 else:
