@@ -269,7 +269,7 @@ class tlm():
                 elif self.df_cfg.at[iItem,'type'] == 'disk space':
                     self.df_mf.iat[iFrame,iItem] = \
                             int.from_bytes((self.data[adrs], self.data[adrs+1]), 
-                                            byteorder='big', signed=True) / 2**17
+                                            byteorder='big', signed=True) / 2**7
 
                 # error code
                 elif self.df_cfg.at[iItem,'type'] == 'ec':
