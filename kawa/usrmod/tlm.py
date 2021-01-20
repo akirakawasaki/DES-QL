@@ -155,15 +155,13 @@ class tlm():
             for iItem in range(2, self.NUM_OF_ITEMS):
                 # designate byte addres with the datagram
                 adrs = adrs_tmp + self.W2B * (self.LEN_HEADER + self.df_cfg.at[iItem,'w assgn'])
-
-                # frame/loop counter
-                if self.df_cfg.at[iItem,'type'] == 'counter':
-                    self.df_mf.iat[iFrame,iItem] = \
-                        int.from_bytes((self.data[adrs], self.data[adrs+1]), 
-                                        byteorder='big', signed=False)
                 
+                #
+                #   SMT
+                #
+
                 # DES timestamp in [sec]
-                elif self.df_cfg.at[iItem,'type'] == 'des time':
+                if self.df_cfg.at[iItem,'type'] == 'des time':
                     self.df_mf.iat[iFrame,iItem] = \
                         int.from_bytes((self.data[adrs], self.data[adrs+1], self.data[adrs+2], self.data[adrs+3]), 
                                         byteorder='big', signed=False) \
@@ -241,16 +239,6 @@ class tlm():
                                             byteorder='big', signed=True) \
                         + self.df_cfg.at[iItem,'coeff b']
 
-                # analog pressure in [MPa]
-                elif self.df_cfg.at[iItem,'type'] == 'p ana':
-                    if iFrame % self.df_cfg.at[iItem,'sub com mod'] != self.df_cfg.at[iItem,'sub com res']: continue
-                    
-                    self.df_mf.iat[iFrame,iItem] = \
-                          self.df_cfg.at[iItem,'coeff a'] / 2**16 * 5.0 \
-                            * int.from_bytes((self.data[adrs],self.data[adrs+1]), 
-                                            byteorder='big', signed=True) \
-                        + self.df_cfg.at[iItem,'coeff b']
-
                 # voltage in [V] <S,16,5>
                 elif self.df_cfg.at[iItem,'type'] == 'V':
                     self.df_mf.iat[iFrame,iItem] = \
@@ -274,7 +262,40 @@ class tlm():
                 # error code
                 elif self.df_cfg.at[iItem,'type'] == 'ec':
                     self.df_mf.iat[iFrame,iItem] = \
-                        int.from_bytes((self.data[adrs], self.data[adrs+1], self.data[adrs+2], self.data[adrs+3] ), 
+                        int.from_bytes((self.data[adrs], self.data[adrs+1], self.data[adrs+2], self.data[adrs+3]), 
+                                        byteorder='big', signed=False)
+
+                #
+                #   PCM
+                #
+
+                # analog pressure in [MPa]
+                elif self.df_cfg.at[iItem,'type'] == 'p ana':
+                    if iFrame % self.df_cfg.at[iItem,'sub com mod'] != self.df_cfg.at[iItem,'sub com res']: continue
+                    
+                    self.df_mf.iat[iFrame,iItem] = \
+                          self.df_cfg.at[iItem,'coeff a'] / 2**16 * 5.0 \
+                            * int.from_bytes((self.data[adrs],self.data[adrs+1]), 
+                                            byteorder='big', signed=True) \
+                        + self.df_cfg.at[iItem,'coeff b']
+
+                # PCB data
+                #elif self.df_cfg.at[iItem,'type'] == 'data':                    
+                #    for iii in (9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25):
+                #    self.df_mf.iat[iFrame,iItem] = \
+                #          self.df_cfg.at[iItem,'coeff a'] / 2**16 * 5.0 \
+                #            * int.from_bytes((self.data[adrs],self.data[adrs+1]), 
+                #                            byteorder='big', signed=True) \
+                #        + self.df_cfg.at[iItem,'coeff b']
+
+                #
+                #   Common
+                #
+                
+                # frame/loop counter
+                elif self.df_cfg.at[iItem,'type'] == 'counter':
+                    self.df_mf.iat[iFrame,iItem] = \
+                        int.from_bytes((self.data[adrs], self.data[adrs+1]), 
                                         byteorder='big', signed=False)
 
                 # others
