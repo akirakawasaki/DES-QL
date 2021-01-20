@@ -18,13 +18,10 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg
 from matplotlib.figure import Figure
 
-from stl import mesh
-from mpl_toolkits import mplot3d
-
 """
 Local libraries
 """
-from usrmod import tlm_copy as tlm
+from usrmod import tlm
 
 """
 Matplotlib configuration
@@ -82,22 +79,18 @@ Time History Plots & Current Value Indicators
 """
 class ChartPanel(wx.Panel):
     index_x = 1
-    t_range = 30
+    t_range = 30    # [s]
 
-    n_time = 3
-    index_plot1 = 11   # Pple,o(8+3)
-    index_plot2 = 2  # Tth,rde(18+3)
-    index_plot3 = 22  # Tcpde(19+3)
+    n_plot = 5
 
     sensor_type = ['Time [s]', 'P [MPa]', 'T [K]', 'IMU', 'House Keeping']
-    n_type = np.array([3, 10, 2, 10, 6, 6, 5, 16, 6, 2])
-    # n_type = np.array([3, 10, 2, 10, 6, 6, 5, 16, 6, 2])
+    col_value = [6, 8, 8, 9, 8]
 
     def __init__(self, parent, reflesh_time_graph, reflesh_time_value):
         super().__init__(parent, wx.ID_ANY)
 
         self.configReader()
-        self.flag_temp = False
+        self.flag_temp = True
 
         self.valueGenerator()
         self.chartGenerator()
@@ -123,8 +116,43 @@ class ChartPanel(wx.Panel):
         self.df_cfg_tlm = th_smt.smt.df_cfg.copy()
         self.df_cfg_tlm.reset_index()
 
-        self.df_cfg_plot = pd.read_excel('./config_plot.xlsx', sheet_name='smt')
-        self.df_cfg_sensor = pd.read_excel('./config_sensor.xlsx', sheet_name='smt')
+        df_cfg_plot_tmp = pd.read_excel('./config_plot.xlsx', sheet_name='smt')
+        self.df_cfg_plot = df_cfg_plot_tmp.dropna(how='all')
+
+        self.index_plot = [self.df_cfg_plot['ID'][self.df_cfg_plot['plot_1'].astype(bool)].astype(int).iat[0],
+                          self.df_cfg_plot['ID'][self.df_cfg_plot['plot_2'].astype(bool)].astype(int).iat[0],
+                          self.df_cfg_plot['ID'][self.df_cfg_plot['plot_3'].astype(bool)].astype(int).iat[0],
+                          self.df_cfg_plot['ID'][self.df_cfg_plot['plot_4'].astype(bool)].astype(int).iat[0],
+                          self.df_cfg_plot['ID'][self.df_cfg_plot['plot_5'].astype(bool)].astype(int).iat[0]]
+        print(self.index_plot)
+        self.item_plot = [self.df_cfg_plot['item'][self.df_cfg_plot['plot_1'].astype(bool)].iat[0],
+                          self.df_cfg_plot['item'][self.df_cfg_plot['plot_2'].astype(bool)].iat[0],
+                          self.df_cfg_plot['item'][self.df_cfg_plot['plot_3'].astype(bool)].iat[0],
+                          self.df_cfg_plot['item'][self.df_cfg_plot['plot_4'].astype(bool)].iat[0],
+                          self.df_cfg_plot['item'][self.df_cfg_plot['plot_5'].astype(bool)].iat[0]]
+        print(self.item_plot)
+        self.unit_plot = [self.df_cfg_plot['unit'][self.df_cfg_plot['plot_1'].astype(bool)].iat[0],
+                          self.df_cfg_plot['unit'][self.df_cfg_plot['plot_2'].astype(bool)].iat[0],
+                          self.df_cfg_plot['unit'][self.df_cfg_plot['plot_3'].astype(bool)].iat[0],
+                          self.df_cfg_plot['unit'][self.df_cfg_plot['plot_4'].astype(bool)].iat[0],
+                          self.df_cfg_plot['unit'][self.df_cfg_plot['plot_5'].astype(bool)].iat[0]]
+        print(self.unit_plot)
+        self.y_min_plot = [self.df_cfg_plot['y_min'][self.df_cfg_plot['plot_1'].astype(bool)].iat[0],
+                          self.df_cfg_plot['y_min'][self.df_cfg_plot['plot_2'].astype(bool)].iat[0],
+                          self.df_cfg_plot['y_min'][self.df_cfg_plot['plot_3'].astype(bool)].iat[0],
+                          self.df_cfg_plot['y_min'][self.df_cfg_plot['plot_4'].astype(bool)].iat[0],
+                          self.df_cfg_plot['y_min'][self.df_cfg_plot['plot_5'].astype(bool)].iat[0]]
+        print(self.y_min_plot)
+        self.y_max_plot = [self.df_cfg_plot['y_max'][self.df_cfg_plot['plot_1'].astype(bool)].iat[0],
+                          self.df_cfg_plot['y_max'][self.df_cfg_plot['plot_2'].astype(bool)].iat[0],
+                          self.df_cfg_plot['y_max'][self.df_cfg_plot['plot_3'].astype(bool)].iat[0],
+                          self.df_cfg_plot['y_max'][self.df_cfg_plot['plot_4'].astype(bool)].iat[0],
+                          self.df_cfg_plot['y_max'][self.df_cfg_plot['plot_5'].astype(bool)].iat[0]]
+        print(self.y_max_plot)
+
+
+        df_cfg_sensor_tmp = pd.read_excel('./config_sensor.xlsx', sheet_name='smt')
+        self.df_cfg_sensor = df_cfg_sensor_tmp.dropna(how='all')
 
         self.id_time = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'Time [s]']['ID'].astype(int)
         self.id_p = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'P [MPa]']['ID'].astype(int)
@@ -135,34 +163,46 @@ class ChartPanel(wx.Panel):
         self.id = [self.id_time, self.id_p, self.id_T, self.id_imu, self.id_hk]
 
     def dfReloder(self):
+        try:
+            self.df
+        except AttributeError:  # In the case of wxpython is not opened
+            pass
+        else:
+            if th_smt.df_ui.shape[0] < self.df.shape[0]:
+                if self.flag_temp:
+                    self.data_past = self.df.values
+                    self.flag_temp = False
+                else:
+                    self.data_past = np.append(self.data_past[-200:], self.df.values, axis=0)
+                print('Reload data_plot : ' + str(self.data_past.shape))
         self.df = th_smt.df_ui.copy()
 
     def chartGenerator(self):
         ''' Time history plots '''
         self.fig = Figure(figsize=(6, 8))
-        self.ax1 = self.fig.add_subplot(311)
-        self.ax2 = self.fig.add_subplot(312)
-        self.ax3 = self.fig.add_subplot(313)
+        self.axes = []
+        for i in range(self.n_plot):
+            self.axes.append(self.fig.add_subplot(self.n_plot, 1, i+1))
         self.canvas = FigureCanvasWxAgg(self, -1, self.fig)
 
-        self.ax1.set_ylim([0.0, 1.5])
-        self.ax2.set_ylim([0.0, 100000.0])
-        self.ax3.set_ylim([200.0, 600.0])
+        for i in range(self.n_plot):
+            self.axes[i].set_ylim([self.y_min_plot[i], self.y_max_plot[i]])
+
+        for i in range(self.n_plot):
+            self.axes[i].set_ylabel(self.item_plot[i] + ' [{}]'.format(self.unit_plot[i]))
 
         self.t_left = 0
-        self.ax1.set_xlim([self.t_left, self.t_left + self.t_range])
-        self.ax2.set_xlim([self.t_left, self.t_left + self.t_range])
-        self.ax3.set_xlim([self.t_left, self.t_left + self.t_range])
+        for i in range(self.n_plot):
+            self.axes[i].set_xlim([self.t_left, self.t_left + self.t_range])
 
         self.canvas.draw()                                            # Plot Empty Chart
-        self.background1 = self.canvas.copy_from_bbox(self.ax1.bbox)  # Save Empty Chart Format as Background
-        self.background2 = self.canvas.copy_from_bbox(self.ax2.bbox)  # Save Empty Chart Format as Background
-        self.background3 = self.canvas.copy_from_bbox(self.ax3.bbox)  # Save Empty Chart Format as Background
+
+        self.backgrounds = []
+        for i in range(self.n_plot):
+            self.backgrounds.append(self.canvas.copy_from_bbox(self.axes[i].bbox))  # Save Empty Chart Format as Background
 
     def valueGenerator(self):
         ''' Current value indicators '''
-        self.col_value = [5, 8, 8, 9, 8]
-
         # generate DataButton instances
         self.DataButton = []
         for index in self.df_cfg_tlm['item']:
@@ -212,102 +252,73 @@ class ChartPanel(wx.Panel):
         for i in range(len(self.sensor_type)):
             self.layout_Value.Add(self.layout_type[i])
 
+        for index in self.index_plot:
+            self.DataButton[index].SetValue(True)
+
         # for button in self.DataButton:
         #     button.Bind(wx.EVT_TOGGLEBUTTON, self.graphTest)
 
     def graphReloader(self, event):
+        # Set Plot Data
+        try:
+            self.data_past
+        except AttributeError:
+            self.data_plot = self.df.values
+        else:
+            self.data_plot = np.append(self.data_past, self.df.values, axis=0)
+
         t_temp = self.df.iloc[-1, self.index_x]
 
         if t_temp >= self.t_left+self.t_range:
+            self.lines = []
 
-            self.i_left = self.df.shape[0]
-            self.lines1 = []
-            self.lines2 = []
-            self.lines3 = []
+            for i in range(self.n_plot):
+                self.axes[i].cla()
 
-            self.ax1.cla()
-            self.ax2.cla()
-            self.ax3.cla()
+            self.t_left = t_temp - self.t_range / 3
+            for i in range(self.n_plot):
+                self.axes[i].set_xlim([self.t_left, self.t_left + self.t_range])
 
-            self.t_left = self.df.iloc[-1, self.index_x]
-            self.ax1.set_xlim([self.t_left, self.t_left + self.t_range])
-            self.ax2.set_xlim([self.t_left, self.t_left + self.t_range])
-            self.ax3.set_xlim([self.t_left, self.t_left + self.t_range])
-
-            self.ax1.set_ylim([-1.0, 1.5])
-            self.ax2.set_ylim([0.0, 100000.0])
-            self.ax3.set_ylim([200.0, 600.0])
+            for i in range(self.n_plot):
+                self.axes[i].set_ylim([self.y_min_plot[i], self.y_max_plot[i]])
 
             # draw alert line
-            self.ax1.axhline(y=1.0, xmin=0, xmax=1, color='red')
+            self.axes[0].axhline(y=1.0, xmin=0, xmax=1, color='red')
             """
-            self.ax2.axhline(y=500.0, xmin=0, xmax=1, color='red')
-            self.ax3.axhline(y=500.0, xmin=0, xmax=1, color='red')
+            self.axes[1].axhline(y=500.0, xmin=0, xmax=1, color='red')
+            self.axes[2].axhline(y=500.0, xmin=0, xmax=1, color='red')
             """
 
-            self.ax1.set_ylabel('Pple,o [MPa]')
-            self.ax2.set_ylabel('Tth,rde [K]')
-            self.ax3.set_ylabel('Tcpde [K]')
+            for i in range(self.n_plot):
+                self.axes[i].set_ylabel(self.item_plot[i] + ' [{}]'.format(self.unit_plot[i]))
 
             self.canvas.draw()
-            self.background1 = self.canvas.copy_from_bbox(self.ax1.bbox)  # Save Empty Chart Format as Background
-            self.background2 = self.canvas.copy_from_bbox(self.ax2.bbox)  # Save Empty Chart Format as Background
-            self.background3 = self.canvas.copy_from_bbox(self.ax3.bbox)  # Save Empty Chart Format as Background
+            for i in range(self.n_plot):
+                self.backgrounds[i] = self.canvas.copy_from_bbox(self.axes[i].bbox)  # Save Empty Chart Format as Background
 
-            # plot Pple,o histories
-            self.lines1 = self.ax1.plot(self.df.iloc[self.i_left::2, self.index_x],
-                                        self.df.iloc[self.i_left::2, self.index_plot1])[0]
-
-            # plot Tth,rde histories
-            self.lines2.append(self.ax2.plot(self.df.iloc[self.i_left::2, self.index_x],
-                                             self.df.iloc[self.i_left::2, self.index_plot2])[0])
-
-            # plot Tcpde histories
-            self.lines3.append(self.ax3.plot(self.df.iloc[self.i_left::2, self.index_x],
-                                             self.df.iloc[self.i_left::2, self.index_plot3])[0])
+            for i in range(self.n_plot):
+                self.lines.append(self.axes[i].plot(self.data_plot[::2, self.index_x],
+                                                    self.data_plot[::2, self.index_plot[i]])[0])
 
         else:
-            # reflesh Pple,o histories plot
-            self.lines1.set_data(self.df.iloc[self.i_left::2, self.index_x],
-                                           self.df.iloc[self.i_left::2, self.index_plot1])
+            for i in range(self.n_plot):
+                self.lines[i].set_data(self.data_plot[::2, self.index_x],
+                                       self.data_plot[::2, self.index_plot[i]])
+            #print(self.df.shape)
 
-            # reflesh Tth,rde histories plot
-            for i_T_line in range(len(self.lines2)):
-                self.lines2[i_T_line].set_data(self.df.iloc[self.i_left::2, self.index_x],
-                                               self.df.iloc[self.i_left::2, self.index_plot2])
+        for i in range(self.n_plot):
+            self.canvas.restore_region(self.backgrounds[i])                 # Re-plot Background (i.e. Delete line)
 
-            # reflesh Tcpde histories plot
-            for i_T_line in range(len(self.lines3)):
-                self.lines3[i_T_line].set_data(self.df.iloc[self.i_left::2, self.index_x],
-                                               self.df.iloc[self.i_left::2, self.index_plot3])
+        for i in range(self.n_plot):
+            self.axes[i].draw_artist(self.lines[i])                              # Set new data in ax
 
-        self.canvas.restore_region(self.background1)                 # Re-plot Background (i.e. Delete line)
-        self.canvas.restore_region(self.background2)                 # Re-plot Background (i.e. Delete line)
-        self.canvas.restore_region(self.background3)                 # Re-plot Background (i.e. Delete line)
-
-        self.ax1.draw_artist(self.lines1)                              # Set new data in ax
-
-        for line in self.lines2:
-            self.ax2.draw_artist(line)                              # Set new data in ax
-
-        for line in self.lines3:
-            self.ax3.draw_artist(line)                              # Set new data in ax
-
-        self.fig.canvas.blit(self.ax1.bbox)                          # Plot New data
-        self.fig.canvas.blit(self.ax2.bbox)                          # Plot New data
-        self.fig.canvas.blit(self.ax3.bbox)                          # Plot New data
+        for i in range(self.n_plot):
+            self.fig.canvas.blit(self.axes[i].bbox)                          # Plot New data
 
     def valueReloader(self, event):
         # update current values
         for i_sensor in range(len(self.df_cfg_tlm['item'])):
             self.SensorValue[i_sensor].SetLabel(str(np.round(self.df.iloc[-1, i_sensor], 2)))
-
-        print('frame counter delay = ' + str(th_smt.df_ui.iloc[-1, 2] - self.df.iloc[-1, 2]))
-        print('Time delay from udp [s] = ' + str(time.time() - th_smt.time_ui))
-        if self.flag_temp:
-            print('Time delay of Reload sensor value [s] = ' + str(time.time() - self.time_sensor))
-        self.flag_temp = True
-        self.time_sensor = time.time()
 
     def graphTest(self, event):
         self.n_graph = 0
@@ -338,7 +349,6 @@ class smt_thread(threading.Thread):
 
     def run(self):
         print('SMT Thread Launched!')
-        flag_temp = False
 
         self.NNN = 1
         while flag_GUI:
@@ -360,13 +370,9 @@ class smt_thread(threading.Thread):
             else:
                 if self.NNN % 10 == 0:
                     self.df_ui = self.smt.append_to_dataframe(self.df_ui)
-                    if flag_temp:
-                        print('Time of DataFrame Reload [s] = ' + str(time.time()-self.time_ui))
-                    flag_temp = True
-                    self.time_ui = time.time()
                     try:
                         GUI_Frame.chart_panel.df
-                    except AttributeError:
+                    except AttributeError:  # In the case of wxpython is not opened
                         GUI_Frame.chart_panel.dfReloder()
                     else:
                         wx.CallAfter(GUI_Frame.chart_panel.dfReloder)
