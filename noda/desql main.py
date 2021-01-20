@@ -24,7 +24,7 @@ from mpl_toolkits import mplot3d
 """
 Local libraries
 """
-from usrmod import tlm
+from usrmod import tlm_copy as tlm
 
 """
 Matplotlib configuration
@@ -89,6 +89,10 @@ class ChartPanel(wx.Panel):
     index_plot2 = 2  # Tth,rde(18+3)
     index_plot3 = 22  # Tcpde(19+3)
 
+    sensor_type = ['Time [s]', 'P [MPa]', 'T [K]', 'IMU', 'House Keeping']
+    n_type = np.array([3, 10, 2, 10, 6, 6, 5, 16, 6, 2])
+    # n_type = np.array([3, 10, 2, 10, 6, 6, 5, 16, 6, 2])
+
     def __init__(self, parent, reflesh_time_graph, reflesh_time_value):
         super().__init__(parent, wx.ID_ANY)
 
@@ -99,10 +103,10 @@ class ChartPanel(wx.Panel):
         self.chartGenerator()
 
         # layout time history pane
-        layout = wx.FlexGridSizer(rows=1, cols=2, gap=(20, 0))
-        layout.Add(self.canvas, flag=wx.EXPAND)
-        layout.Add(self.layout_Data, flag=wx.ALIGN_CENTER_HORIZONTAL)
-        self.SetSizer(layout)
+        self.layout = wx.FlexGridSizer(rows=1, cols=2, gap=(20, 0))
+        self.layout.Add(self.canvas, flag=wx.EXPAND)
+        self.layout.Add(self.layout_Value, flag=wx.ALIGN_CENTER_HORIZONTAL)
+        self.SetSizer(self.layout)
 
         # set refresh timer for time history pane
         self.timer_reload_graph = wx.Timer(self)
@@ -119,12 +123,16 @@ class ChartPanel(wx.Panel):
         self.df_cfg_tlm = th_smt.smt.df_cfg.copy()
         self.df_cfg_tlm.reset_index()
 
-        self.p_number = np.array(list(self.df_cfg_tlm.query('type == "p"').index))
-        self.T_number = np.array(list(self.df_cfg_tlm.query('type == "T"').index))
-        self.a_number = np.array(list(self.df_cfg_tlm.query('type == "a"').index))
-        self.omg_number = np.array(list(self.df_cfg_tlm.query('type == "omg"').index))
-        self.B_number = np.array(list(self.df_cfg_tlm.query('type == "B"').index))
-        self.EA_number = np.array(list(self.df_cfg_tlm.query('type == "EA"').index))
+        self.df_cfg_plot = pd.read_excel('./config_plot.xlsx', sheet_name='smt')
+        self.df_cfg_sensor = pd.read_excel('./config_sensor.xlsx', sheet_name='smt')
+
+        self.id_time = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'Time [s]']['ID'].astype(int)
+        self.id_p = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'P [MPa]']['ID'].astype(int)
+        self.id_T = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'T [K]']['ID'].astype(int)
+        self.id_imu = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'IMU']['ID'].astype(int)
+        self.id_hk = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'House Keeping']['ID'].astype(int)
+
+        self.id = [self.id_time, self.id_p, self.id_T, self.id_imu, self.id_hk]
 
     def dfReloder(self):
         self.df = th_smt.df_ui.copy()
@@ -153,8 +161,7 @@ class ChartPanel(wx.Panel):
 
     def valueGenerator(self):
         ''' Current value indicators '''
-        self.row_value = 11
-        self.col_value = 6
+        self.col_value = [5, 8, 8, 9, 8]
 
         # generate DataButton instances
         self.DataButton = []
@@ -163,18 +170,47 @@ class ChartPanel(wx.Panel):
 
         # set presentation of values
         self.SensorValue = []
-        for i in range(self.row_value * self.col_value):
+        for i in range(len(self.df_cfg_tlm['item'])):
             self.SensorValue.append(wx.StaticText(self, wx.ID_ANY, str(i+1), style=wx.ALIGN_CENTRE | wx.ST_NO_AUTORESIZE))
             self.SensorValue[-1].SetBackgroundColour('BLACK')
             self.SensorValue[-1].SetForegroundColour('GREEN')
 
-        # layout current value pane
-        self.layout_Data = wx.GridSizer(rows=self.row_value*2, cols=self.col_value, gap=(10,5))
-        for k in range(self.row_value):
-            for l in range(self.col_value):
-                self.layout_Data.Add(self.DataButton[self.col_value*k+l], flag=wx.EXPAND)
-            for n in range(self.col_value):
-                self.layout_Data.Add(self.SensorValue[self.col_value*k+n], flag=wx.EXPAND)
+        # layout current value panel
+        self.layout_Value = wx.BoxSizer(wx.VERTICAL)
+
+        self.sbox_type = []
+        self.sbox_font = wx.Font(15, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
+        for name in self.sensor_type:
+            self.sbox_type.append(wx.StaticBox(self, wx.ID_ANY, name))
+            self.sbox_type[-1].SetFont(self.sbox_font)
+            self.sbox_type[-1].SetForegroundColour('WHITE')
+
+        self.layout_type = []
+        for i in range(len(self.sensor_type)):
+            self.layout_type.append(wx.StaticBoxSizer(self.sbox_type[i], wx.VERTICAL))
+
+        self.layout_Data = []
+        for i in range(len(self.sensor_type)):
+            self.layout_Data.append(wx.GridSizer(rows=len(self.id[i])//self.col_value[i]+1,
+                                                 cols=self.col_value[i], gap=(10,5)))
+
+        self.layout_Set = []
+        for i in range(len(self.df_cfg_tlm['item'])):
+            self.layout_Set.append(wx.GridSizer(rows=2, cols=1, gap=(5,5)))
+
+        for i in range(len(self.df_cfg_tlm['item'])):
+            self.layout_Set[i].Add(self.DataButton[i], flag=wx.EXPAND)
+            self.layout_Set[i].Add(self.SensorValue[i], flag=wx.EXPAND)
+
+        # Set Data Button and Sensor Value
+        for i in range(len(self.sensor_type)):
+            for sensor in self.id[i]:
+                self.layout_Data[i].Add(self.layout_Set[sensor], flag=wx.EXPAND)
+
+        for i in range(len(self.sensor_type)):
+            self.layout_type[i].Add(self.layout_Data[i])
+        for i in range(len(self.sensor_type)):
+            self.layout_Value.Add(self.layout_type[i])
 
         # for button in self.DataButton:
         #     button.Bind(wx.EVT_TOGGLEBUTTON, self.graphTest)
