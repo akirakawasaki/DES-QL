@@ -11,3 +11,5 @@ kawa_smt/config_tlm.xlsx
 kawa_smt/desql.py
 kawa_smt/usrmod/tlm.py
 kawa_smt/usrmod/__pycache__/tlm.cpython-37.pyc
+kawa/tlmsvsim/pcm.bin
+kawa/tlmsvsim/smt.bin

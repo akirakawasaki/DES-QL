@@ -1,10 +1,20 @@
 import socket
-#import struct
-import sys
+import struct
 import time
 
 import numpy as np
 
+TLM_TYPE = 'smt'
+#TLM_TYPE = 'pcm'
+
+if TLM_TYPE == 'smt':
+    PORT = 49157    # smt
+    FILE_NAME = 'smt.bin'
+elif TLM_TYPE == 'pcm':
+    PORT = 49158    # pcm
+    FILE_NAME = 'pcm.bin'
+else:
+    print('Error: Type of the telemeter is wrong!')
 
 W2B = 2
 
@@ -13,27 +23,9 @@ LEN_HEADER  = 4
 LEN_PAYLOAD = 64
 LEN_MF = W2B * (LEN_HEADER + LEN_PAYLOAD) * NUM_OF_FRAMES       # 1088 bytes
 
-# initialize
-HOST = socket.gethostbyname(socket.gethostname())
-PORT = 0
-FILE_NAME = ''
-N_LB = 0
-SLP_TIME = 0
 
-TLM_TYPE = sys.argv[1]
-if TLM_TYPE == 'smt':
-    PORT = 49157
-    FILE_NAME = 'smt.bin'
-    N_LB = 67000            # smt 20201020 shortened sequence
-    SLP_TIME = 0.02
-elif TLM_TYPE == 'pcm':
-    PORT = 49158
-    FILE_NAME = 'pcm.bin'
-    N_LB = 135000           # pcm 20201020 shortened sequence
-    SLP_TIME = 0.01
-else :
-    print("ERROR: TLM_TYPE is wrong!")
-    sys.exit()
+host = socket.gethostname()
+addr = socket.gethostbyname(host)
 
 with open(FILE_NAME, 'rb') as f:
     NNN = 1
@@ -68,20 +60,18 @@ with open(FILE_NAME, 'rb') as f:
         #if NNN > 0:
         #if NNN > 67000:     # smt 20201020 shortened sequence
         #if NNN > 135000:    # pcm 20201020 shortened sequence
-        #if NNN > 55000:     # smt 20201021 full sequence
+        if NNN > 55000:     # smt 20201021 full sequence
         #if NNN > 112000:    # pcm 20201021 full sequence
         #if NNN > 600 and NNN < 1000:
-        if NNN > N_LB:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-                s.sendto(data_mf, (HOST, PORT))
+                s.sendto(data_mf, (addr, PORT))
                 
             #if NNN % 1 == 0:
             if NNN % 100 == 0:
                 print(f'data sent: NNN = {NNN}')
-
-            time.sleep(SLP_TIME)    
+                
             #time.sleep(0.01)    # pcm
-            #time.sleep(0.02)    # smt
+            time.sleep(0.02)    # smt
             #time.sleep(0.02)    # pcm safe mode
             #time.sleep(0.04)    # smt safe mode
 
