@@ -1,13 +1,14 @@
-# standard libraries
+### Standard libraries
 import decimal
 import math
 import socket
+import sys
 
-# third-party libraries
+### Third-party libraries
 import numpy as np
 import pandas as pd
 
-# local libraries
+### Local libraries
 #n/a
 
 
@@ -35,11 +36,12 @@ class tlm():
         self.TLM_TYPE = tlm_type
         #print(self.TLM_TYPE)
 
-        #self.HOST = socket.gethostname()
-        self.HOST = ''
-        #print(self.BUFSIZE)
-
+        # initialize
+        self.HOST = socket.gethostbyname(socket.gethostname())
+        self.PORT = 0
         #self.PORT = 70
+        self.DATA_PATH = ''
+
         if self.TLM_TYPE == 'smt':
             self.PORT = 49157
             self.DATA_PATH = './data_smt.csv'
@@ -47,11 +49,11 @@ class tlm():
             self.PORT = 49158
             self.DATA_PATH = './data_pcm.csv'
         else:
-            self.PORT = 0
-            self.DATA_PATH = ''
             print('Error: Type of the telemeter is wrong!')
+            sys.exit()
             
         #print(self.PORT)
+        #print(self.BUFSIZE)
 
         # load configuration
         if self.TLM_TYPE == 'smt':

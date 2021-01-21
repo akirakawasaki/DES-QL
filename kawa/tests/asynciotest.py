@@ -1,15 +1,12 @@
-# standard libraries
+### standard libraries
 import asyncio
-#import decimal
-#import math
-#import socket
-#import concurrent.futures
+import socket
+import sys
 
-# third-party libraries
-#import numpy as np
-#import pandas as pd
+### third-party libraries
+#n/a
 
-# local libraries
+### local libraries
 #n/a
 
 
@@ -17,17 +14,10 @@ import asyncio
 Constant Definition
 '''
 W2B = 2
-
 NUM_OF_FRAMES = 8
-
 LEN_HEADER  = 4
 LEN_PAYLOAD = 64
-
 BUFSIZE = W2B * (LEN_HEADER + LEN_PAYLOAD) * NUM_OF_FRAMES       # 1088 bytes
-#BUFSIZE = 1088
-#BUFSIZE = 1280
-#BUFSIZE = 2176
-
 
 class DatagramServerProtocol:
     def __init__(self,type):
@@ -35,56 +25,53 @@ class DatagramServerProtocol:
     
     def connection_made(self,transport):
         self.transport = transport
+        print("connected")
+
+    def connection_lost(self,exec):
+        print("disconnected")
 
     def datagram_received(self,data,addr):
+        print("Received a datagram from %s" % self.type)
+        
         #port = self.transport.get_extra_info('sockname')[1]     # destination port
-        #print(port)
         #print(addr)
-        #print(self.type)
+        #print(port)
 
-        if type == 'smt':
-        #if port == 49157:
-            # SMT
-            DATA_PATH = './data_smt.csv'
-        elif type == 'pcm':
-        #elif port == 49158:
-            # PCM
-            DATA_PATH = './data_pcm.csv'
-        else :
-            DATA_PATH = ''
-            print('Error: Type of the telemeter is wrong!')
+        #DATA_PATH = ''
+        #if self.type == 'smt':
+        #    DATA_PATH = './data_smt.csv'
+        #elif self.type == 'pcm':
+        #    DATA_PATH = './data_pcm.csv'
+        #else :
+        #    print('Error: Type of the telemeter is wrong!')
 
-        print(data)
+        #print(data)
 
-        '''
-        # header
-        for k in range(W2B * LEN_HEADER): 
+        for k in range(W2B * LEN_HEADER):   # header
             print(hex(data[k]).zfill(4), end=' ')
-
-        # payload
-        for j in range(4):
+        print('')   # linefeed
+        for j in range(4):                  # payload
             print(f"message {0}-{j}: ",end='')
             for k in range(W2B * int(LEN_PAYLOAD / 4)): 
                 print(hex(data[k + W2B * (LEN_HEADER + j * int(LEN_PAYLOAD / 4))]).zfill(4), end=' ')
-        
-        # linefeed
-        print('')
-        '''
+            print('')   # linefeed
+        print('')   # linefeed
 
 
 async def tlm(type):
     print("Starting UDP server for %s" % type)
 
-    #HOST = socket.gethostname()
-    HOST = 'localhost'
+    # initialize
+    HOST = socket.gethostbyname(socket.gethostname())
+    PORT = 0
 
     if type == 'smt':
         PORT = 49157
     elif type == 'pcm':
         PORT = 49158
     else :
-        PORT = 0
         print('Error: Type of the telemeter is wrong!')
+        sys.exit()
 
     # Get a reference to the event loop as we plan to use low-level APIs.
     loop = asyncio.get_running_loop()
