@@ -1,3 +1,13 @@
 .DS_Store
 kawa/.DS_Store
 kawa/usrmod/__pycache__/tlm.cpython-37.pyc
+kawa_pcm/.DS_Store
+kawa_pcm/config_tlm.xlsx
+kawa_pcm/data_pcm.xlsx
+kawa_pcm/desql.py
+kawa_pcm/usrmod/tlm.py
+kawa_pcm/usrmod/__pycache__/tlm.cpython-37.pyc
+kawa_smt/config_tlm.xlsx
+kawa_smt/desql.py
+kawa_smt/usrmod/tlm.py
+kawa_smt/usrmod/__pycache__/tlm.cpython-37.pyc

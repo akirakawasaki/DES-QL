@@ -47,7 +47,10 @@ class tlm():
             self.PORT = 49158
             self.DATA_PATH = './data_pcm.csv'
         else:
+            self.PORT = 0
+            self.DATA_PATH = ''
             print('Error: Type of the telemeter is wrong!')
+            
         #print(self.PORT)
 
         # load configuration
