@@ -188,13 +188,16 @@ if __name__ =="__main__":
     #frame.Show()
     #app.MainLoop()
 
-    flag_GUI = True
+    #flag_GUI = True
 
     app = wx.App()
-    frame = frmMain()
+    
+    #frame = frmMain()
+    frmMain()
     print('wxPytho Launched!')
+    
     app.MainLoop()
 
-    flag_GUI = False
+    #flag_GUI = False
 
     print('... DES QL quitted normally')

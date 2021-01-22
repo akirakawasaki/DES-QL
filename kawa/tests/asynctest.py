@@ -4,7 +4,8 @@ import asyncio
 import math
 import socket
 import sys
-import concurrent.futures
+import time
+#import concurrent.futures
 
 ### Third-party libraries
 import numpy as np
@@ -21,7 +22,9 @@ import wx.lib.plot as plt
 '''
 Global Variables
 '''
-F_GUI_TERMINATED = False
+#F_GUI_TERMINATED = False
+#dfSmtData = pd.DataFrame()
+#dfPcmData = pd.DataFrame()
 
 '''
 Constant Definition
@@ -34,8 +37,11 @@ BUFSIZE = W2B * (LEN_HEADER + LEN_PAYLOAD) * NUM_OF_FRAMES       # 1088 bytes
 
 
 class DatagramServerProtocol:
-    def __init__(self,type):
+    def __init__(self, type, sData):
         self.type = type
+        self.sData = sData
+        #self.dfTlmData = pd.DataFrame()
+        self.NNN = 0
     
     def connection_made(self,transport):
         self.transport = transport
@@ -45,16 +51,19 @@ class DatagramServerProtocol:
         print("disconnected")
 
     def datagram_received(self,data,addr):
-        print("Received a datagram from %s" % self.type)
+        #print("Received a datagram from %s" % self.type)
 
         DATA_PATH = ''
         if self.type == 'smt':
             DATA_PATH = './data_smt.csv'
+            self.sData.dfSmtData = pd.DataFrame(columns=['User_ID', str(self.NNN), self.type], index=['a', 'b', 'c'])
         elif self.type == 'pcm':
             DATA_PATH = './data_pcm.csv'
+            self.sData.dfPcmData = pd.DataFrame(columns=['User_ID', str(self.NNN), self.type], index=['a', 'b', 'c'])
         else :
             print('Error: Type of the telemeter is wrong!')
 
+        '''
         for k in range(W2B * LEN_HEADER):   # header
             print(hex(data[k]).zfill(4), end=' ')
         print('')   # linefeed
@@ -64,9 +73,13 @@ class DatagramServerProtocol:
                 print(hex(data[k + W2B * (LEN_HEADER + j * int(LEN_PAYLOAD / 4))]).zfill(4), end=' ')
             print('')   # linefeed
         print('')   # linefeed
+        '''
+
+        self. NNN += 1
+        #self.dfTlmData = pd.DataFrame(columns=['User_ID', str(self.NNN), self.type], index=['a', 'b', 'c'])
 
 
-async def tlm(type):
+async def tlm(type, sData):
     print("Starting UDP server for %s" % type)
 
     # initialize
@@ -86,8 +99,21 @@ async def tlm(type):
 
     # One protocol instance will be created to serve all client requests.
     transport, protocol = await loop.create_datagram_endpoint(
-        lambda: DatagramServerProtocol(type),
-        local_addr=(HOST,PORT))
+                                    lambda: DatagramServerProtocol(type, sData),
+                                    local_addr=(HOST,PORT))
+
+    '''
+    while True:
+        if type == 'smt':
+            dfSmtData = protocol.dfTlmData
+        elif type == 'pcm':
+            dfPcmData = protocol.dfTlmData
+        
+        await asyncio.sleep(0.1)
+    '''
+
+    #return protocol.dfTlmData
+    return (transport, protocol)
 
     #try:
     #    await asyncio.sleep(3600)  # Serve for 1 hour.
@@ -100,7 +126,7 @@ wxPython configurations
 """
 REFLESH_RATE_PLOTTER = 20
 #REFLESH_RATE_PLOTTER = 1000
-REFLESH_RATE_DIGITAL_INDICATOR = 450
+REFLESH_RATE_DIGITAL_INDICATOR = 2000
 
 """
 Test data generatiton
@@ -118,10 +144,12 @@ xy1_val = list(zip(x1_val, y1_val))
 Main Frame
 """
 class frmMain(wx.Frame):
-    def __init__(self, parent=None, id=-1, title='DES Quick Look', size=(1000,1000)):
+    def __init__(self, sData):
         # inherit super class
-        super().__init__(parent, id, title, size)
-        #super().__init__(parent=None, id=-1, title='DES Quick Look',size=(500,500))
+        #super().__init__(parent, id, title, size)
+        super().__init__(parent=None, id=-1, title='DES Quick Look',size=(800,800))
+
+        self.sData = sData
 
         self.SetBackgroundColour('Dark Grey')
         #self.Maximize(True)
@@ -184,7 +212,7 @@ class frmMain(wx.Frame):
         if retval == wx.ID_OK:  self.Destroy()
         '''
 
-        F_GUI_TERMINATED = True
+        #F_GUI_TERMINATED = True
 
     # event handler: EVT_TIMER1
     def OnRefreshPlotter(self, event):
@@ -203,42 +231,52 @@ class frmMain(wx.Frame):
 
     # event handler: EVT_TIMER2
     def OnRefreshDigitalIndicator(self, event):
-        pass
+        print(self.sData.dfSmtData)
+        print(self.sData.dfPcmData)
+        
+        #pass
 
 
-def gui_main():
+def gui_main(sData):
     #flag_GUI = True
-
+   
     app = wx.App()
-    frame = frmMain()
+    #frmMain(dfSmtData, dfPcmData)
+    frmMain(sData)
     print('wxPytho Launched!')
     app.MainLoop()
 
     #flag_GUI = False
 
-    print('... DES QL quitted normally')
+
+class sharedData:
+    def __init__(self):
+        self.dfSmtData = pd.DataFrame()
+        self.dfPcmData = pd.DataFrame()
 
 
 if __name__ == "__main__":
-    
-    
+    sData = sharedData()
+
     #asyncio uses event loops to manage its operation
     loop = asyncio.get_event_loop()
 
     # multi-thread executor 
-    executor = concurrent.futures.ThreadPoolExecutor()
-    loop.set_default_executor(executor)
+    #executor = concurrent.futures.ThreadPoolExecutor()
+    #loop.set_default_executor(executor)
 
     # Create coroutines for three asyncronous tasks
     gathered_coroutines = asyncio.gather(
-        tlm("smt"),
-        tlm("pcm"),
-        loop.run_in_executor(None, gui_main))
+        tlm("smt", sData),
+        tlm("pcm", sData),
+        loop.run_in_executor(None, gui_main, sData))
 
     # This is the entry from synchronous to asynchronous code
     # It will block until the coroutine passed in has completed
-    #loop.run_forever(gathered_coroutines)
-    loop.run_until_complete(gathered_coroutines)
-    
+    results = loop.run_until_complete(gathered_coroutines)
+    print(results)
+
     # We're done with the event loop
     loop.close()
+
+    print('... DES QL quitted normally')
