@@ -53,12 +53,12 @@ class DatagramServerProtocol:
     def datagram_received(self,data,addr):
         #print("Received a datagram from %s" % self.type)
 
-        DATA_PATH = ''
+        #DATA_PATH = ''
         if self.type == 'smt':
-            DATA_PATH = './data_smt.csv'
+            #DATA_PATH = './data_smt.csv'
             self.sData.dfSmtData = pd.DataFrame(columns=['User_ID', str(self.NNN), self.type], index=['a', 'b', 'c'])
         elif self.type == 'pcm':
-            DATA_PATH = './data_pcm.csv'
+            #DATA_PATH = './data_pcm.csv'
             self.sData.dfPcmData = pd.DataFrame(columns=['User_ID', str(self.NNN), self.type], index=['a', 'b', 'c'])
         else :
             print('Error: Type of the telemeter is wrong!')
@@ -158,7 +158,8 @@ class frmMain(wx.Frame):
         # Parts on frmMain
         #
         # panel
-        pnlMain = wx.Panel(self,-1)
+        wx.Panel(self,-1)
+        #pnlMain = wx.Panel(self,-1)
         #pnlMain = wx.Panel(self,id=wx.ID_ANY,pos=wx.DefaultPosition,size=wx.DefaultSize)
 
         #
