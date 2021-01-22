@@ -19,6 +19,11 @@ import wx.lib.plot as plt
 
 
 '''
+Global Variables
+'''
+F_GUI_TERMINATED = False
+
+'''
 Constant Definition
 '''
 W2B = 2
@@ -84,10 +89,10 @@ async def tlm(type):
         lambda: DatagramServerProtocol(type),
         local_addr=(HOST,PORT))
 
-    try:
-        await asyncio.sleep(3600)  # Serve for 1 hour.
-    finally:
-        transport.close()
+    #try:
+    #    await asyncio.sleep(3600)  # Serve for 1 hour.
+    #finally:
+    #    transport.close()
 
 
 """
@@ -179,6 +184,8 @@ class frmMain(wx.Frame):
         if retval == wx.ID_OK:  self.Destroy()
         '''
 
+        F_GUI_TERMINATED = True
+
     # event handler: EVT_TIMER1
     def OnRefreshPlotter(self, event):
         # update plot data
@@ -213,6 +220,8 @@ def gui_main():
 
 
 if __name__ == "__main__":
+    
+    
     #asyncio uses event loops to manage its operation
     loop = asyncio.get_event_loop()
 
@@ -220,14 +229,16 @@ if __name__ == "__main__":
     executor = concurrent.futures.ThreadPoolExecutor()
     loop.set_default_executor(executor)
 
-    #Create coroutines for three tables
+    # Create coroutines for three asyncronous tasks
     gathered_coroutines = asyncio.gather(
         tlm("smt"),
         tlm("pcm"),
         loop.run_in_executor(None, gui_main))
 
-    #This is the entry from synchronous to asynchronous code. It will block ntil the coroutine passed in has completed
+    # This is the entry from synchronous to asynchronous code
+    # It will block until the coroutine passed in has completed
+    #loop.run_forever(gathered_coroutines)
     loop.run_until_complete(gathered_coroutines)
     
-    #We're done with the event loop
+    # We're done with the event loop
     loop.close()
