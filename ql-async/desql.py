@@ -20,9 +20,9 @@ import wx
 #from matplotlib.figure import Figure
 
 ### Local libraries
-from usrmod import asynctlm
-from usrmod import gui
-from usrmod import shared_variables
+from ./usrmod import asynctlm
+from ./usrmod import gui
+from ./usrmod import shared_variables
 
 
 #
