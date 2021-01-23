@@ -4,7 +4,7 @@
 #import math
 #import socket
 #import sys
-#import concurrent.futures
+import time
 
 ### Third-party libraries
 import numpy as np
@@ -26,9 +26,11 @@ from matplotlib.figure import Figure
 """
 wxPython configurations
 """
+FETCH_RATE_LATEST_VALUES = 200          # ms/cycle
 #REFLESH_RATE_PLOTTER = 20               # ms/cycle
 REFLESH_RATE_PLOTTER = 1000             # ms/cycle
 REFLESH_RATE_DIGITAL_INDICATOR = 450    # ms/cycle
+
 
 """
 Matplotlib configuration
@@ -42,33 +44,42 @@ plt.rcParams["figure.subplot.right"] = 0.97     # Right Margin
 
 plt.rcParams["figure.subplot.hspace"] = 0.30    # Height Margin between subplots
 
+
 """
 Top Level Window
 """
 class frmMain(wx.Frame):
-    def __init__(self):
+    def __init__(self, latest_values):
         super().__init__(None, wx.ID_ANY, 'Rocket System Information App')
 
-        self.Maximize(True)     # Maxmize GUI window size
+        # receive instance of shared variables
+        #self.latest_values = latest_values
+
+        # maxmize GUI window size
+        self.Maximize(True)
 
         self.SetBackgroundColour('Dark Grey')
         #self.SetBackgroundColour('Black')
 
-        # Making Main Graphic
+        # generate Main Graphic
         root_panel = wx.Panel(self, wx.ID_ANY)
 
-        # System panel : Show the feeding system status
-        self.chart_panel = ChartPanel(root_panel)
+        # ??? System panel : Show the feeding system status
+        self.chart_panel = ChartPanel(root_panel, latest_values)
 
-        # Set layout of panels
+        # set layout of panels
         root_layout = wx.GridBagSizer()
         root_layout.Add(self.chart_panel, pos=wx.GBPosition(0,0), flag=wx.EXPAND | wx.ALL, border=10)
 
         root_panel.SetSizer(root_layout)
         root_layout.Fit(root_panel)
 
-        # Bind events
+        # bind events
         self.Bind(wx.EVT_CLOSE, self.OnClose)
+
+        # show
+        self.Show()
+
 
     # Event handler: EVT_CLOSE
     def OnClose(self, event):
@@ -80,126 +91,157 @@ class frmMain(wx.Frame):
         dig.Destroy()
         if result == wx.ID_OK:  self.Destroy()
 
+
 """
 Time History Plots & Current Value Indicators
 """
 class ChartPanel(wx.Panel):
     index_x = 1
-    t_range = 30    # [s]
+    __T_RANGE = 30    # [s]
 
     n_plot = 5
 
     sensor_type = ['Time [s]', 'P [MPa]', 'T [K]', 'IMU', 'House Keeping']
     col_value = [6, 8, 8, 9, 8]
 
-    def __init__(self, parent):
+    def __init__(self, parent, latest_values):
         super().__init__(parent, wx.ID_ANY)
 
-        # load configurations from external files
-        self.load_configurations()
-        #self.flag_temp = True
+        ### initialize
+        self.latest_values = latest_values      # receive instance of shared variables
+        self.__F_TLM_IS_ACTIVE = False
+        self.dfTlm = pd.DataFrame()
+        
+        ### load configurations from external files
+        # - smt&pcm config
+        #self.df_cfg_tlm = th_smt.smt.df_cfg.copy()
+        self.df_cfg_tlm = pd.read_excel('./config_tlm.xlsx', sheet_name='smt').dropna(how='all')
+        #self.df_cfg_smt = pd.read_excel('./config_tlm.xlsx', sheet_name='smt')
+        self.df_cfg_pcm = pd.read_excel('./config_tlm.xlsx', sheet_name='pcm').dropna(how='all')
 
-        # configure appearance
+        self.df_cfg_tlm.reset_index()
+        #self.df_cfg_smt.reset_index()
+        self.df_cfg_pcm.reset_index()
+
+        # - digital indicator config
+        self.load_config_digital_indicator()
+
+        # - plotter config
+        self.load_config_plotter()
+
+        ### configure appearance
         self.configure_digital_indicator()
         self.configure_plotter()
 
-        # layout plotters and digital indicators
+        ### layout 
         self.layout = wx.FlexGridSizer(rows=1, cols=2, gap=(20, 0))
         self.layout.Add(self.canvas, flag=wx.EXPAND)                            # plotter
         self.layout.Add(self.layout_Value, flag=wx.ALIGN_CENTER_HORIZONTAL)     # digital indicators
         self.SetSizer(self.layout)
 
-        # bind events
-        # set refresh timer for current value pane
+        ### bind events
+        # - set timer to fetch latest telemeter data
+        self.tmrFetchTelemeterData = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self.OnFetchLatestValues, self.tmrFetchTelemeterData)
+        self.tmrFetchTelemeterData.Start(FETCH_RATE_LATEST_VALUES)
+
+        # - set timer to refresh current-value pane
         self.tmrRefreshDigitalIndicator = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.OnRefreshDigitalIndicator, self.tmrRefreshDigitalIndicator)
-        self.timer_reload_value.Start(REFLESH_RATE_DIGITAL_INDICATOR)
+        self.tmrRefreshDigitalIndicator.Start(REFLESH_RATE_DIGITAL_INDICATOR)
 
-        # set refresh timer for time history pane
+        # - set timer to refresh time-history pane
         self.tmrRefreshPlotter = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.OnRefreshPlotter, self.tmrRefreshPlotter)
         self.tmrRefreshPlotter.Start(REFLESH_RATE_PLOTTER)
 
     # Event handler: EVT_TIMER
-    def OnRefreshDigitalIndicator(self, event):
-        # fetch current values
-        dfCurrentValues = 
+    def OnFetchLatestValues(self, event):
+        if len(self.latest_values.df_smt.index) == 0:
+            # print("GUI awaiting tlm data")
+            self.__F_TLM_IS_ACTIVE = False
+            return None
+        
+        # for debug
+        print("GUI: df.index length = %i" % len(self.latest_values.df_smt.index))
+        # print(self.latest_values.df_smt) 
 
-        # refresh display
-        for i_sensor in range(len(self.df_cfg_tlm['item'])):
-            self.SensorValue[i_sensor].SetLabel(str(np.round(dfCurrentValues.iloc[-1, i_sensor], 2)))
+        self.__F_TLM_IS_ACTIVE = True
+
+        # fetch current values & store
+        self.dfTlm = self.latest_values.df_smt
+        # TBREFAC.: should be thread-safe
 
     # Event handler: EVT_TIMER
-    def OnRefreshPlotter(self, event):
-        # fetch current values
-
+    def OnRefreshDigitalIndicator(self, event):
+        if self.__F_TLM_IS_ACTIVE == False: return None     # skip refresh
         
-        try:
-            self.data_past
-        except AttributeError:
-            self.data_plot = self.df.values
-        else:
-            self.data_plot = np.append(self.data_past, self.df.values, axis=0)
+        # obtain time slice of dfTlm to avoid unexpected rewrite during refresh
+        df_tmp = self.dfTlm.copy()
+        
+        # refresh display
+        for i_sensor in range(len(self.df_cfg_tlm['item'])):
+            self.SensorValue[i_sensor].SetLabel(str(np.round(df_tmp.iloc[-1, i_sensor], 2)))
+            
+    # Event handler: EVT_TIMER
+    def OnRefreshPlotter(self, event):
+        if self.__F_TLM_IS_ACTIVE == False: return None     # skip refresh
 
-        t_temp = self.df.iloc[-1, self.index_x]
-        if t_temp >= self.t_left + self.t_range:
-            self.lines = []
+        ### update data set for plot
+        # - obtain time slice of dfTlm by deep copy to avoid unexpected rewrite during refresh
+        df_tmp = self.dfTlm.copy()
 
-            for i in range(self.n_plot):
-                self.axes[i].cla()
-
-            self.t_left = t_temp - self.t_range / 3
-            for i in range(self.n_plot):
-                self.axes[i].set_xlim([self.t_left, self.t_left + self.t_range])
-
-            for i in range(self.n_plot):
-                self.axes[i].set_ylim([self.y_min_plot[i], self.y_max_plot[i]])
-
-            # draw alert line
-            self.axes[0].axhline(y=1.0, xmin=0, xmax=1, color='red')
-            """
-            self.axes[1].axhline(y=500.0, xmin=0, xmax=1, color='red')
-            self.axes[2].axhline(y=500.0, xmin=0, xmax=1, color='red')
-            """
-
-            for i in range(self.n_plot):
-                self.axes[i].set_ylabel(self.item_plot[i] + ' [{}]'.format(self.unit_plot[i]))
-
-            self.canvas.draw()
-            for i in range(self.n_plot):
-                self.backgrounds[i] = self.canvas.copy_from_bbox(self.axes[i].bbox)  # Save Empty Chart Format as Background
-
-            for i in range(self.n_plot):
-                self.lines.append(self.axes[i].plot(self.data_plot[::2, self.index_x],
-                                                    self.data_plot[::2, self.index_plot[i]])[0])
-
-        else:
-            for i in range(self.n_plot):
-                self.lines[i].set_data(self.data_plot[::2, self.index_x],
-                                       self.data_plot[::2, self.index_plot[i]])
-            #print(self.df.shape)
-
-        # Re-draw plotter
-        # MARKED TO BE REFACTOR #
+        # - append latest values
+        self.x_series = np.append(self.x_series, df_tmp.iloc[-1,self.index_x])
         for i in range(self.n_plot):
-            self.canvas.restore_region(self.backgrounds[i])     # Re-plot Background (i.e. Delete line)
+            self.y_series[i] = np.append(self.y_series[i], df_tmp.iloc[-1,self.index_plot[i]])
 
-        for i in range(self.n_plot):
-            self.axes[i].draw_artist(self.lines[i])             # Set new data in ax
+        # - determine time max & min
+        t_max = self.x_series[-1]
+        t_min = t_max - self.__T_RANGE
 
+        # - delete items out of the designated time range
+        while self.x_series[0] < t_min:
+            self.x_series = np.delete(self.x_series, 0)
+
+        ### refresh plotter
+        # TBREFAC.: for-loops should be merged?
+        # - delete x axes and lines by restroring canvas
         for i in range(self.n_plot):
-            self.fig.canvas.blit(self.axes[i].bbox)             # Plot New data
+            self.canvas.restore_region(self.backgrounds[i])     
+
+        # - update x axis (time axis)
+        for i in range(self.n_plot):
+            self.axes[i].set_xlim([self.t_min, self.t_max])
+        
+        # - update lines
+        for i in range(self.n_plot):
+            self.lines[i].set_data(self.x_series, self.y_series[i])
+
+        # - prepare drawing of new lines
+        for i in range(self.n_plot):
+            self.axes[i].draw_artist(self.lines[i])             
+
+        # - redraw canvas by blitting
+        for i in range(self.n_plot):
+            self.fig.canvas.blit(self.axes[i].bbox)             
 
     # Load configurations from external files
-    def load_configurations(self):
-        # Load smt&pcm config
-        #self.df_cfg_tlm = th_smt.smt.df_cfg.copy()
-        self.df_cfg_smt = pd.read_excel('./config_tlm.xlsx', sheet_name='smt')
-        self.df_cfg_pcm = pd.read_excel('./config_tlm.xlsx', sheet_name='pcm')
+    def load_config_digital_indicator(self):
+        # Load digital indicator appearance config
+        self.df_cfg_sensor = (pd.read_excel('./config_sensor.xlsx', sheet_name='smt')).dropna(how='all')
 
-        self.df_cfg_smt.reset_index()
-        self.df_cfg_pcm.reset_index()
+        self.id_time = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'Time [s]']['ID'].astype(int)
+        self.id_p = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'P [MPa]']['ID'].astype(int)
+        self.id_T = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'T [K]']['ID'].astype(int)
+        self.id_imu = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'IMU']['ID'].astype(int)
+        self.id_hk = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'House Keeping']['ID'].astype(int)
 
+        self.id = [self.id_time, self.id_p, self.id_T, self.id_imu, self.id_hk]
+
+
+    # Load configurations from external files
+    def load_config_plotter(self):  
         # Load plotter appearance config
         self.df_cfg_plot = (pd.read_excel('./config_plot.xlsx', sheet_name='smt')).dropna(how='all')
 
@@ -237,35 +279,6 @@ class ChartPanel(wx.Panel):
                            self.df_cfg_plot['y_max'][self.df_cfg_plot['plot_4'].astype(bool)].iat[0],
                            self.df_cfg_plot['y_max'][self.df_cfg_plot['plot_5'].astype(bool)].iat[0]]
         #print(self.y_max_plot)
-
-        # Load sensor config
-        self.df_cfg_sensor = (pd.read_excel('./config_sensor.xlsx', sheet_name='smt')).dropna(how='all')
-
-        self.id_time = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'Time [s]']['ID'].astype(int)
-        self.id_p = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'P [MPa]']['ID'].astype(int)
-        self.id_T = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'T [K]']['ID'].astype(int)
-        self.id_imu = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'IMU']['ID'].astype(int)
-        self.id_hk = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'House Keeping']['ID'].astype(int)
-
-        self.id = [self.id_time, self.id_p, self.id_T, self.id_imu, self.id_hk]
-
-    # Update df
-    '''
-    def dfReloder(self):
-        try:
-            self.df
-        except AttributeError:  # In the case of wxpython is not opened
-            pass
-        else:
-            if th_smt.df_ui.shape[0] < self.df.shape[0]:
-                if self.flag_temp:
-                    self.data_past = self.df.values
-                    self.flag_temp = False
-                else:
-                    self.data_past = np.append(self.data_past[-200:], self.df.values, axis=0)
-                print('Reload data_plot : ' + str(self.data_past.shape))
-        self.df = th_smt.df_ui.copy()
-    '''
 
     # Configure appearance for digital indicators to display current values
     def configure_digital_indicator(self):
@@ -324,45 +337,72 @@ class ChartPanel(wx.Panel):
         # for button in self.DataButton:
         #     button.Bind(wx.EVT_TOGGLEBUTTON, self.graphTest)
 
+
     # Configure appearance for plotters to display time histories
     def configure_plotter(self):
+        # initialize
+        #self.data_plot = np.ndarray()
+        self.x_series = np.empty(0)
+        self.y_series = np.empty(0)
+        self.lines = np.empty(0)
+        # for i in range(self.n_plot):
+        #     self.y_series[i] = np.empty(0)
+        #     self.lines[i] = np.empty(0)
+        # self.x_series = []
+        # self.y_series = []
+        # self.lines = []
+        
+        # prepare empty matplotlib Fugure
         self.fig = Figure(figsize=(6, 8))
-        
-        self.axes = []
-        for i in range(self.n_plot):
-            self.axes.append(self.fig.add_subplot(self.n_plot, 1, i+1))
-        
+
+        # register Figure with matplotlib Canvas
         self.canvas = FigureCanvasWxAgg(self, -1, self.fig)
 
+        # prepare axes
+        self.axes = []
+
+        # - add subplots containing axes to Figure
+        for i in range(self.n_plot):
+            self.axes.append(self.fig.add_subplot(self.n_plot, 1, i+1))        
+
+        # - set limit for y axis 
         for i in range(self.n_plot):
             self.axes[i].set_ylim([self.y_min_plot[i], self.y_max_plot[i]])
 
+        # - set label for y axis
         for i in range(self.n_plot):
             self.axes[i].set_ylabel(self.item_plot[i] + ' [{}]'.format(self.unit_plot[i]))
 
-        self.t_left = 0
-        for i in range(self.n_plot):
-            self.axes[i].set_xlim([self.t_left, self.t_left + self.t_range])
+        # - set limit for x axis
+        # self.t_left = 0
+        # for i in range(self.n_plot):
+        #     self.axes[i].set_xlim([self.t_left, self.t_left + self.t_range])
+        ### "DYNAMIC" X AXIS IS TO BE PREPARED UPON UPDATE ###
 
-        # Plot Empty Chart
+        # - set alert line
+        self.axes[0].axhline(y=1.0, xmin=0, xmax=1, color='red')
+        # self.axes[1].axhline(y=500.0, xmin=0, xmax=1, color='red')
+        # self.axes[2].axhline(y=500.0, xmin=0, xmax=1, color='red')
+
+        # tentatively draw chart without x axis and plots
         self.canvas.draw()                                            
 
-        # Save Empty Chart Format as Background
+        # save empty chart format as background
         self.backgrounds = []
         for i in range(self.n_plot):
             self.backgrounds.append(self.canvas.copy_from_bbox(self.axes[i].bbox))  
 
-    '''
-    def graphTest(self, event):
-        self.n_graph = 0
-        self.parameter = []
-        for button in self.DataButton:
-            if button.GetValue():
-                self.n_graph += 1
-                self.parameter.append(button.GetLabel())
 
-        print(self.n_graph)
-        print(self.parameter)
-        self.chartGenerator(self.n_graph)
-    '''
+    # def graphTest(self, event):
+    #     self.n_graph = 0
+    #     self.parameter = []
+    #     for button in self.DataButton:
+    #         if button.GetValue():
+    #             self.n_graph += 1
+    #             self.parameter.append(button.GetLabel())
+
+    #     print(self.n_graph)
+    #     print(self.parameter)
+    #     self.chartGenerator(self.n_graph)
+
 

@@ -13,3 +13,10 @@ kawa_smt/usrmod/tlm.py
 kawa_smt/usrmod/__pycache__/tlm.cpython-37.pyc
 kawa/tlmsvsim/pcm.bin
 kawa/tlmsvsim/smt.bin
+kawa/.DS_Store
+.gitignore
+noda/usrmod/__pycache__/tlm.cpython-38.pyc
+ql-async/dir/__pycache__/asynctlm.cpython-38.pyc
+ql-async/dir/__pycache__/common.cpython-38.pyc
+ql-async/dir/__pycache__/gui.cpython-38.pyc
+noda/usrmod/__pycache__/tlm.cpython-38.pyc

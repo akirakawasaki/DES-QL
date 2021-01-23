@@ -1,11 +1,11 @@
 ### Standard libraries
 import asyncio
+import concurrent.futures
 #import decimal
 import math
 import socket
 import sys
 import time
-#import concurrent.futures
 
 ### Third-party libraries
 import numpy as np
@@ -263,7 +263,8 @@ if __name__ == "__main__":
     loop = asyncio.get_event_loop()
 
     # multi-thread executor 
-    #executor = concurrent.futures.ThreadPoolExecutor()
+    #executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    #executor = concurrent.futures.ThreadPoolExecutor(max_workers=None)
     #loop.set_default_executor(executor)
 
     # Create coroutines for three asyncronous tasks
@@ -271,6 +272,7 @@ if __name__ == "__main__":
         tlm("smt", sData),
         tlm("pcm", sData),
         loop.run_in_executor(None, gui_main, sData))
+    # gui_main(sData)
 
     # This is the entry from synchronous to asynchronous code
     # It will block until the coroutine passed in has completed
