@@ -21,16 +21,16 @@ from matplotlib.figure import Figure
 
 
 ### wxPython configurations
-REFLESH_RATE_PLOTTER = 50
+REFLESH_RATE_PLOTTER = 200
 # REFLESH_RATE_PLOTTER = 1000
 # REFLESH_RATE_DIGITAL_INDICATOR = 450
 
 ### Matplotlib configuration
 plt.style.use('dark_background')
 
-#plt.rcParams["figure.subplot.bottom"] = 0.07    # Bottom Margin
+# plt.rcParams["figure.subplot.bottom"] = 0.07    # Bottom Margin
 plt.rcParams["figure.subplot.top"] = 0.97       # Top Margin
-#plt.rcParams["figure.subplot.left"] = 0.1       # Left Margin
+# plt.rcParams["figure.subplot.left"] = 0.1       # Left Margin
 plt.rcParams["figure.subplot.right"] = 0.97     # Right Margin
 
 plt.rcParams["figure.subplot.hspace"] = 0.30    # Height Margin between subplots
@@ -41,14 +41,14 @@ plt.rcParams["figure.subplot.hspace"] = 0.30    # Height Margin between subplots
 #
 
 # served as time in [s]
-x_val = list(map(lambda y: y/1.0, range(10000)))
+x_val = list(map(lambda y: y/10.0, range(10000)))
 
 # pseudo-data (series 1: sinusoidal)
 y1_val = list(map(lambda y: 2.0 * math.sin(y/5.0) + 2.0, x_val))    # 0 < y < 4
 # xy1_val = list(zip(x_val, y1_val))
 
 # pseudo-data (series 2: random)
-y2_val = list(map(lambda y: 4.0 * random.random(), x_val))          # 0 < y < 4
+y2_val = list(map(lambda y: 3.0 * random.random(), x_val))          # 0 < y < 3
 # xy2_val = list(zip(x_val, y2_val))
 
 
@@ -67,12 +67,6 @@ class frmMain(wx.Frame):
 
         # generate panel
         self.pnlMain = MainPanel(self)
-
-        # # generate Main Graphic
-        # root_panel = wx.Panel(self, wx.ID_ANY)
-
-        # # ??? System panel : Show the feeding system status
-        # self.chart_panel = ChartPanel(root_panel, latest_values)
 
         # layout panels
         #lytRoot = wx.GridBagSizer()
@@ -157,8 +151,8 @@ class MainPanel(wx.Panel):
             self.y2_series = np.delete(self.y2_series, 0)
             # self.y_series = np.delete(self.y_series, self.__N_PLOT)
 
-        # emty lines
-        self.lines = []
+        # delete x axis and lines by restroring canvas
+        self.canvas.restore_region(self.backgrounds[0])
 
         # clear axes
         self.axes[0].cla()
@@ -167,40 +161,39 @@ class MainPanel(wx.Panel):
         self.axes[0].set_xlim([t_min, t_max])
 
         # set limit for y axis
-        self.axes[0].set_ylim([self.y_min[1], self.y_max[1]])
+        self.axes[0].set_ylim([self.y_min[0], self.y_max[0]])
+
+        # set label for y axis
+        self.axes[0].set_ylabel(self.y_label[0])
 
         # update alert line
         self.axes[0].axhline(y=1.0, xmin=0, xmax=1, color='red')
         # self.axes[1].axhline(y=500.0, xmin=0, xmax=1, color='red')
 
-        # set label for y axis
-        self.axes[0].set_ylabel(self.y_label[1])
-
         # tentative draw
-        self.canvas.draw()
+        #self.canvas.draw()
 
         # save the empty canvas as background
-        self.backgrounds[0] = self.canvas.copy_from_bbox(self.axes[0].bbox)
+        #self.backgrounds[0] = self.canvas.copy_from_bbox(self.axes[0].bbox)
         
-        # *** add prepared axes to lines
+        # update lines by prepared axes
+        # NOTE: lines become iterrable hereafter
+        self.lines = []
         self.lines.append(self.axes[0].plot(self.x_series, self.y1_series)[0])
      
-        # delete x axis and lines by restroring canvas
-        self.canvas.restore_region(self.backgrounds[0])
-
         # reflect updates in lines
         self.axes[0].draw_artist(self.lines[0])
 
         # redraw and show updated canvas
         self.fig.canvas.blit(self.axes[0].bbox)
-        # self.fig.canvas.flush_events()
+        self.fig.canvas.flush_events()
         print("GUI PLT: redraw plots...")
 
     # Load configurations from external files
     def load_config_plotter(self):          
         self.y_label = ["Series 1", "Series 2"]
         self.y_min = [0.0, 0.0]
-        self.y_max = [4.0, 4.0]
+        self.y_max = [4.0, 3.0]
         
         # self.item_plot = [self.df_cfg_plot['item'][self.df_cfg_plot['plot_1'].astype(bool)].iat[0],
         #                   self.df_cfg_plot['item'][self.df_cfg_plot['plot_2'].astype(bool)].iat[0]]
@@ -214,13 +207,12 @@ class MainPanel(wx.Panel):
         self.y2_series = np.empty(0)
 
         # prepare empty matplotlib Fugure
-        self.fig = Figure(figsize=(6, 8))
+        self.fig = Figure(figsize=(8, 8))
         
         ### prepare axes
-        # - initialize
+        # - generate subplots containing axes in Figure
+        # NOTE: axes become iterrable hereafter
         self.axes = []
-        
-        # - *** add subplots containing axes to Figure
         self.axes.append(self.fig.add_subplot(1, 1, 1))
         
         # register Figure with matplotlib Canvas
@@ -229,20 +221,21 @@ class MainPanel(wx.Panel):
         # return None     # for debug
 
         # - set limit for y axis
-        self.axes[0].set_ylim([self.y_min[1], self.y_max[1]])
+        self.axes[0].set_ylim([self.y_min[0], self.y_max[0]])
 
         # - set label for y axis
-        self.axes[0].set_ylabel(self.y_label[1])
+        self.axes[0].set_ylabel(self.y_label[0])
 
         # - set limit for x axis
-        ## "DYNAMIC" X AXIS IS TO BE PREPARED UPON UPDATE ###
+        # "DYNAMIC" X AXIS IS TO BE PREPARED UPON UPDATE ###
         t_min = 0
         self.axes[0].set_xlim([t_min, t_min + self.__T_RANGE])
 
-        # tentatively draw canvas without plot points
+        # tentatively draw canvas without plot points to save as background
         self.canvas.draw()                                            
 
         # save the empty canvas as background
+        # NOTE: backgrounds become iterrable hereafter
         self.backgrounds = []
         self.backgrounds.append(self.canvas.copy_from_bbox(self.axes[0].bbox))
 
