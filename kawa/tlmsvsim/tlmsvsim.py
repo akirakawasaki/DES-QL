@@ -25,12 +25,12 @@ if TLM_TYPE == 'smt':
     PORT = 49157
     FILE_NAME = 'smt.bin'
     N_LB = 67000            # smt 20201020 shortened sequence
-    SLP_TIME = 0.02
+    SLP_TIME = 0.01
 elif TLM_TYPE == 'pcm':
     PORT = 49158
     FILE_NAME = 'pcm.bin'
     N_LB = 135000           # pcm 20201020 shortened sequence
-    SLP_TIME = 0.01
+    SLP_TIME = 0.005
 else :
     print("ERROR: TLM_TYPE is wrong!")
     sys.exit()
