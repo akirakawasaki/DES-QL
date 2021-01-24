@@ -21,7 +21,7 @@ from matplotlib.figure import Figure
 
 
 ### wxPython configurations
-REFLESH_RATE_PLOTTER = 200
+REFLESH_RATE_PLOTTER = 50
 # REFLESH_RATE_PLOTTER = 1000
 # REFLESH_RATE_DIGITAL_INDICATOR = 450
 
@@ -41,14 +41,14 @@ plt.rcParams["figure.subplot.hspace"] = 0.30    # Height Margin between subplots
 #
 
 # served as time in [s]
-x_val = map(lambda y: y/10.0, list(range(10000)))
+x_val = list(map(lambda y: y/1.0, range(10000)))
 
 # pseudo-data (series 1: sinusoidal)
-y1_val = map(lambda y: 2.0 * math.sin(y/5.0) + 2.0, x_val)      # 0 < y < 4
+y1_val = list(map(lambda y: 2.0 * math.sin(y/5.0) + 2.0, x_val))    # 0 < y < 4
 # xy1_val = list(zip(x_val, y1_val))
 
 # pseudo-data (series 2: random)
-y2_val = map(lambda y: 4.0 * random.random(), x_val)            # 0 < y < 4
+y2_val = list(map(lambda y: 4.0 * random.random(), x_val))          # 0 < y < 4
 # xy2_val = list(zip(x_val, y2_val))
 
 
@@ -75,18 +75,20 @@ class frmMain(wx.Frame):
         # self.chart_panel = ChartPanel(root_panel, latest_values)
 
         # layout panels
-        lytRoot = wx.GridBagSizer()
-        lytRoot.Add(self.pnlMain, pos=wx.GBPosition(0,0), flag=wx.EXPAND | wx.ALL, border=10)
+        #lytRoot = wx.GridBagSizer()
+        #lytRoot.Add(self.pnlMain, pos=wx.GBPosition(0,0), flag=wx.EXPAND | wx.ALL, border=10)
 
-        self.pnlMain.SetSizer(lytRoot)
-        lytRoot.Fit(self.pnlMain)
-
+        #self.pnlMain.SetSizer(lytRoot)
+        #lytRoot.Fit(self.pnlMain)
+        
         # bind events
         self.Bind(wx.EVT_CLOSE, self.OnClose)
+        
+        # print("I'm here !")     # for debug
 
         # make frmMain visible at first
         self.Show()
-
+        
     # Event handler: EVT_CLOSE
     def OnClose(self, event):
         self.Destroy()
@@ -131,16 +133,16 @@ class MainPanel(wx.Panel):
             
     # Event handler: EVT_TIMER
     def OnRefreshPlotter(self, event):
-        return None     # for debug
-        
+        # return None     # for debug
+
         # update plot points by appending latest values
         self.x_series = np.append(self.x_series, x_val[self.NNN])
         self.y1_series = np.append(self.y1_series, y1_val[self.NNN])
-        self.y2_series = np.append(self.y1_series, y2_val[self.NNN])
+        self.y2_series = np.append(self.y2_series, y2_val[self.NNN])
 
         # pseudo-time incriment NEEDED ONLY FOR TEST
         self.NNN += 1
-        if self.NNNN == len(x_val):  self.NNN = 0   # reset pseudo-time
+        if self.NNN == len(x_val):  self.NNN = 0   # reset pseudo-time
 
         # update time range to plot
         t_max = self.x_series[-1]
@@ -162,7 +164,7 @@ class MainPanel(wx.Panel):
         self.axes[0].cla()
 
         # update limit for x axis
-        self.axes[0].set_xlim([self.t_min, self.t_max])
+        self.axes[0].set_xlim([t_min, t_max])
 
         # set limit for y axis
         self.axes[0].set_ylim([self.y_min[1], self.y_max[1]])
@@ -184,7 +186,7 @@ class MainPanel(wx.Panel):
         self.lines.append(self.axes[0].plot(self.x_series, self.y1_series)[0])
      
         # delete x axis and lines by restroring canvas
-        self.canvas.restore_region(self.backgrounds)
+        self.canvas.restore_region(self.backgrounds[0])
 
         # reflect updates in lines
         self.axes[0].draw_artist(self.lines[0])
