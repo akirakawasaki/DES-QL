@@ -83,14 +83,14 @@ class frmMain(wx.Frame):
 
     # Event handler: EVT_CLOSE
     def OnClose(self, event):
-        dig = wx.MessageDialog(self,
-                               "Do you really want to close this application?",
-                               "Confirm Exit",
-                               wx.OK | wx.CANCEL | wx.ICON_QUESTION)
-        result = dig.ShowModal()
-        dig.Destroy()
-        if result == wx.ID_OK:  self.Destroy()
-
+        # dig = wx.MessageDialog(self,
+        #                        "Do you really want to close this application?",
+        #                        "Confirm Exit",
+        #                        wx.OK | wx.CANCEL | wx.ICON_QUESTION)
+        # result = dig.ShowModal()
+        # dig.Destroy()
+        # if result == wx.ID_OK:  self.Destroy()
+        self.Destroy()
 
 """
 Time History Plots & Current Value Indicators
@@ -157,13 +157,14 @@ class ChartPanel(wx.Panel):
 
     # Event handler: EVT_TIMER
     def OnFetchLatestValues(self, event):
+        # break off when tlm data not exist
         if len(self.latest_values.df_smt.index) == 0:
-            # print("GUI awaiting tlm data")
+            print("GUI awaiting tlm data")
             self.__F_TLM_IS_ACTIVE = False
             return None
         
         # for debug
-        print("GUI: df.index length = %i" % len(self.latest_values.df_smt.index))
+        # print("GUI FTC: df.index length = %i" % len(self.latest_values.df_smt.index))
         # print(self.latest_values.df_smt) 
 
         self.__F_TLM_IS_ACTIVE = True
@@ -187,36 +188,79 @@ class ChartPanel(wx.Panel):
     def OnRefreshPlotter(self, event):
         if self.__F_TLM_IS_ACTIVE == False: return None     # skip refresh
 
+        # for debug
+        # print("GUI PLT: F_TLM_IS_ACTIVE = {}".format(self.__F_TLM_IS_ACTIVE))
+
         ### update data set for plot
         # - obtain time slice of dfTlm by deep copy to avoid unexpected rewrite during refresh
         df_tmp = self.dfTlm.copy()
 
         # - append latest values
+        #print("GUI: append latest values {}".format(df_tmp.iloc[-1,self.index_x]))       # debug
         self.x_series = np.append(self.x_series, df_tmp.iloc[-1,self.index_x])
+        # print("GUI PLT: x_series = {}".format(self.x_series))
+        # print(self.x_series)
+
+        # self.y_series = np.append(self.y_series, df_tmp.iloc[-1,self.index_x])
         for i in range(self.n_plot):
-            self.y_series[i] = np.append(self.y_series[i], df_tmp.iloc[-1,self.index_plot[i]])
+            self.y_series = np.append(self.y_series, df_tmp.iloc[-1,self.index_plot[i]])
+            # self.y_series[i] = np.append(self.y_series[i], df_tmp.iloc[-1,self.index_plot[i]])
+            # self.y_series[i][0] = np.append(self.y_series[i][0], df_tmp.iloc[-1,self.index_plot[i]])
+        # print("GUI PLT: y_series = {}".format(self.y_series))
+        # print(self.y_series)
+        # tmp_list = []
+        # for i in range(self.n_plot):
+        #     # tmp_list = tmp_list.append(df_tmp.iloc[-1,self.index_plot[i]])
+        #     tmp_list.append(float(df_tmp.iloc[-1,self.index_x]))
+        # self.y_series_not_np.append(tmp_list)
+        # print("GUI PLT: y_series_not_np")
+        # print(self.y_series_not_np)
 
         # - determine time max & min
         t_max = self.x_series[-1]
         t_min = t_max - self.__T_RANGE
+        # print("t_max = {}, t_min = {}".format(t_max, t_min))
 
         # - delete items out of the designated time range
         while self.x_series[0] < t_min:
+            print("GUI PLT: a member of 'x_series' is out of the range")
             self.x_series = np.delete(self.x_series, 0)
+            self.y_series = np.delete(self.y_series, self.n_plot)
 
         ### refresh plotter
         # TBREFAC.: for-loops should be merged?
-        # - delete x axes and lines by restroring canvas
+        # - clear axes
         for i in range(self.n_plot):
-            self.canvas.restore_region(self.backgrounds[i])     
+            self.axes[i].cla()
 
-        # - update x axis (time axis)
+        # - delete x axis and lines by restroring canvas
+        # for i in range(self.n_plot):
+        #     self.canvas.restore_region(self.backgrounds[i])     
+
+        # - set limit for y axis 
         for i in range(self.n_plot):
-            self.axes[i].set_xlim([self.t_min, self.t_max])
+            self.axes[i].set_ylim([self.y_min_plot[i], self.y_max_plot[i]])
+
+        # - set label for y axis
+        for i in range(self.n_plot):
+            self.axes[i].set_ylabel(self.item_plot[i] + ' [{}]'.format(self.unit_plot[i]))
+
+        # - update limit for x axis (time axis)
+        for i in range(self.n_plot):
+            self.axes[i].set_xlim([t_min, t_max])
         
+        # - update alert line
+        self.axes[0].axhline(y=1.0, xmin=0, xmax=1, color='red')
+        # self.axes[1].axhline(y=500.0, xmin=0, xmax=1, color='red')
+        # self.axes[2].axhline(y=500.0, xmin=0, xmax=1, color='red')
+
         # - update lines
+        self.lines = []
         for i in range(self.n_plot):
-            self.lines[i].set_data(self.x_series, self.y_series[i])
+            # self.lines[i].set_data(self.x_series, self.y_series[i])
+            # self.lines[i].set_data(self.x_series, self.y_series[i::self.n_plot])
+            # self.lines[i].set_data(self.x_series, np.array(self.y_series_not_np[i::self.n_plot]))
+            self.lines.append(self.axes[i].plot(self.x_series, self.y_series[i::self.n_plot])[0])
 
         # - prepare drawing of new lines
         for i in range(self.n_plot):
@@ -224,7 +268,10 @@ class ChartPanel(wx.Panel):
 
         # - redraw canvas by blitting
         for i in range(self.n_plot):
-            self.fig.canvas.blit(self.axes[i].bbox)             
+            self.fig.canvas.blit(self.axes[i].bbox)
+
+        self.fig.canvas.flush_events()
+        print("GUI PLT: redraw plots...")    
 
     # Load configurations from external files
     def load_config_digital_indicator(self):
@@ -344,7 +391,9 @@ class ChartPanel(wx.Panel):
         #self.data_plot = np.ndarray()
         self.x_series = np.empty(0)
         self.y_series = np.empty(0)
-        self.lines = np.empty(0)
+        # self.y_series_not_np = []
+        # self.lines = np.empty(0)
+        # self.lines_not_np = []
         # for i in range(self.n_plot):
         #     self.y_series[i] = np.empty(0)
         #     self.lines[i] = np.empty(0)
@@ -379,18 +428,13 @@ class ChartPanel(wx.Panel):
         #     self.axes[i].set_xlim([self.t_left, self.t_left + self.t_range])
         ### "DYNAMIC" X AXIS IS TO BE PREPARED UPON UPDATE ###
 
-        # - set alert line
-        self.axes[0].axhline(y=1.0, xmin=0, xmax=1, color='red')
-        # self.axes[1].axhline(y=500.0, xmin=0, xmax=1, color='red')
-        # self.axes[2].axhline(y=500.0, xmin=0, xmax=1, color='red')
-
         # tentatively draw chart without x axis and plots
-        self.canvas.draw()                                            
+        # self.canvas.draw()                                            
 
         # save empty chart format as background
-        self.backgrounds = []
-        for i in range(self.n_plot):
-            self.backgrounds.append(self.canvas.copy_from_bbox(self.axes[i].bbox))  
+        # self.backgrounds = []
+        # for i in range(self.n_plot):
+        #     self.backgrounds.append(self.canvas.copy_from_bbox(self.axes[i].bbox))  
 
 
     # def graphTest(self, event):

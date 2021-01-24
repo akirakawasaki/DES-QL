@@ -108,7 +108,7 @@ class DatagramServerProtocol:
 
         # notify GUI of the latest values
         if self.TLM_TYPE == "smt":
-            self.tlm_latest_values.df_smt = (self.df_mf).tail(1)
+            self.tlm_latest_values.df_smt = self.df_mf.tail(1)
             # df_tmp = self.df_mf.tail(1)
             # print(df_tmp)
             # df_tmp1 = df_tmp.reset_index
@@ -120,13 +120,12 @@ class DatagramServerProtocol:
             # self.tlm_latest_values.df_smt = (self.df_mf).tail(1) \
             #                                             .reset_index(drop=True,inplace=True)
         else:
-            self.tlm_latest_values.df_pcm = (self.df_mf).tail(1) \
-                                                        .reset_index(drop=True,inplace=True)
+            self.tlm_latest_values.df_pcm = self.df_mf.tail(1)
 
         # for debug
         print("TLM notifies GUI of df:")
         # print(self.tlm_latest_values.df_smt)
-        print(self.tlm_latest_values.df_smt.index)
+        # print(self.tlm_latest_values.df_smt.index)
     
 
     # Internal method: 
