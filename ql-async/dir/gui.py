@@ -26,10 +26,9 @@ from matplotlib.figure import Figure
 """
 wxPython configurations
 """
-FETCH_RATE_LATEST_VALUES = 200          # ms/cycle
-#REFLESH_RATE_PLOTTER = 20               # ms/cycle
-REFLESH_RATE_PLOTTER = 1000             # ms/cycle
-REFLESH_RATE_DIGITAL_INDICATOR = 450    # ms/cycle
+FETCH_RATE_LATEST_VALUES       = 100    # ms/cycle
+REFLESH_RATE_PLOTTER           = 500    # ms/cycle
+REFLESH_RATE_DIGITAL_INDICATOR = 350    # ms/cycle
 
 
 """
@@ -37,12 +36,12 @@ Matplotlib configuration
 """
 plt.style.use('dark_background')
 
-#plt.rcParams["figure.subplot.bottom"] = 0.07    # Bottom Margin
-plt.rcParams["figure.subplot.top"] = 0.97       # Top Margin
-#plt.rcParams["figure.subplot.left"] = 0.1       # Left Margin
-plt.rcParams["figure.subplot.right"] = 0.97     # Right Margin
-
-plt.rcParams["figure.subplot.hspace"] = 0.30    # Height Margin between subplots
+# Margin
+plt.rcParams["figure.subplot.bottom"] = 0.04    # Bottom
+plt.rcParams["figure.subplot.top"]    = 0.97    # Top
+plt.rcParams["figure.subplot.left"]   = 0.15    # Left
+plt.rcParams["figure.subplot.right"]  = 0.97    # Right
+plt.rcParams["figure.subplot.hspace"] = 0.1     # Height Margin between subplots
 
 
 """
@@ -96,10 +95,9 @@ class frmMain(wx.Frame):
 Time History Plots & Current Value Indicators
 """
 class ChartPanel(wx.Panel):
-    index_x = 1
+    __N_PLOTTER = 5
     __T_RANGE = 30    # [s]
-
-    n_plot = 5
+    __IND_TIME = 1
 
     sensor_type = ['Time [s]', 'P [MPa]', 'T [K]', 'IMU', 'House Keeping']
     col_value = [6, 8, 8, 9, 8]
@@ -187,91 +185,71 @@ class ChartPanel(wx.Panel):
     # Event handler: EVT_TIMER
     def OnRefreshPlotter(self, event):
         if self.__F_TLM_IS_ACTIVE == False: return None     # skip refresh
-
         # for debug
         # print("GUI PLT: F_TLM_IS_ACTIVE = {}".format(self.__F_TLM_IS_ACTIVE))
 
+        ###
         ### update data set for plot
         # - obtain time slice of dfTlm by deep copy to avoid unexpected rewrite during refresh
         df_tmp = self.dfTlm.copy()
 
-        # - append latest values
-        #print("GUI: append latest values {}".format(df_tmp.iloc[-1,self.index_x]))       # debug
-        self.x_series = np.append(self.x_series, df_tmp.iloc[-1,self.index_x])
-        # print("GUI PLT: x_series = {}".format(self.x_series))
-        # print(self.x_series)
-
-        # self.y_series = np.append(self.y_series, df_tmp.iloc[-1,self.index_x])
-        for i in range(self.n_plot):
+        # - update plot points by appending latest values
+        self.x_series = np.append(self.x_series, df_tmp.iloc[-1,self.__IND_TIME])        
+        for i in range(self.__N_PLOTTER):
             self.y_series = np.append(self.y_series, df_tmp.iloc[-1,self.index_plot[i]])
-            # self.y_series[i] = np.append(self.y_series[i], df_tmp.iloc[-1,self.index_plot[i]])
-            # self.y_series[i][0] = np.append(self.y_series[i][0], df_tmp.iloc[-1,self.index_plot[i]])
+        # print("GUI: append latest values {}".format(df_tmp.iloc[-1,self.index_x]))
+        # print("GUI PLT: x_series = {}".format(self.x_series))
         # print("GUI PLT: y_series = {}".format(self.y_series))
-        # print(self.y_series)
-        # tmp_list = []
-        # for i in range(self.n_plot):
-        #     # tmp_list = tmp_list.append(df_tmp.iloc[-1,self.index_plot[i]])
-        #     tmp_list.append(float(df_tmp.iloc[-1,self.index_x]))
-        # self.y_series_not_np.append(tmp_list)
-        # print("GUI PLT: y_series_not_np")
-        # print(self.y_series_not_np)
 
         # - determine time max & min
         t_max = self.x_series[-1]
         t_min = t_max - self.__T_RANGE
         # print("t_max = {}, t_min = {}".format(t_max, t_min))
 
-        # - delete items out of the designated time range
+        # - delete plot points out of the designated time range
         while self.x_series[0] < t_min:
             print("GUI PLT: a member of 'x_series' is out of the range")
             self.x_series = np.delete(self.x_series, 0)
-            self.y_series = np.delete(self.y_series, self.n_plot)
+            self.y_series = np.delete(self.y_series, np.s_[0:self.__N_PLOTTER])
 
+        ###
         ### refresh plotter
-        # TBREFAC.: for-loops should be merged?
-        # - clear axes
-        for i in range(self.n_plot):
+        self.lines = []
+        for i in range(self.__N_PLOTTER):
+            # delete x axis and lines by restroring canvas
+            self.canvas.restore_region(self.backgrounds[i])
+
+            # clear axes
             self.axes[i].cla()
 
-        # - delete x axis and lines by restroring canvas
-        # for i in range(self.n_plot):
-        #     self.canvas.restore_region(self.backgrounds[i])     
-
-        # - set limit for y axis 
-        for i in range(self.n_plot):
-            self.axes[i].set_ylim([self.y_min_plot[i], self.y_max_plot[i]])
-
-        # - set label for y axis
-        for i in range(self.n_plot):
-            self.axes[i].set_ylabel(self.item_plot[i] + ' [{}]'.format(self.unit_plot[i]))
-
-        # - update limit for x axis (time axis)
-        for i in range(self.n_plot):
+            # update limit for x axis
             self.axes[i].set_xlim([t_min, t_max])
+
+            # set limit for y axis
+            self.axes[i].set_ylim([self.plt_attr[i].y_min, self.plt_attr[i].y_max])
+
+            # set label for y axis
+            self.axes[i].set_ylabel(self.plt_attr[i].y_label)
+
+            # update alert line
+            self.axes[i].axhline(y=self.plt_attr[i].alart_lim_u, xmin=0, xmax=1, color='red')
+            self.axes[i].axhline(y=self.plt_attr[i].alart_lim_u, xmin=0, xmax=1, color='red')
         
-        # - update alert line
-        self.axes[0].axhline(y=1.0, xmin=0, xmax=1, color='red')
-        # self.axes[1].axhline(y=500.0, xmin=0, xmax=1, color='red')
-        # self.axes[2].axhline(y=500.0, xmin=0, xmax=1, color='red')
+            # update plot
+            # NOTE: lines become iterrable hereafter
+            self.lines.append(self.axes[i].plot(self.x_series, self.y_series[i::self.__N_PLOTTER])[0])
+     
+            # reflect updates in lines
+            self.axes[i].draw_artist(self.lines[i])
 
-        # - update lines
-        self.lines = []
-        for i in range(self.n_plot):
-            # self.lines[i].set_data(self.x_series, self.y_series[i])
-            # self.lines[i].set_data(self.x_series, self.y_series[i::self.n_plot])
-            # self.lines[i].set_data(self.x_series, np.array(self.y_series_not_np[i::self.n_plot]))
-            self.lines.append(self.axes[i].plot(self.x_series, self.y_series[i::self.n_plot])[0])
+            # # redraw and show updated canvas
+            # self.fig.canvas.blit(self.axes[i].bbox)
 
-        # - prepare drawing of new lines
-        for i in range(self.n_plot):
-            self.axes[i].draw_artist(self.lines[i])             
-
-        # - redraw canvas by blitting
-        for i in range(self.n_plot):
-            self.fig.canvas.blit(self.axes[i].bbox)
-
-        self.fig.canvas.flush_events()
-        print("GUI PLT: redraw plots...")    
+        # redraw and show updated canvas
+        self.fig.canvas.draw()
+        # self.fig.canvas.flush_events()
+        
+        print("GUI PLT: redraw plots...")   
 
     # Load configurations from external files
     def load_config_digital_indicator(self):
@@ -288,7 +266,9 @@ class ChartPanel(wx.Panel):
 
 
     # Load configurations from external files
-    def load_config_plotter(self):  
+    def load_config_plotter(self):
+        ### TBREFAC.: TEMPORALLY DESIGNATED BY LITERALS ###
+
         # Load plotter appearance config
         self.df_cfg_plot = (pd.read_excel('./config_plot.xlsx', sheet_name='smt')).dropna(how='all')
 
@@ -297,35 +277,104 @@ class ChartPanel(wx.Panel):
                            self.df_cfg_plot['ID'][self.df_cfg_plot['plot_3'].astype(bool)].astype(int).iat[0],
                            self.df_cfg_plot['ID'][self.df_cfg_plot['plot_4'].astype(bool)].astype(int).iat[0],
                            self.df_cfg_plot['ID'][self.df_cfg_plot['plot_5'].astype(bool)].astype(int).iat[0]]
-        #print(self.index_plot)
+
+        # handle exception
+        if self.__N_PLOTTER > 5: self.__N_PLOTTER = 5
+
+        # load attributions
+        self.plt_attr = []
+        for i in range(self.__N_PLOTTER):
+            str_tmp = 'plot_' + str(i+1)
+            self.plt_attr.append(PltAttr(
+                y_label = self.df_cfg_plot['item'][self.df_cfg_plot[str_tmp].astype(bool)].iat[0],
+                y_unit = self.df_cfg_plot['unit'][self.df_cfg_plot[str_tmp].astype(bool)].iat[0],
+                y_min = self.df_cfg_plot['y_min'][self.df_cfg_plot[str_tmp].astype(bool)].iat[0],
+                y_max = self.df_cfg_plot['y_max'][self.df_cfg_plot[str_tmp].astype(bool)].iat[0],
+                alart_lim_u = 10,
+                alart_lim_l = 0.0))
+
         
-        self.item_plot = [self.df_cfg_plot['item'][self.df_cfg_plot['plot_1'].astype(bool)].iat[0],
-                          self.df_cfg_plot['item'][self.df_cfg_plot['plot_2'].astype(bool)].iat[0],
-                          self.df_cfg_plot['item'][self.df_cfg_plot['plot_3'].astype(bool)].iat[0],
-                          self.df_cfg_plot['item'][self.df_cfg_plot['plot_4'].astype(bool)].iat[0],
-                          self.df_cfg_plot['item'][self.df_cfg_plot['plot_5'].astype(bool)].iat[0]]
-        #print(self.item_plot)
+        # plt_attr_1 = PltAttr(
+        #     y_label =  "Series 1",
+        #     y_min = 0.0,
+        #     y_max = 4.0,
+        #     alart_lim_u = 3.0,
+        #     alart_lim_l = 1.0
+        # )
+        # plt_attr_2 = PltAttr(
+        #     y_label =  "Series 2",
+        #     y_min = 0.0,
+        #     y_max = 3.0,
+        #     alart_lim_u = 2.5,
+        #     alart_lim_l = 0.5,
+        # )
+        # plt_attr_3 = PltAttr(
+        #     y_label =  "Series 3",
+        #     y_min = 0.0,
+        #     y_max = 3.0,
+        #     alart_lim_u = 2.5,
+        #     alart_lim_l = 0.5,
+        # )
+        # plt_attr_4 = PltAttr(
+        #     y_label =  "Series 4",
+        #     y_min = 0.0,
+        #     y_max = 3.0,
+        #     alart_lim_u = 2.5,
+        #     alart_lim_l = 0.5,
+        # )
+        # plt_attr_5 = PltAttr(
+        #     y_label =  "Series 5",
+        #     y_min = 0.0,
+        #     y_max = 3.0,
+        #     alart_lim_u = 2.5,
+        #     alart_lim_l = 0.5,
+        # )
+
+        # self.plt_attr = []
+        # self.plt_attr.append(plt_attr_1)    
+        # if self.__N_PLOTTER <= 1: return
+
+        # self.plt_attr.append(plt_attr_2)
+        # if self.__N_PLOTTER <= 2: return
+
+        # self.plt_attr.append(plt_attr_3)
+        # if self.__N_PLOTTER <= 3: return
+
+        # self.plt_attr.append(plt_attr_4)
+        # if self.__N_PLOTTER <= 4: return
+
+        # self.plt_attr.append(plt_attr_5)
+        # if self.__N_PLOTTER <= 5: return
+        # else: self.__N_PLOTTER == 5
+
         
-        self.unit_plot = [self.df_cfg_plot['unit'][self.df_cfg_plot['plot_1'].astype(bool)].iat[0],
-                          self.df_cfg_plot['unit'][self.df_cfg_plot['plot_2'].astype(bool)].iat[0],
-                          self.df_cfg_plot['unit'][self.df_cfg_plot['plot_3'].astype(bool)].iat[0],
-                          self.df_cfg_plot['unit'][self.df_cfg_plot['plot_4'].astype(bool)].iat[0],
-                          self.df_cfg_plot['unit'][self.df_cfg_plot['plot_5'].astype(bool)].iat[0]]
-        #print(self.unit_plot)
+        # self.item_plot = [self.df_cfg_plot['item'][self.df_cfg_plot['plot_1'].astype(bool)].iat[0],
+        #                   self.df_cfg_plot['item'][self.df_cfg_plot['plot_2'].astype(bool)].iat[0],
+        #                   self.df_cfg_plot['item'][self.df_cfg_plot['plot_3'].astype(bool)].iat[0],
+        #                   self.df_cfg_plot['item'][self.df_cfg_plot['plot_4'].astype(bool)].iat[0],
+        #                   self.df_cfg_plot['item'][self.df_cfg_plot['plot_5'].astype(bool)].iat[0]]
+        # #print(self.item_plot)
         
-        self.y_min_plot = [self.df_cfg_plot['y_min'][self.df_cfg_plot['plot_1'].astype(bool)].iat[0],
-                           self.df_cfg_plot['y_min'][self.df_cfg_plot['plot_2'].astype(bool)].iat[0],
-                           self.df_cfg_plot['y_min'][self.df_cfg_plot['plot_3'].astype(bool)].iat[0],
-                           self.df_cfg_plot['y_min'][self.df_cfg_plot['plot_4'].astype(bool)].iat[0],
-                           self.df_cfg_plot['y_min'][self.df_cfg_plot['plot_5'].astype(bool)].iat[0]]
-        #print(self.y_min_plot)
+        # self.unit_plot = [self.df_cfg_plot['unit'][self.df_cfg_plot['plot_1'].astype(bool)].iat[0],
+        #                   self.df_cfg_plot['unit'][self.df_cfg_plot['plot_2'].astype(bool)].iat[0],
+        #                   self.df_cfg_plot['unit'][self.df_cfg_plot['plot_3'].astype(bool)].iat[0],
+        #                   self.df_cfg_plot['unit'][self.df_cfg_plot['plot_4'].astype(bool)].iat[0],
+        #                   self.df_cfg_plot['unit'][self.df_cfg_plot['plot_5'].astype(bool)].iat[0]]
+        # #print(self.unit_plot)
         
-        self.y_max_plot = [self.df_cfg_plot['y_max'][self.df_cfg_plot['plot_1'].astype(bool)].iat[0],
-                           self.df_cfg_plot['y_max'][self.df_cfg_plot['plot_2'].astype(bool)].iat[0],
-                           self.df_cfg_plot['y_max'][self.df_cfg_plot['plot_3'].astype(bool)].iat[0],
-                           self.df_cfg_plot['y_max'][self.df_cfg_plot['plot_4'].astype(bool)].iat[0],
-                           self.df_cfg_plot['y_max'][self.df_cfg_plot['plot_5'].astype(bool)].iat[0]]
-        #print(self.y_max_plot)
+        # self.y_min_plot = [self.df_cfg_plot['y_min'][self.df_cfg_plot['plot_1'].astype(bool)].iat[0],
+        #                    self.df_cfg_plot['y_min'][self.df_cfg_plot['plot_2'].astype(bool)].iat[0],
+        #                    self.df_cfg_plot['y_min'][self.df_cfg_plot['plot_3'].astype(bool)].iat[0],
+        #                    self.df_cfg_plot['y_min'][self.df_cfg_plot['plot_4'].astype(bool)].iat[0],
+        #                    self.df_cfg_plot['y_min'][self.df_cfg_plot['plot_5'].astype(bool)].iat[0]]
+        # #print(self.y_min_plot)
+        
+        # self.y_max_plot = [self.df_cfg_plot['y_max'][self.df_cfg_plot['plot_1'].astype(bool)].iat[0],
+        #                    self.df_cfg_plot['y_max'][self.df_cfg_plot['plot_2'].astype(bool)].iat[0],
+        #                    self.df_cfg_plot['y_max'][self.df_cfg_plot['plot_3'].astype(bool)].iat[0],
+        #                    self.df_cfg_plot['y_max'][self.df_cfg_plot['plot_4'].astype(bool)].iat[0],
+        #                    self.df_cfg_plot['y_max'][self.df_cfg_plot['plot_5'].astype(bool)].iat[0]]
+        # #print(self.y_max_plot)
 
     # Configure appearance for digital indicators to display current values
     def configure_digital_indicator(self):
@@ -387,55 +436,43 @@ class ChartPanel(wx.Panel):
 
     # Configure appearance for plotters to display time histories
     def configure_plotter(self):
-        # initialize
-        #self.data_plot = np.ndarray()
+        # initialize data set for plot
         self.x_series = np.empty(0)
         self.y_series = np.empty(0)
-        # self.y_series_not_np = []
-        # self.lines = np.empty(0)
-        # self.lines_not_np = []
-        # for i in range(self.n_plot):
-        #     self.y_series[i] = np.empty(0)
-        #     self.lines[i] = np.empty(0)
-        # self.x_series = []
-        # self.y_series = []
-        # self.lines = []
         
-        # prepare empty matplotlib Fugure
+        # generate empty matplotlib Fugure
         self.fig = Figure(figsize=(6, 8))
-
+        
         # register Figure with matplotlib Canvas
-        self.canvas = FigureCanvasWxAgg(self, -1, self.fig)
+        self.canvas = FigureCanvasWxAgg(self, wx.ID_ANY, self.fig)
 
-        # prepare axes
+        # return None     # for debug
+
+        ### prepare axes
+        # - generate subplots containing axes in Figure
+        # NOTE: axes become iterrable hereafter
         self.axes = []
+        for i in range(self.__N_PLOTTER):
+            self.axes.append(self.fig.add_subplot(self.__N_PLOTTER, 1, i+1))
 
-        # - add subplots containing axes to Figure
-        for i in range(self.n_plot):
-            self.axes.append(self.fig.add_subplot(self.n_plot, 1, i+1))        
+            # - set limit for x axis
+            t_min = 0
+            self.axes[i].set_xlim([t_min, t_min + self.__T_RANGE])
 
-        # - set limit for y axis 
-        for i in range(self.n_plot):
-            self.axes[i].set_ylim([self.y_min_plot[i], self.y_max_plot[i]])
+            # - set limit for y axis
+            self.axes[i].set_ylim([self.plt_attr[i].y_min, self.plt_attr[i].y_max])
 
-        # - set label for y axis
-        for i in range(self.n_plot):
-            self.axes[i].set_ylabel(self.item_plot[i] + ' [{}]'.format(self.unit_plot[i]))
+            # - set label for y axis
+            self.axes[i].set_ylabel(self.plt_attr[i].y_label + ' [{}]'.format(self.plt_attr[i].y_unit))
 
-        # - set limit for x axis
-        # self.t_left = 0
-        # for i in range(self.n_plot):
-        #     self.axes[i].set_xlim([self.t_left, self.t_left + self.t_range])
-        ### "DYNAMIC" X AXIS IS TO BE PREPARED UPON UPDATE ###
+        # tentatively draw canvas without plot points to save as background
+        self.canvas.draw()                                            
 
-        # tentatively draw chart without x axis and plots
-        # self.canvas.draw()                                            
-
-        # save empty chart format as background
-        # self.backgrounds = []
-        # for i in range(self.n_plot):
-        #     self.backgrounds.append(self.canvas.copy_from_bbox(self.axes[i].bbox))  
-
+        # save the empty canvas as background
+        # NOTE: backgrounds become iterrable hereafter
+        self.backgrounds = []
+        for i in range(self.__N_PLOTTER):
+            self.backgrounds.append(self.canvas.copy_from_bbox(self.axes[i].bbox))
 
     # def graphTest(self, event):
     #     self.n_graph = 0
@@ -450,3 +487,15 @@ class ChartPanel(wx.Panel):
     #     self.chartGenerator(self.n_graph)
 
 
+# retain plotter attributions
+class PltAttr():
+    def __init__(self, 
+                y_label="", y_unit="", 
+                y_min=0.0, y_max=1.0, 
+                alart_lim_l=0.0, alart_lim_u=1.0) -> None:
+        self.y_label = y_label
+        self.y_unit = y_unit
+        self.y_min = y_min
+        self.y_max = y_max
+        self.alart_lim_l = alart_lim_l
+        self.alart_lim_u = alart_lim_u
