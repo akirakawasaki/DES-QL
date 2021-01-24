@@ -20,24 +20,24 @@ import wx
 #from matplotlib.figure import Figure
 
 ### Local libraries
-from usrmod import asynctlm
-from usrmod import gui
-from usrmod import shared_variables
+from dir import asynctlm
+from dir import gui
+from dir import common
 
 
 #
 # Telemetry Data Handler
 #
-async def tlm_handler(type):
-    print("Starting UDP server for %s" % type)
+async def tlm_handler(tlm_type, tlm_latest_values):
+    print("Starting UDP server for %s" % tlm_type)
 
     # initialize
     HOST = socket.gethostbyname(socket.gethostname())
     PORT = 0
 
-    if type == 'smt':
+    if tlm_type == 'smt':
         PORT = 49157
-    elif type == 'pcm':
+    elif tlm_type == 'pcm':
         PORT = 49158
     else :
         print('Error: Type of the telemeter is wrong!')
@@ -47,10 +47,11 @@ async def tlm_handler(type):
     loop = asyncio.get_running_loop()
 
     # One protocol instance will be created to serve all client requests.
-    #transport, protocol = await loop.create_datagram_endpoint(
-    await loop.create_datagram_endpoint(
-        lambda: asynctlm.DatagramServerProtocol(type),
-        local_addr=(HOST,PORT))
+    transport, protocol = await loop.create_datagram_endpoint(
+                                    lambda: asynctlm.DatagramServerProtocol(tlm_type, tlm_latest_values),
+                                    local_addr=(HOST,PORT))
+
+    return (transport, protocol)
 
     #try:
     #    await asyncio.sleep(3600)  # Serve for 1 hour.
@@ -61,12 +62,15 @@ async def tlm_handler(type):
 #
 # GUI Handler
 #
-def gui_handler():
-    print('Starting GUI')
+def gui_handler(latest_values):
+    print('Starting GUI...')
     
     app = wx.App()
 
-    gui.frmMain()
+    # launche main window
+    gui.frmMain(latest_values)
+    
+    # handle event loop for GUI
     app.MainLoop()
 
 
@@ -74,18 +78,30 @@ def gui_handler():
 # Main
 #
 if __name__ == "__main__":
+    # Variables shared among threads
+    latest_values = common.LatestValues()
+    
     # Asyncio uses event loops to manage its operation
     loop = asyncio.get_event_loop()
 
     # multi-thread executor 
-    executor = concurrent.futures.ThreadPoolExecutor()
-    loop.set_default_executor(executor)
+    #executor = concurrent.futures.ThreadPoolExecutor()
+    #loop.set_default_executor(executor)
 
     # Create coroutines for three asyncronous tasks
     gathered_coroutines = asyncio.gather(
-        tlm_handler("smt"),
-        tlm_handler("pcm"),
-        loop.run_in_executor(None, gui_handler))
+        tlm_handler("smt", latest_values),
+        tlm_handler("pcm", latest_values),
+        loop.run_in_executor(None, gui_handler, latest_values))
+    
+    # for debug of TLM handler
+    # gathered_coroutines = asyncio.gather(
+    #     tlm_handler("smt", latest_values),
+    #     tlm_handler("pcm", latest_values))
+    # loop.run_until_complete(gathered_coroutines)
+
+    # for debug of GUI handler
+    # gui_handler(latest_values)
 
     # This is the entry from synchronous to asynchronous code
     # It will block until the coroutine passed in has completed
