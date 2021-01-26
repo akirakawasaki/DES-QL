@@ -2,7 +2,7 @@
 #import asyncio
 #import decimal
 import math
-#import socket
+import socket
 import sys
 
 ### Third-party libraries
@@ -39,6 +39,8 @@ class DatagramServerProtocol:
     
     # Initialize instance
     def __init__(self, tlm_type, tlm_latest_values):
+        print('Starting {} handlar...'.format(tlm_type))
+        
         self.TLM_TYPE = tlm_type
         self.tlm_latest_values = tlm_latest_values
 
@@ -80,17 +82,17 @@ class DatagramServerProtocol:
 
     # Event handler
     def connection_lost(self,exec):
-        print("Disconnected from %s" % self.TLM_TYPE)
+        print(f'Disconnected from {self.TLM_TYPE}')
 
 
     # Event handler
     def datagram_received(self,data,addr):
-        print("Received a datagram from %s" % self.TLM_TYPE)
+        print(f'Received a datagram from {self.TLM_TYPE}')
         #print_mf(data)      # for debug
 
         # check size of the datagram
         if len(data) != self.__BUFSIZE:
-            print("Size of received data = %i" % len(data))
+            print(f'ERROR TLM: Size of received data = {len(data)}')
 
         self.__translate(data)
         
@@ -98,32 +100,22 @@ class DatagramServerProtocol:
         self.df_mf.to_csv(self.DATA_PATH, mode='a', header=False)
         
         #if self.iLine % 1 == 0:
-        #if self.iLine % 10 == 0:
         if self.iLine % 200 == 0:
-            print(f"iLine: {self.iLine}")
-            print(f"From : {self.addr}")
-            #print(f"To   : {socket.gethostbyname(self.HOST)}")
             print('')
+            print(f'iLine: {self.iLine}')
+            print(f'From : {addr}')
+            # print(f'To   : {socket.gethostbyname(self.HOST)}')
             print(self.df_mf)
+            print('')
 
         # notify GUI of the latest values
-        if self.TLM_TYPE == "smt":
+        if self.TLM_TYPE == 'smt':
             self.tlm_latest_values.df_smt = self.df_mf.tail(1)
-            # df_tmp = self.df_mf.tail(1)
-            # print(df_tmp)
-            # df_tmp1 = df_tmp.reset_index
-            # print(df_tmp1)
-            # self.tlm_latest_values.df_smt =  df_tmp1
-            
-            # df_tmp = self.df_mf.tail(1)
-            # self.tlm_latest_values.df_smt = df_tmp.reset_index(drop=True,inplace=True)
-            # self.tlm_latest_values.df_smt = (self.df_mf).tail(1) \
-            #                                             .reset_index(drop=True,inplace=True)
         else:
             self.tlm_latest_values.df_pcm = self.df_mf.tail(1)
 
         # for debug
-        print("TLM notifies GUI of df:")
+        # print("TLM notifies GUI of df:")
         # print(self.tlm_latest_values.df_smt)
         # print(self.tlm_latest_values.df_smt.index)
     

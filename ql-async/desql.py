@@ -25,23 +25,22 @@ from dir import gui
 from dir import common
 
 
-#
-# Telemetry Data Handler
-#
-async def tlm_handler(tlm_type, tlm_latest_values):
-    print("Starting UDP server for %s" % tlm_type)
-
+### TBREFAC.: TO BE MOVED TO ASYNCTLM.PY ###
+async def tlm(tlm_type, tlm_latest_values):
+    # print('Starting {} handlar...'.format(tlm_type))
+    
     # initialize
     HOST = socket.gethostbyname(socket.gethostname())
     PORT = 0
 
+    ### TBREFAC. ###
     if tlm_type == 'smt':
         PORT = 49157
     elif tlm_type == 'pcm':
         PORT = 49158
     else :
         print('Error: Type of the telemeter is wrong!')
-        sys.exit()
+        return
 
     # Get a reference to the event loop as we plan to use low-level APIs.
     loop = asyncio.get_running_loop()
@@ -51,27 +50,43 @@ async def tlm_handler(tlm_type, tlm_latest_values):
                                     lambda: asynctlm.DatagramServerProtocol(tlm_type, tlm_latest_values),
                                     local_addr=(HOST,PORT))
 
-    return (transport, protocol)
+    ### TBREFAC.: MUST FIGURE OUT HOW TO KILL THE TASK AFTER CLOSING GUI ###
+    try:
+       await asyncio.sleep(3600)  # *Serve for 1 hour*
+    finally:
+        transport.close()
 
-    #try:
-    #    await asyncio.sleep(3600)  # Serve for 1 hour.
-    #finally:
-    #    transport.close()
+        return (transport, protocol)
+
+
+
+#
+# Telemetry Data Handler (co-routine)
+#
+async def tlm_handler(tlm_latest_values):
+    # print('Starting TLM handler...')
+
+    gatherd_tasks = await asyncio.gather(
+        tlm("smt", tlm_latest_values),
+        tlm("pcm", tlm_latest_values))
+
 
 
 #
 # GUI Handler
 #
-def gui_handler(latest_values):
+def gui_handler(tlm_latest_data):
     print('Starting GUI...')
     
     app = wx.App()
 
     # launche main window
-    gui.frmMain(latest_values)
+    gui.frmMain(tlm_latest_data)
     
     # handle event loop for GUI
     app.MainLoop()
+
+    print('Closing GUI...')
 
 
 #
@@ -79,35 +94,22 @@ def gui_handler(latest_values):
 #
 if __name__ == "__main__":
     # Variables shared among threads
-    latest_values = common.LatestValues()
-    
-    # Asyncio uses event loops to manage its operation
-    loop = asyncio.get_event_loop()
+    tlm_latest_data = common.LatestValues()
 
-    # multi-thread executor 
-    #executor = concurrent.futures.ThreadPoolExecutor()
-    #loop.set_default_executor(executor)
+    # wrapper for tlm_handler co-routine
+    def tlm_handler_wrapper(tlm_latest_data):
+        asyncio.run(tlm_handler(tlm_latest_data))
+        print('Closing TLM...')
 
-    # Create coroutines for three asyncronous tasks
-    gathered_coroutines = asyncio.gather(
-        tlm_handler("smt", latest_values),
-        tlm_handler("pcm", latest_values),
-        loop.run_in_executor(None, gui_handler, latest_values))
-    
-    # for debug of TLM handler
-    # gathered_coroutines = asyncio.gather(
-    #     tlm_handler("smt", latest_values),
-    #     tlm_handler("pcm", latest_values))
-    # loop.run_until_complete(gathered_coroutines)
+    # run tlm_handler concurrently in other threads
+    executor = concurrent.futures.ThreadPoolExecutor()
+    executor.submit(tlm_handler_wrapper, tlm_latest_data)
 
-    # for debug of GUI handler
-    # gui_handler(latest_values)
+    # launch GUI
+    gui_handler(tlm_latest_data)
 
-    # This is the entry from synchronous to asynchronous code
-    # It will block until the coroutine passed in has completed
-    loop.run_until_complete(gathered_coroutines)
-    
-    # We're done with the event loop
-    loop.close()
+    # 
+    executor.shutdown(wait=True)
+    # executor.shutdown(wait=True, cancel_futures=True)  # valid after Python 3.9
 
     print('... DES-QL quitted normally')

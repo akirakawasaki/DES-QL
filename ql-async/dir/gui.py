@@ -1,9 +1,4 @@
 ### Standard libraries
-#import asyncio
-#import decimal
-#import math
-#import socket
-#import sys
 import time
 
 ### Third-party libraries
@@ -26,9 +21,9 @@ from matplotlib.figure import Figure
 """
 wxPython configurations
 """
-FETCH_RATE_LATEST_VALUES       = 100    # ms/cycle
-REFLESH_RATE_PLOTTER           = 200    # ms/cycle
-REFLESH_RATE_DIGITAL_INDICATOR = 190    # ms/cycle
+FETCH_RATE_LATEST_VALUES       = 20     # ms/cycle
+REFLESH_RATE_PLOTTER           = 20     # ms/cycle
+REFLESH_RATE_DIGITAL_INDICATOR = 350    # ms/cycle
 
 
 """
@@ -48,7 +43,7 @@ plt.rcParams["figure.subplot.hspace"] = 0.1     # Height Margin between subplots
 Top Level Window
 """
 class frmMain(wx.Frame):
-    def __init__(self, latest_values):
+    def __init__(self, tlm_latest_data):
         super().__init__(None, wx.ID_ANY, 'Rocket System Information App')
 
         # receive instance of shared variables
@@ -64,12 +59,11 @@ class frmMain(wx.Frame):
         root_panel = wx.Panel(self, wx.ID_ANY)
 
         # ??? System panel : Show the feeding system status
-        self.chart_panel = ChartPanel(root_panel, latest_values)
+        self.chart_panel = ChartPanel(root_panel, tlm_latest_data)
 
-        # set layout of panels
+        # lay out panels by sizer
         root_layout = wx.GridBagSizer()
         root_layout.Add(self.chart_panel, pos=wx.GBPosition(0,0), flag=wx.EXPAND | wx.ALL, border=10)
-
         root_panel.SetSizer(root_layout)
         root_layout.Fit(root_panel)
 
@@ -99,26 +93,27 @@ class ChartPanel(wx.Panel):
     __T_RANGE = 30    # [s]
     __IND_TIME = 1
 
-    sensor_type = ['Time [s]', 'P [MPa]', 'T [K]', 'IMU', 'House Keeping']
-    col_value = [6, 8, 8, 9, 8]
+    __PLOT_SKIP = 20    ### TBREFAC. ###
 
-    def __init__(self, parent, latest_values):
+    sensor_type = ['Time [s]', 'Pressure [MPa]', 'Temperature [K]', 'IMU', 'House Keeping']
+    col_value = [6, 6, 6, 6, 6]
+    # col_value = [6, 8, 8, 9, 8]
+
+    def __init__(self, parent, tlm_latest_data):
         super().__init__(parent, wx.ID_ANY)
 
         ### initialize
-        self.latest_values = latest_values      # receive instance of shared variables
+        self.tlm_latest_data = tlm_latest_data      # receive instance of shared variables
         self.__F_TLM_IS_ACTIVE = False
         self.dfTlm = pd.DataFrame()
+        self.__PLOT_COUNT = self.__PLOT_SKIP   ### TBREFAC. ###
         
         ### load configurations from external files
         # - smt&pcm config
-        #self.df_cfg_tlm = th_smt.smt.df_cfg.copy()
-        self.df_cfg_tlm = pd.read_excel('./config_tlm.xlsx', sheet_name='smt').dropna(how='all')
-        #self.df_cfg_smt = pd.read_excel('./config_tlm.xlsx', sheet_name='smt')
+        self.df_cfg_smt = pd.read_excel('./config_tlm.xlsx', sheet_name='smt').dropna(how='all')
         self.df_cfg_pcm = pd.read_excel('./config_tlm.xlsx', sheet_name='pcm').dropna(how='all')
 
-        self.df_cfg_tlm.reset_index()
-        #self.df_cfg_smt.reset_index()
+        self.df_cfg_smt.reset_index()
         self.df_cfg_pcm.reset_index()
 
         # - digital indicator config
@@ -131,7 +126,7 @@ class ChartPanel(wx.Panel):
         self.configure_digital_indicator()
         self.configure_plotter()
 
-        ### layout 
+        ### lay out GUI elements by sizer 
         self.layout = wx.FlexGridSizer(rows=1, cols=2, gap=(20, 0))
         self.layout.Add(self.canvas, flag=wx.EXPAND)                            # plotter
         self.layout.Add(self.layout_Value, flag=wx.ALIGN_CENTER_HORIZONTAL)     # digital indicators
@@ -155,21 +150,27 @@ class ChartPanel(wx.Panel):
 
     # Event handler: EVT_TIMER
     def OnFetchLatestValues(self, event):
+        print('GUI FTC: fetched tlm data')
+        
         # break off when tlm data not exist
-        if len(self.latest_values.df_smt.index) == 0:
-            print("GUI awaiting tlm data")
+        if len(self.tlm_latest_data.df_smt.index) == 0:
+            print('GUI awaiting smt data')
             self.__F_TLM_IS_ACTIVE = False
             return None
         
         # for debug
-        # print("GUI FTC: df.index length = %i" % len(self.latest_values.df_smt.index))
-        # print(self.latest_values.df_smt) 
+        # print('GUI FTC: df.index length = {}'.format(len(self.tlm_latest_data.df_smt.index)))
+        # print(self.tlm_latest_data.df_smt) 
 
         self.__F_TLM_IS_ACTIVE = True
 
+        # if self.dfTlm == self.tlm_latest_data.df_smt:
+        #     print('GUI FTC: TLM data has NOT been updated!')
+        #     return None
+        
         # fetch current values & store
-        self.dfTlm = self.latest_values.df_smt
-        # TBREFAC.: should be thread-safe
+        self.dfTlm = self.tlm_latest_data.df_smt
+        ### TBREFAC.: should be thread safe
 
     # Event handler: EVT_TIMER
     def OnRefreshDigitalIndicator(self, event):
@@ -179,7 +180,7 @@ class ChartPanel(wx.Panel):
         df_tmp = self.dfTlm.copy()
         
         # refresh display
-        for i_sensor in range(len(self.df_cfg_tlm['item'])):
+        for i_sensor in range(len(self.df_cfg_smt['item'])):
             self.SensorValue[i_sensor].SetLabel(str(np.round(df_tmp.iloc[-1, i_sensor], 2)))
             
     # Event handler: EVT_TIMER
@@ -211,6 +212,13 @@ class ChartPanel(wx.Panel):
             print("GUI PLT: a member of 'x_series' is out of the range")
             self.x_series = np.delete(self.x_series, 0)
             self.y_series = np.delete(self.y_series, np.s_[0:self.__N_PLOTTER])
+
+        # skip redraw
+        ### TBREFAC. ###
+        if self.__PLOT_COUNT != self.__PLOT_SKIP:
+            self.__PLOT_COUNT += 1
+            return None
+        self.__PLOT_COUNT = 0
 
         ###
         ### refresh plotter
@@ -264,7 +272,6 @@ class ChartPanel(wx.Panel):
 
         self.id = [self.id_time, self.id_p, self.id_T, self.id_imu, self.id_hk]
 
-
     # Load configurations from external files
     def load_config_plotter(self):
         ### TBREFAC.: TEMPORALLY DESIGNATED BY LITERALS ###
@@ -293,140 +300,61 @@ class ChartPanel(wx.Panel):
                 alart_lim_u = 10,
                 alart_lim_l = 0.0))
 
-        
-        # plt_attr_1 = PltAttr(
-        #     y_label =  "Series 1",
-        #     y_min = 0.0,
-        #     y_max = 4.0,
-        #     alart_lim_u = 3.0,
-        #     alart_lim_l = 1.0
-        # )
-        # plt_attr_2 = PltAttr(
-        #     y_label =  "Series 2",
-        #     y_min = 0.0,
-        #     y_max = 3.0,
-        #     alart_lim_u = 2.5,
-        #     alart_lim_l = 0.5,
-        # )
-        # plt_attr_3 = PltAttr(
-        #     y_label =  "Series 3",
-        #     y_min = 0.0,
-        #     y_max = 3.0,
-        #     alart_lim_u = 2.5,
-        #     alart_lim_l = 0.5,
-        # )
-        # plt_attr_4 = PltAttr(
-        #     y_label =  "Series 4",
-        #     y_min = 0.0,
-        #     y_max = 3.0,
-        #     alart_lim_u = 2.5,
-        #     alart_lim_l = 0.5,
-        # )
-        # plt_attr_5 = PltAttr(
-        #     y_label =  "Series 5",
-        #     y_min = 0.0,
-        #     y_max = 3.0,
-        #     alart_lim_u = 2.5,
-        #     alart_lim_l = 0.5,
-        # )
-
-        # self.plt_attr = []
-        # self.plt_attr.append(plt_attr_1)    
-        # if self.__N_PLOTTER <= 1: return
-
-        # self.plt_attr.append(plt_attr_2)
-        # if self.__N_PLOTTER <= 2: return
-
-        # self.plt_attr.append(plt_attr_3)
-        # if self.__N_PLOTTER <= 3: return
-
-        # self.plt_attr.append(plt_attr_4)
-        # if self.__N_PLOTTER <= 4: return
-
-        # self.plt_attr.append(plt_attr_5)
-        # if self.__N_PLOTTER <= 5: return
-        # else: self.__N_PLOTTER == 5
-
-        
-        # self.item_plot = [self.df_cfg_plot['item'][self.df_cfg_plot['plot_1'].astype(bool)].iat[0],
-        #                   self.df_cfg_plot['item'][self.df_cfg_plot['plot_2'].astype(bool)].iat[0],
-        #                   self.df_cfg_plot['item'][self.df_cfg_plot['plot_3'].astype(bool)].iat[0],
-        #                   self.df_cfg_plot['item'][self.df_cfg_plot['plot_4'].astype(bool)].iat[0],
-        #                   self.df_cfg_plot['item'][self.df_cfg_plot['plot_5'].astype(bool)].iat[0]]
-        # #print(self.item_plot)
-        
-        # self.unit_plot = [self.df_cfg_plot['unit'][self.df_cfg_plot['plot_1'].astype(bool)].iat[0],
-        #                   self.df_cfg_plot['unit'][self.df_cfg_plot['plot_2'].astype(bool)].iat[0],
-        #                   self.df_cfg_plot['unit'][self.df_cfg_plot['plot_3'].astype(bool)].iat[0],
-        #                   self.df_cfg_plot['unit'][self.df_cfg_plot['plot_4'].astype(bool)].iat[0],
-        #                   self.df_cfg_plot['unit'][self.df_cfg_plot['plot_5'].astype(bool)].iat[0]]
-        # #print(self.unit_plot)
-        
-        # self.y_min_plot = [self.df_cfg_plot['y_min'][self.df_cfg_plot['plot_1'].astype(bool)].iat[0],
-        #                    self.df_cfg_plot['y_min'][self.df_cfg_plot['plot_2'].astype(bool)].iat[0],
-        #                    self.df_cfg_plot['y_min'][self.df_cfg_plot['plot_3'].astype(bool)].iat[0],
-        #                    self.df_cfg_plot['y_min'][self.df_cfg_plot['plot_4'].astype(bool)].iat[0],
-        #                    self.df_cfg_plot['y_min'][self.df_cfg_plot['plot_5'].astype(bool)].iat[0]]
-        # #print(self.y_min_plot)
-        
-        # self.y_max_plot = [self.df_cfg_plot['y_max'][self.df_cfg_plot['plot_1'].astype(bool)].iat[0],
-        #                    self.df_cfg_plot['y_max'][self.df_cfg_plot['plot_2'].astype(bool)].iat[0],
-        #                    self.df_cfg_plot['y_max'][self.df_cfg_plot['plot_3'].astype(bool)].iat[0],
-        #                    self.df_cfg_plot['y_max'][self.df_cfg_plot['plot_4'].astype(bool)].iat[0],
-        #                    self.df_cfg_plot['y_max'][self.df_cfg_plot['plot_5'].astype(bool)].iat[0]]
-        # #print(self.y_max_plot)
-
     # Configure appearance for digital indicators to display current values
     def configure_digital_indicator(self):
-        # generate DataButton instances
-        self.DataButton = []
-        for index in self.df_cfg_tlm['item']:
-            self.DataButton.append(wx.ToggleButton(self, wx.ID_ANY, index))
-
-        # set presentation of values
+        ### generate instances        
+        # - StaticText: digital indicators
         self.SensorValue = []
-        for i in range(len(self.df_cfg_tlm['item'])):
+        for i in range(len(self.df_cfg_smt['item'])):
             self.SensorValue.append(wx.StaticText(self, wx.ID_ANY, str(i+1), style=wx.ALIGN_CENTRE | wx.ST_NO_AUTORESIZE))
             self.SensorValue[-1].SetBackgroundColour('BLACK')
             self.SensorValue[-1].SetForegroundColour('GREEN')
 
-        # layout digital indicators
-        self.layout_Value = wx.BoxSizer(wx.VERTICAL)
+        # - ToggleButton: item labels for indicators
+        self.DataButton = []
+        for index in self.df_cfg_smt['item']:
+            self.DataButton.append(wx.ToggleButton(self, wx.ID_ANY, index, size=(120,22)))
 
-        self.sbox_type = []
+        # - StaticBox: container grouping labels and indicators
         self.sbox_font = wx.Font(15, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
+        self.sbox_type = []
         for name in self.sensor_type:
             self.sbox_type.append(wx.StaticBox(self, wx.ID_ANY, name))
             self.sbox_type[-1].SetFont(self.sbox_font)
             self.sbox_type[-1].SetForegroundColour('WHITE')
 
+        ### lay out digital indicators
+        self.layout_Value = wx.BoxSizer(wx.VERTICAL)
+
+        # - containers by StaticBoxSizer
         self.layout_type = []
         for i in range(len(self.sensor_type)):
             self.layout_type.append(wx.StaticBoxSizer(self.sbox_type[i], wx.VERTICAL))
 
-        self.layout_Data = []
-        for i in range(len(self.sensor_type)):
-            self.layout_Data.append(wx.GridSizer(rows=len(self.id[i])//self.col_value[i]+1,
-                                                 cols=self.col_value[i], gap=(10,5)))
-
+        # - pairs of an item label & an inidicator by GridSizer
+        # -- make pairs of an item label & an inidicator
         self.layout_Set = []
-        for i in range(len(self.df_cfg_tlm['item'])):
-            self.layout_Set.append(wx.GridSizer(rows=2, cols=1, gap=(5,5)))
-
-        for i in range(len(self.df_cfg_tlm['item'])):
+        for i in range(len(self.df_cfg_smt['item'])):
+            # self.layout_Set.append(wx.GridSizer(rows=2, cols=1, gap=(5,5)))
+            self.layout_Set.append(wx.GridSizer(rows=2, cols=1, gap=(0,0)))
             self.layout_Set[i].Add(self.DataButton[i], flag=wx.EXPAND)
             self.layout_Set[i].Add(self.SensorValue[i], flag=wx.EXPAND)
 
-        # Set Data Button and Sensor Value
+        # -- snap the pairs into grid
+        self.layout_Data = []
         for i in range(len(self.sensor_type)):
+            self.layout_Data.append(wx.GridSizer(rows=len(self.id[i])//self.col_value[i]+1,
+                                                 cols=self.col_value[i], 
+                                                 gap=(10,5)))
             for sensor in self.id[i]:
                 self.layout_Data[i].Add(self.layout_Set[sensor], flag=wx.EXPAND)
 
-        for i in range(len(self.sensor_type)):
+            # snap
             self.layout_type[i].Add(self.layout_Data[i])
-        for i in range(len(self.sensor_type)):
+            
             self.layout_Value.Add(self.layout_type[i])
 
+        # set states for ToggleButton
         for index in self.index_plot:
             self.DataButton[index].SetValue(True)
 
@@ -463,7 +391,7 @@ class ChartPanel(wx.Panel):
             self.axes[i].set_ylim([self.plt_attr[i].y_min, self.plt_attr[i].y_max])
 
             # - set label for y axis
-            self.axes[i].set_ylabel(self.plt_attr[i].y_label + ' [{}]'.format(self.plt_attr[i].y_unit))
+            self.axes[i].set_ylabel(self.plt_attr[i].y_label + f' [{self.plt_attr[i].y_unit}]')
 
         # tentatively draw canvas without plot points to save as background
         self.canvas.draw()                                            
