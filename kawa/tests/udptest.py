@@ -1,19 +1,25 @@
-from socket import *
+# from socket import *
+import socket
 
 class udprecv():
     def __init__(self):
-        
-        #SrcIP = "192.168.108.189" 
-        SrcIP = "" 
-        #SrcPort = 70
-        SrcPort = 49157
-        self.SrcAddr = (SrcIP, SrcPort)
+
+        # DistIP = "192.168.1.4" 
+        DistIP = "192.168.1.255" 
+        # DistIP = "192.168.108.189" 
+        # DistIP = "" 
+        # DistIP = socket.gethostbyname(socket.gethostname())
+        # SrcPort = 70
+        DistPort = 49157
+        self.DistAddr = (DistIP, DistPort)
+
+        print(f'HOST = {DistIP}')
 
         self.BUFSIZE = 1088
         #self.BUFSIZE = 2176
         #self.BUFSIZE = 3000
-        self.udpServSock = socket(AF_INET, SOCK_DGRAM)
-        self.udpServSock.bind(self.SrcAddr)
+        self.udpServSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.udpServSock.bind(self.DistAddr)
 
     def recv(self):
         #while True:
