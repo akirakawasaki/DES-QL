@@ -1,5 +1,6 @@
 ### Standard libraries
-import time
+# import time
+import concurrent.futures
 
 ### Third-party libraries
 import numpy as np
@@ -22,7 +23,8 @@ from matplotlib.figure import Figure
 wxPython configurations
 """
 FETCH_RATE_LATEST_VALUES       = 20     # ms/cycle
-REFLESH_RATE_PLOTTER           = 20     # ms/cycle
+# FETCH_RATE_LATEST_VALUES       = 200     # ms/cycle
+REFLESH_RATE_PLOTTER           = 100    # ms/cycle
 REFLESH_RATE_DIGITAL_INDICATOR = 350    # ms/cycle
 
 
@@ -32,8 +34,8 @@ Matplotlib configuration
 plt.style.use('dark_background')
 
 # Margin
-plt.rcParams["figure.subplot.bottom"] = 0.04    # Bottom
-plt.rcParams["figure.subplot.top"]    = 0.97    # Top
+plt.rcParams["figure.subplot.bottom"] = 0.03    # Bottom
+plt.rcParams["figure.subplot.top"]    = 0.99    # Top
 plt.rcParams["figure.subplot.left"]   = 0.15    # Left
 plt.rcParams["figure.subplot.right"]  = 0.97    # Right
 plt.rcParams["figure.subplot.hspace"] = 0.1     # Height Margin between subplots
@@ -43,10 +45,10 @@ plt.rcParams["figure.subplot.hspace"] = 0.1     # Height Margin between subplots
 Top Level Window
 """
 class frmMain(wx.Frame):
-    def __init__(self, tlm_latest_data):
+    def __init__(self, internal_flags, tlm_latest_data):
         super().__init__(None, wx.ID_ANY, 'Rocket System Information App')
-
         # receive instance of shared variables
+        self.internal_flags = internal_flags
         #self.latest_values = latest_values
 
         # maxmize GUI window size
@@ -84,6 +86,7 @@ class frmMain(wx.Frame):
         # dig.Destroy()
         # if result == wx.ID_OK:  self.Destroy()
         self.Destroy()
+        self.internal_flags.GUI_TASK_IS_DONE = True
 
 """
 Time History Plots & Current Value Indicators
@@ -93,7 +96,7 @@ class ChartPanel(wx.Panel):
     __T_RANGE = 30    # [s]
     __IND_TIME = 1
 
-    __PLOT_SKIP = 20    ### TBREFAC. ###
+    __PLOT_SKIP = 50    ### TBREFAC. ###
 
     sensor_type = ['Time [s]', 'Pressure [MPa]', 'Temperature [K]', 'IMU', 'House Keeping']
     col_value = [6, 6, 6, 6, 6]
@@ -150,7 +153,7 @@ class ChartPanel(wx.Panel):
 
     # Event handler: EVT_TIMER
     def OnFetchLatestValues(self, event):
-        print('GUI FTC: fetched tlm data')
+        # print('GUI FTC: fetched tlm data')
         
         # break off when tlm data not exist
         if len(self.tlm_latest_data.df_smt.index) == 0:
@@ -203,12 +206,12 @@ class ChartPanel(wx.Panel):
         # print("GUI PLT: y_series = {}".format(self.y_series))
 
         # - determine time max & min
-        t_max = self.x_series[-1]
-        t_min = t_max - self.__T_RANGE
-        # print("t_max = {}, t_min = {}".format(t_max, t_min))
+        self.t_max = self.x_series[-1]
+        self.t_min = self.t_max - self.__T_RANGE
+        # print("t_max = {}, t_min = {}".format(self.t_max, self.t_min))
 
         # - delete plot points out of the designated time range
-        while self.x_series[0] < t_min:
+        while self.x_series[0] < self.t_min:
             print("GUI PLT: a member of 'x_series' is out of the range")
             self.x_series = np.delete(self.x_series, 0)
             self.y_series = np.delete(self.y_series, np.s_[0:self.__N_PLOTTER])
@@ -220,6 +223,12 @@ class ChartPanel(wx.Panel):
             return None
         self.__PLOT_COUNT = 0
 
+    #     # run tlm_handler concurrently in other threads
+    #     executor = concurrent.futures.ThreadPoolExecutor()
+    #     # executor = concurrent.futures.ProcessPoolExecutor()
+    #     executor.submit(self.__redraw_plotter_pane)
+
+    # def __redraw_plotter_pane(self):
         ###
         ### refresh plotter
         self.lines = []
@@ -231,7 +240,7 @@ class ChartPanel(wx.Panel):
             self.axes[i].cla()
 
             # update limit for x axis
-            self.axes[i].set_xlim([t_min, t_max])
+            self.axes[i].set_xlim([self.t_min, self.t_max])
 
             # set limit for y axis
             self.axes[i].set_ylim([self.plt_attr[i].y_min, self.plt_attr[i].y_max])

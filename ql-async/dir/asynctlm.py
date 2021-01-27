@@ -38,11 +38,11 @@ class DatagramServerProtocol:
     __BUFSIZE = __W2B * (__LEN_HEADER + __LEN_PAYLOAD) * __NUM_OF_FRAMES       # 1088 bytes
     
     # Initialize instance
-    def __init__(self, tlm_type, tlm_latest_values):
+    def __init__(self, tlm_type, tlm_latest_data):
         print('Starting {} handlar...'.format(tlm_type))
         
         self.TLM_TYPE = tlm_type
-        self.tlm_latest_values = tlm_latest_values
+        self.tlm_latest_data = tlm_latest_data
 
         # choose a destination file for data ouput
         self.DATA_PATH = ''
@@ -110,9 +110,9 @@ class DatagramServerProtocol:
 
         # notify GUI of the latest values
         if self.TLM_TYPE == 'smt':
-            self.tlm_latest_values.df_smt = self.df_mf.tail(1)
+            self.tlm_latest_data.df_smt = self.df_mf.tail(1)
         else:
-            self.tlm_latest_values.df_pcm = self.df_mf.tail(1)
+            self.tlm_latest_data.df_pcm = self.df_mf.tail(1)
 
         # for debug
         # print("TLM notifies GUI of df:")

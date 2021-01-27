@@ -16,8 +16,14 @@ import pandas as pd
 #
 # Shared Variables
 #
-class LatestValues:
+class TlmLatestData:
     def __init__(self):
         self.df_smt = pd.DataFrame()
         self.df_pcm = pd.DataFrame()
+
+class InternalFlags:
+    def __init__(self):
+        self.GUI_TASK_IS_DONE = False
+        self.FILE_SAVE_IS_ACTIVE = False
+
         

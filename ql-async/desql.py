@@ -26,11 +26,13 @@ from dir import common
 
 
 ### TBREFAC.: TO BE MOVED TO ASYNCTLM.PY ###
-async def tlm(tlm_type, tlm_latest_values):
+async def tlm(tlm_type, internal_flags, tlm_latest_data):
     # print('Starting {} handlar...'.format(tlm_type))
     
     # initialize
-    HOST = socket.gethostbyname(socket.gethostname())
+    HOST = "192.168.1.255"
+    # HOST = "192.168.1.4"
+    # HOST = socket.gethostbyname(socket.gethostname())
     PORT = 0
 
     ### TBREFAC. ###
@@ -47,41 +49,44 @@ async def tlm(tlm_type, tlm_latest_values):
 
     # One protocol instance will be created to serve all client requests.
     transport, protocol = await loop.create_datagram_endpoint(
-                                    lambda: asynctlm.DatagramServerProtocol(tlm_type, tlm_latest_values),
+                                    lambda: asynctlm.DatagramServerProtocol(tlm_type, tlm_latest_data),
                                     local_addr=(HOST,PORT))
 
     ### TBREFAC.: MUST FIGURE OUT HOW TO KILL THE TASK AFTER CLOSING GUI ###
-    try:
-       await asyncio.sleep(3600)  # *Serve for 1 hour*
-    finally:
-        transport.close()
+    while internal_flags.GUI_TASK_IS_DONE != True:
+        await asyncio.sleep(2)
 
-        return (transport, protocol)
+    # try:
+    #    await asyncio.sleep(3600)  # *Serve for 1 hour*
+    # finally:
+    #     transport.close()
+
+    return (transport, protocol)
 
 
 
 #
 # Telemetry Data Handler (co-routine)
 #
-async def tlm_handler(tlm_latest_values):
+async def tlm_handler(internal_flags, tlm_latest_values):
     # print('Starting TLM handler...')
 
     gatherd_tasks = await asyncio.gather(
-        tlm("smt", tlm_latest_values),
-        tlm("pcm", tlm_latest_values))
+        tlm("smt", internal_flags, tlm_latest_values),
+        tlm("pcm", internal_flags, tlm_latest_values))
 
 
 
 #
 # GUI Handler
 #
-def gui_handler(tlm_latest_data):
+def gui_handler(internal_flags, tlm_latest_data):
     print('Starting GUI...')
     
     app = wx.App()
 
     # launche main window
-    gui.frmMain(tlm_latest_data)
+    gui.frmMain(internal_flags, tlm_latest_data)
     
     # handle event loop for GUI
     app.MainLoop()
@@ -94,19 +99,20 @@ def gui_handler(tlm_latest_data):
 #
 if __name__ == "__main__":
     # Variables shared among threads
-    tlm_latest_data = common.LatestValues()
+    internal_flags = common.InternalFlags()
+    tlm_latest_data = common.TlmLatestData()
 
     # wrapper for tlm_handler co-routine
-    def tlm_handler_wrapper(tlm_latest_data):
-        asyncio.run(tlm_handler(tlm_latest_data))
+    def tlm_handler_wrapper(internal_flags, tlm_latest_data):
+        asyncio.run(tlm_handler(internal_flags, tlm_latest_data))
         print('Closing TLM...')
 
     # run tlm_handler concurrently in other threads
     executor = concurrent.futures.ThreadPoolExecutor()
-    executor.submit(tlm_handler_wrapper, tlm_latest_data)
+    executor.submit(tlm_handler_wrapper, internal_flags, tlm_latest_data)
 
     # launch GUI
-    gui_handler(tlm_latest_data)
+    gui_handler(internal_flags, tlm_latest_data)
 
     # 
     executor.shutdown(wait=True)
