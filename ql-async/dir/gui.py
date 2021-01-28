@@ -24,7 +24,7 @@ wxPython configurations
 """
 FETCH_RATE_LATEST_VALUES       = 20     # ms/cycle
 # FETCH_RATE_LATEST_VALUES       = 200     # ms/cycle
-REFLESH_RATE_PLOTTER           = 100    # ms/cycle
+REFLESH_RATE_PLOTTER           = 20     # ms/cycle
 REFLESH_RATE_DIGITAL_INDICATOR = 350    # ms/cycle
 
 
@@ -46,7 +46,7 @@ Top Level Window
 """
 class frmMain(wx.Frame):
     def __init__(self, internal_flags, tlm_latest_data):
-        super().__init__(None, wx.ID_ANY, 'Rocket System Information App')
+        super().__init__(None, wx.ID_ANY, 'Telemetry Data Quick Look for Detonation Engine System')
         # receive instance of shared variables
         self.internal_flags = internal_flags
         #self.latest_values = latest_values
@@ -96,7 +96,7 @@ class ChartPanel(wx.Panel):
     __T_RANGE = 30    # [s]
     __IND_TIME = 1
 
-    __PLOT_SKIP = 50    ### TBREFAC. ###
+    __PLOT_SKIP = 20    ### TBREFAC. ###
 
     sensor_type = ['Time [s]', 'Pressure [MPa]', 'Temperature [K]', 'IMU', 'House Keeping']
     col_value = [6, 6, 6, 6, 6]

@@ -115,7 +115,7 @@ if __name__ == "__main__":
     gui_handler(internal_flags, tlm_latest_data)
 
     # 
-    executor.shutdown(wait=True)
+    # executor.shutdown(wait=True)
     # executor.shutdown(wait=True, cancel_futures=True)  # valid after Python 3.9
 
     print('... DES-QL quitted normally')

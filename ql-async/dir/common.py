@@ -23,6 +23,7 @@ class TlmLatestData:
 
 class InternalFlags:
     def __init__(self):
+        self.DESQL_SHOULD_QUIT = False
         self.GUI_TASK_IS_DONE = False
         self.FILE_SAVE_IS_ACTIVE = False
 
