@@ -16,7 +16,7 @@ import pandas as pd
 '''
 Constant Definition
 '''
-# W2B = 2
+W2B = 2
 # NUM_OF_FRAMES = 8
 # LEN_HEADER  = 4
 # LEN_PAYLOAD = 64
@@ -54,10 +54,12 @@ class DatagramServerProtocol:
         #     print('Error: Type of the telemeter is wrong!')
         #     sys.exit()
 
+        # print('Im here!')
+
         # load configuration for word assignment
         # self.df_cfg = pd.read_excel('./config_tlm.xlsx', sheet_name=self.TLM_TYPE).dropna(how='all')
         try: 
-            self.df_cfg = pd.read_excel('./config_tlm_2.xlsx', 
+            df_cfg = pd.read_excel('./config_tlm_2.xlsx', 
                                 sheet_name=self.TLM_TYPE, header=0, index_col=None).dropna(how='all')
             # self.df_cfg = pd.read_excel('./config_tlm.xlsx', 
             #                     sheet_name=self.TLM_TYPE, header=0, index_col=None).dropna(how='all')
@@ -66,12 +68,20 @@ class DatagramServerProtocol:
             print(self.TLM_TYPE)
             sys.exit()
 
-        # print(self.df_cfg)
-        self.NUM_OF_ITEMS = len(self.df_cfg.index)
-        self.MAX_SUP_COM = self.df_cfg['sup com'].max()
-        
+        # print('df_cfg = {}'.format(df_cfg))
+
+        self.TlmItemList = df_cfg['item'].values.tolist()
+        self.TlmItemAttr = df_cfg.to_dict(orient='index')
+        self.NUM_OF_ITEMS = len(df_cfg.index)
+        self.MAX_SUP_COM = df_cfg['sup com'].max()
+
+        # for debug
+        print('Item List = {}'.format(self.TlmItemList))
+        # print('Item Attributions = {}'.format(self.TlmItemAttr))
+
         # initialize a DataFrame to store data of one major frame 
-        self.df_mf = pd.DataFrame(index=[], columns=self.df_cfg['item']) 
+        self.df_mf = pd.DataFrame(index=[], columns=self.TlmItemList) 
+        # self.df_mf = pd.DataFrame(index=[], columns=self.df_cfg['item']) 
         self.df_mf.to_csv(self.DATA_PATH, mode='w')
 
         # initialize data index
@@ -90,7 +100,7 @@ class DatagramServerProtocol:
 
 
     # Event handler
-    def datagram_received(self,data,addr):
+    def datagram_received(self, data, addr):
         print(f'Received a datagram from {self.TLM_TYPE}')
         #print_mf(data)      # for debug
 
@@ -125,172 +135,224 @@ class DatagramServerProtocol:
     
 
     # Internal method: 
-    # Translate raw tlm data 
+    # Translate raw telemetry data into physical values
     def __translate(self, data):
+        # initialize   ### T.B.REFAC ###
+        Vcjc = 0.0
+        Vaz = 0.0
+        
+        # self.df_mf = pd.DataFrame(index=[], columns=self.TlmItemList) 
+
         # sweep frames in a major frame
         for iFrame in range(self.__NUM_OF_FRAMES):
             #print(f"iLine: {self.iLine}")
 
-            # byte index of the head of the frame (including header)
-            byte_idx_frame_head = iFrame * self.__W2B * (self.__LEN_HEADER + self.__LEN_PAYLOAD)
-            #print(f"byte_idx_frame_head: {byte_idx_frame_head}") 
-
-            # initialize the row by filling wit NaN
+            ### initialize the row by filling wit NaN
             self.df_mf.loc[iFrame] = np.nan
+            # self.df_mf.loc[iFrame] = np.nan
             # print(self.df_mf)
-            
 
-            # pick up data from the datagram
+            ### byte index of the head of the frame (without header)
+            byte_idx_head =  self.__W2B * (self.__LEN_HEADER + self.__LEN_PAYLOAD) * iFrame \
+                           + self.__W2B *  self.__LEN_HEADER
+            #print(f"byte_idx_head: {byte_idx_head}") 
+            
+            ### pick up data from the datagram
             '''
             When w assgn < 0
             '''
-            # Days from January 1st on GSE
-            byte_idx = byte_idx_frame_head + self.__W2B * 0
-            self.df_mf.iat[iFrame,0] =  (data[byte_idx]   >> 4  ) * 100 \
-                                      + (data[byte_idx]   & 0x0F) * 10  \
-                                      + (data[byte_idx+1] >> 4  ) * 1
+            # # Days from January 1st on GSE
+            # byte_idx = byte_idx_head + self.__W2B * 0
+            # self.df_mf.iat[iFrame,0] =  (data[byte_idx]   >> 4  ) * 100 \
+            #                           + (data[byte_idx]   & 0x0F) * 10  \
+            #                           + (data[byte_idx+1] >> 4  ) * 1
         
-            # GSE timestamp in [sec]
-            byte_idx = byte_idx_frame_head + self.__W2B * 0
-            self.df_mf.iat[iFrame,1] =  (data[byte_idx+1] & 0x0F) * 10  * 3600 \
-                                      + (data[byte_idx+2] >> 4  ) * 1   * 3600 \
-                                      + (data[byte_idx+2] & 0x0F) * 10  * 60   \
-                                      + (data[byte_idx+3] >> 4  ) * 1   * 60   \
-                                      + (data[byte_idx+3] & 0x0F) * 10         \
-                                      + (data[byte_idx+4] >> 4  ) * 1          \
-                                      + (data[byte_idx+4] & 0x0F) * 100 / 1000 \
-                                      + (data[byte_idx+5] >> 4  ) * 10  / 1000 \
-                                      + (data[byte_idx+5] & 0x0F) * 1   / 1000 
+            # # GSE timestamp in [sec]
+            # byte_idx = byte_idx_head + self.__W2B * 0
+            # self.df_mf.iat[iFrame,1] =  (data[byte_idx+1] & 0x0F) * 10  * 3600 \
+            #                           + (data[byte_idx+2] >> 4  ) * 1   * 3600 \
+            #                           + (data[byte_idx+2] & 0x0F) * 10  * 60   \
+            #                           + (data[byte_idx+3] >> 4  ) * 1   * 60   \
+            #                           + (data[byte_idx+3] & 0x0F) * 10         \
+            #                           + (data[byte_idx+4] >> 4  ) * 1          \
+            #                           + (data[byte_idx+4] & 0x0F) * 100 / 1000 \
+            #                           + (data[byte_idx+5] >> 4  ) * 10  / 1000 \
+            #                           + (data[byte_idx+5] & 0x0F) * 1   / 1000 
 
             '''
             When w assgn >= 0
             '''
-            for iItem in range(2, self.NUM_OF_ITEMS):
-                # designate byte addres with the datagram
-                byte_idx = byte_idx_frame_head + self.__W2B * (self.__LEN_HEADER + int(self.df_cfg.at[iItem,'w idx']))
-                
-                #
-                #   SMT
-                #
+            # Get a physical value from telemeter words
+            # for iItem in range(0, self.NUM_OF_ITEMS):
+            # for iItem in range(2, self.NUM_OF_ITEMS):
+            for strItem in self.TlmItemList:
+                iItem = self.TlmItemList.index(strItem)
+                # iItem = int(self.TlmItemAttr[strItem]['No.']) - 1       ### T.B.REFAC ###
 
-                # DES timestamp in [sec]
-                if self.df_cfg.at[iItem,'type'] == 'des time':
-                    self.df_mf.iat[iFrame,iItem] = \
-                        int.from_bytes((data[byte_idx], data[byte_idx+1], data[byte_idx+2], data[byte_idx+3]), 
-                                        byteorder='big', signed=False) \
-                        / 1000.0
+                # byte index of the datum with the datagram
+                byte_idx =  byte_idx_head + self.__W2B * int(self.TlmItemAttr[iItem]['w idx'])
+                # byte_idx = byte_idx_head + self.__W2B * (self.__LEN_HEADER + int(self.df_cfg.at[iItem,'w idx']))
 
-                # pressure in [MPa] <S,16,5>
-                elif self.df_cfg.at[iItem,'type'] == 'p':
-                    self.df_mf.iat[iFrame,iItem] = \
-                        self.df_cfg.at[iItem,'a coeff'] / 2**11 \
-                            * int.from_bytes((data[byte_idx], data[byte_idx+1]), 
-                                            byteorder='big', signed=True) \
-                        + self.df_cfg.at[iItem,'b coeff']
-                                    
-                # temperature in [K] <S,16,-2>
-                elif self.df_cfg.at[iItem,'type'] == 'T':
-                    # TC thermoelectric voltage in [uV]
-                    Vtc =  self.df_cfg.at[iItem,'a coeff'] / 2**18 * 1e6 \
-                            * int.from_bytes((data[byte_idx], data[byte_idx+1]), 
-                                            byteorder='big', signed=True) \
-                         + self.df_cfg.at[iItem,'b coeff']
-                    Ttc = self.uv2k(Vtc + Vcjc - Vaz, 'K')
+                # Ordinary Items
+                if self.TlmItemAttr[iItem]['ordinary item'] == True :
+                    self.df_mf.iat[iFrame,iItem] = self.get_physical_value_from_tlm_words(iItem, data, byte_idx)
 
-                    self.df_mf.iat[iFrame,iItem] = Ttc
-
-                # auto-zero coefficient in [uV]
-                elif self.df_cfg.at[iItem,'type'] == 'az':
-                    Vaz =  self.df_cfg.at[iItem,'a coeff'] / 2**18 * 1e6 \
-                            * int.from_bytes((data[byte_idx], data[byte_idx+1]), 
-                                            byteorder='big', signed=True) \
-                         + self.df_cfg.at[iItem,'b coeff']
-                    
-                    self.df_mf.iat[iFrame,iItem] = Vaz
+                # Days from January 1st on GSE
+                elif self.TlmItemAttr[iItem]['type'] == 'gse day':
+                    # byte_idx = byte_idx_head + self.__W2B * 0
+                    self.df_mf.iat[iFrame,iItem] =  (data[byte_idx]   >> 4  ) * 100 \
+                                                      + (data[byte_idx]   & 0x0F) * 10  \
+                                                      + (data[byte_idx+1] >> 4  ) * 1
+        
+                # GSE timestamp in [sec]
+                elif self.TlmItemAttr[iItem]['type'] == 'gse time':
+                    # byte_idx = byte_idx_head + self.__W2B * 0
+                    self.df_mf.iat[iFrame,iItem] =  (data[byte_idx+1] & 0x0F) * 10  * 3600 \
+                                                      + (data[byte_idx+2] >> 4  ) * 1   * 3600 \
+                                                      + (data[byte_idx+2] & 0x0F) * 10  * 60   \
+                                                      + (data[byte_idx+3] >> 4  ) * 1   * 60   \
+                                                      + (data[byte_idx+3] & 0x0F) * 10         \
+                                                      + (data[byte_idx+4] >> 4  ) * 1          \
+                                                      + (data[byte_idx+4] & 0x0F) * 100 / 1000 \
+                                                      + (data[byte_idx+5] >> 4  ) * 10  / 1000 \
+                                                      + (data[byte_idx+5] & 0x0F) * 1   / 1000 
 
                 # cold-junction compensation coefficient in [uV]
-                elif self.df_cfg.at[iItem,'type'] == 'cjc':
-                    cjc =  self.df_cfg.at[iItem,'a coeff'] / 2**18 \
-                            * int.from_bytes((data[byte_idx], data[byte_idx+1]), 
-                                            byteorder='big', signed=True) \
-                         + self.df_cfg.at[iItem,'b coeff']
+                elif self.TlmItemAttr[iItem]['type'] == 'cjc':
+                # elif self.df_cfg.at[iItem,'type'] == 'cjc':
+                    cjc = self.get_physical_value_from_tlm_words(iItem, data, byte_idx)
+                    # cjc =  self.df_cfg.at[iItem,'a coeff'] / 2**18 \
+                    #         * int.from_bytes((data[byte_idx], data[byte_idx+1]), 
+                    #                         byteorder='big', signed=True) \
+                    #      + self.df_cfg.at[iItem,'b coeff']
                     Rcjc = self.v2ohm(cjc)
                     Tcjc = self.ohm2k(Rcjc)
                     Vcjc = self.k2uv(Tcjc, 'K')
 
                     self.df_mf.iat[iFrame,iItem] = Vcjc
+                    # self.df_mf.iat[iFrame,iItem] = Vcjc
 
-                # acceleration in [m/s2] <S,32,12>
-                elif self.df_cfg.at[iItem,'type'] == 'a':
-                    self.df_mf.iat[iFrame,iItem] = \
-                        self.df_cfg.at[iItem,'a coeff'] / 2**20 \
-                            * int.from_bytes((data[byte_idx], data[byte_idx+1], data[byte_idx+2], data[byte_idx+3] ), 
-                                            byteorder='big', signed=True) \
-                        + self.df_cfg.at[iItem,'b coeff']
+                # auto-zero coefficient in [uV]
+                elif self.TlmItemAttr[iItem]['type'] == 'az':
+                # elif self.df_cfg.at[iItem,'type'] == 'az':
+                    Vaz = self.get_physical_value_from_tlm_words(iItem, data, byte_idx)
+                    # Vaz =  self.df_cfg.at[iItem,'a coeff'] / 2**18 * 1e6 \
+                    #         * int.from_bytes((data[byte_idx], data[byte_idx+1]), 
+                    #                         byteorder='big', signed=True) \
+                    #      + self.df_cfg.at[iItem,'b coeff']
+                    
+                    self.df_mf.iat[iFrame,iItem] = Vaz
+                    # self.df_mf.iat[iFrame,iItem] = Vaz
 
-                # angular velocity in [rad/s] <S,32,12>
-                elif self.df_cfg.at[iItem,'type'] == 'omg':
-                    self.df_mf.iat[iFrame,iItem] = \
-                        self.df_cfg.at[iItem,'a coeff'] / 2**20 \
-                            * int.from_bytes((data[byte_idx], data[byte_idx+1], data[byte_idx+2], data[byte_idx+3] ), 
-                                            byteorder='big', signed=True) \
-                        + self.df_cfg.at[iItem,'b coeff']
+                # temperature in [K] <S,16,-2>
+                elif self.TlmItemAttr[iItem]['type'] == 'T':
+                # elif self.df_cfg.at[iItem,'type'] == 'T':
+                    # TC thermoelectric voltage in [uV]
+                    Vtc = self.get_physical_value_from_tlm_words(iItem, data, byte_idx)
+                    # Vtc =  self.df_cfg.at[iItem,'a coeff'] / 2**18 * 1e6 \
+                    #         * int.from_bytes((data[byte_idx], data[byte_idx+1]), 
+                    #                         byteorder='big', signed=True) \
+                    #      + self.df_cfg.at[iItem,'b coeff']
 
-                # magnetic flux density in arbitrary unit
-                elif self.df_cfg.at[iItem,'type'] == 'B':
-                    self.df_mf.iat[iFrame,iItem] = \
-                        self.df_cfg.at[iItem,'a coeff'] \
-                            * int.from_bytes((data[byte_idx], data[byte_idx+1], data[byte_idx+2], data[byte_idx+3] ), 
-                                            byteorder='big', signed=True) \
-                        + self.df_cfg.at[iItem,'b coeff']
+                    Ttc = self.uv2k(Vtc + Vcjc - Vaz, 'K')
 
-                # Eular angle in [rad] <S,32,12>
-                elif self.df_cfg.at[iItem,'type'] == 'EA':
-                    self.df_mf.iat[iFrame,iItem] = \
-                        self.df_cfg.at[iItem,'a coeff'] / 2**20 \
-                            * int.from_bytes((data[byte_idx], data[byte_idx+1], data[byte_idx+2], data[byte_idx+3] ), 
-                                            byteorder='big', signed=True) \
-                        + self.df_cfg.at[iItem,'b coeff']
-
-                # voltage in [V] <S,16,5>
-                elif self.df_cfg.at[iItem,'type'] == 'V':
-                    self.df_mf.iat[iFrame,iItem] = \
-                        self.df_cfg.at[iItem,'a coeff'] / 2**11 \
-                            * int.from_bytes((data[byte_idx], data[byte_idx+1]), 
-                                            byteorder='big', signed=True) \
-                        + self.df_cfg.at[iItem,'b coeff']
+                    # self.df_mf.iat[iFrame,iItem] = Ttc                 # Kelvin
+                    self.df_mf.iat[iFrame,iItem] = Ttc - 273.15         # deg-C
+                    # self.df_mf.iat[iFrame,iItem] = Ttc
 
                 # relay status (boolean)
-                elif self.df_cfg.at[iItem,'type'] == 'rel':
+                elif self.TlmItemAttr[iItem]['type'] == 'rel':
+                # elif self.df_cfg.at[iItem,'type'] == 'rel':
                     self.df_mf.iat[iFrame,iItem] = \
-                        (data[byte_idx + int(self.df_cfg.at[iItem,'b coeff'])] & int(self.df_cfg.at[iItem,'a coeff'])) \
-                            / self.df_cfg.at[iItem,'a coeff']
+                        (  data[byte_idx + int(self.TlmItemAttr[iItem]['b coeff'])] 
+                         & int(self.TlmItemAttr[iItem]['a coeff'])) \
+                            / int(self.TlmItemAttr[iItem]['a coeff'])
 
-                # SSD free space in [GB]
-                elif self.df_cfg.at[iItem,'type'] == 'disk space':
-                    self.df_mf.iat[iFrame,iItem] = \
-                            int.from_bytes((data[byte_idx], data[byte_idx+1]), 
-                                            byteorder='big', signed=True) / 2**7
-
-                # error code
-                elif self.df_cfg.at[iItem,'type'] == 'ec':
-                    self.df_mf.iat[iFrame,iItem] = \
-                        int.from_bytes((data[byte_idx], data[byte_idx+1], data[byte_idx+2], data[byte_idx+3]), 
-                                        byteorder='big', signed=False)
-
-                #
-                #   PCM
-                #
+                    # self.df_mf.iat[iFrame,iItem] = \
+                        # (data[byte_idx + int(self.df_cfg.at[iItem,'b coeff'])] & int(self.df_cfg.at[iItem,'a coeff'])) \
+                        #     / self.df_cfg.at[iItem,'a coeff']
 
                 # analog pressure in [MPa]
-                elif self.df_cfg.at[iItem,'type'] == 'p ana':
-                    if iFrame % self.df_cfg.at[iItem,'sub com mod'] != self.df_cfg.at[iItem,'sub com res']: continue
+                elif self.TlmItemAttr[iItem]['type'] == 'p ana':
+                # elif self.df_cfg.at[iItem,'type'] == 'p ana':
+                    if iFrame % self.TlmItemAttr[iItem]['sub com mod'] != self.TlmItemAttr[iItem]['sub com res']: 
+                        continue
+                    # if iFrame % self.df_cfg.at[iItem,'sub com mod'] != self.df_cfg.at[iItem,'sub com res']: continue
                     
-                    self.df_mf.iat[iFrame,iItem] = \
-                          self.df_cfg.at[iItem,'a coeff'] / 2**16 * 5.0 \
-                            * int.from_bytes((data[byte_idx],data[byte_idx+1]), 
-                                            byteorder='big', signed=True) \
-                        + self.df_cfg.at[iItem,'b coeff']
+                    self.df_mf.iat[iFrame,iItem] = self.get_physical_value_from_tlm_words(iItem, data, byte_idx)
+                    # self.df_mf.iat[iFrame,iItem] = \
+                    #       self.df_cfg.at[iItem,'a coeff'] / 2**16 * 5.0 \
+                    #         * int.from_bytes((data[byte_idx],data[byte_idx+1]), 
+                    #                         byteorder='big', signed=True) \
+                    #     + self.df_cfg.at[iItem,'b coeff']
+
+                # DES timestamp in [sec]
+                # if self.df_cfg.at[iItem,'type'] == 'des time':
+                #     self.df_mf.iat[iFrame,iItem] = \
+                #         int.from_bytes((data[byte_idx], data[byte_idx+1], data[byte_idx+2], data[byte_idx+3]), 
+                #                         byteorder='big', signed=False) \
+                #         / 1000.0
+
+                # pressure in [MPa] <S,16,5>
+                # elif self.df_cfg.at[iItem,'type'] == 'p':
+                #     self.df_mf.iat[iFrame,iItem] = \
+                #         self.df_cfg.at[iItem,'a coeff'] / 2**11 \
+                #             * int.from_bytes((data[byte_idx], data[byte_idx+1]), 
+                #                             byteorder='big', signed=True) \
+                #         + self.df_cfg.at[iItem,'b coeff']
+
+
+                # acceleration in [m/s2] <S,32,12>
+                # elif self.df_cfg.at[iItem,'type'] == 'a':
+                #     self.df_mf.iat[iFrame,iItem] = \
+                #         self.df_cfg.at[iItem,'a coeff'] / 2**20 \
+                #             * int.from_bytes((data[byte_idx], data[byte_idx+1], data[byte_idx+2], data[byte_idx+3] ), 
+                #                             byteorder='big', signed=True) \
+                #         + self.df_cfg.at[iItem,'b coeff']
+
+                # angular velocity in [rad/s] <S,32,12>
+                # elif self.df_cfg.at[iItem,'type'] == 'omg':
+                #     self.df_mf.iat[iFrame,iItem] = \
+                #         self.df_cfg.at[iItem,'a coeff'] / 2**20 \
+                #             * int.from_bytes((data[byte_idx], data[byte_idx+1], data[byte_idx+2], data[byte_idx+3] ), 
+                #                             byteorder='big', signed=True) \
+                #         + self.df_cfg.at[iItem,'b coeff']
+
+                # magnetic flux density in arbitrary unit
+                # elif self.df_cfg.at[iItem,'type'] == 'B':
+                #     self.df_mf.iat[iFrame,iItem] = \
+                #         self.df_cfg.at[iItem,'a coeff'] \
+                #             * int.from_bytes((data[byte_idx], data[byte_idx+1], data[byte_idx+2], data[byte_idx+3] ), 
+                #                             byteorder='big', signed=True) \
+                #         + self.df_cfg.at[iItem,'b coeff']
+
+                # Eular angle in [rad] <S,32,12>
+                # elif self.df_cfg.at[iItem,'type'] == 'EA':
+                #     self.df_mf.iat[iFrame,iItem] = \
+                #         self.df_cfg.at[iItem,'a coeff'] / 2**20 \
+                #             * int.from_bytes((data[byte_idx], data[byte_idx+1], data[byte_idx+2], data[byte_idx+3] ), 
+                #                             byteorder='big', signed=True) \
+                #         + self.df_cfg.at[iItem,'b coeff']
+
+                # voltage in [V] <S,16,5>
+                # elif self.df_cfg.at[iItem,'type'] == 'V':
+                #     self.df_mf.iat[iFrame,iItem] = \
+                #         self.df_cfg.at[iItem,'a coeff'] / 2**11 \
+                #             * int.from_bytes((data[byte_idx], data[byte_idx+1]), 
+                #                             byteorder='big', signed=True) \
+                #         + self.df_cfg.at[iItem,'b coeff']
+
+                # SSD free space in [GB]
+                # elif self.df_cfg.at[iItem,'type'] == 'disk space':
+                #     self.df_mf.iat[iFrame,iItem] = \
+                #             int.from_bytes((data[byte_idx], data[byte_idx+1]), 
+                #                             byteorder='big', signed=True) / 2**7
+
+                # error code
+                # elif self.df_cfg.at[iItem,'type'] == 'ec':
+                #     self.df_mf.iat[iFrame,iItem] = \
+                #         int.from_bytes((data[byte_idx], data[byte_idx+1], data[byte_idx+2], data[byte_idx+3]), 
+                #                         byteorder='big', signed=False)
 
                 # PCB data
                 #elif self.df_cfg.at[iItem,'type'] == 'data':                    
@@ -300,26 +362,27 @@ class DatagramServerProtocol:
                 #            * int.from_bytes((data[byte_idx],data[byte_idx+1]), 
                 #                            byteorder='big', signed=True) \
                 #        + self.df_cfg.at[iItem,'b coeff']
-
-                #
-                #   Common
-                #
                 
                 # frame/loop counter
-                elif self.df_cfg.at[iItem,'type'] == 'counter':
-                    self.df_mf.iat[iFrame,iItem] = \
-                        int.from_bytes((data[byte_idx], data[byte_idx+1]), 
-                                        byteorder='big', signed=False)
+                # elif self.df_cfg.at[iItem,'type'] == 'counter':
+                #     self.df_mf.iat[iFrame,iItem] = \
+                #         int.from_bytes((data[byte_idx], data[byte_idx+1]), 
+                #                         byteorder='big', signed=False)
 
                 # others
                 else:
-                    self.df_mf.iat[iFrame,iItem] = \
-                          self.df_cfg.at[iItem,'a coeff'] \
-                            * int.from_bytes((data[byte_idx], data[byte_idx+1]), 
-                                            byteorder='big', signed=False) \
-                        + self.df_cfg.at[iItem,'b coeff']
+                    # print(f'Error TLM RCV: ITEM={iItem} has no translation rule!')
+                    self.df_mf.iat[iFrame,iItem] = np.nan
+                    # self.df_mf.iat[iFrame,iItem] = \
+                    #       self.df_cfg.at[iItem,'a coeff'] \
+                    #         * int.from_bytes((data[byte_idx], data[byte_idx+1]), 
+                    #                         byteorder='big', signed=False) \
+                    #     + self.df_cfg.at[iItem,'b coeff']
 
             self.iLine += 1
+
+        # clean up
+        # self.df_mf.drop(self.df_mf.index[[0, -1]])
 
 
     #
@@ -344,24 +407,23 @@ class DatagramServerProtocol:
         print('')  
 
     # Get a physical value from telemeter words
-    def get_physical_value_from_tlm_words(self, data, datum_attr):
-        # tlm_type  = 'smt'
-        # head = datum_attr.head
-        # byte_length = datum_attr.byte_length
-        # signed = True
-        total_bit_length = 8 * datum_attr.byte_length
-        # fracttional_bit_length = total_bit_length - integer_bit_lengtu
-        # integer_bit_length = 10
-        # a_coeff = 1
-        # b_coeff = 0
+    def get_physical_value_from_tlm_words(self, iItem, data, idx_byte):
+        byte_length = self.__W2B * int(self.TlmItemAttr[iItem]['word len'])
+        signed = self.TlmItemAttr[iItem]['signed']
+        integer_bit_length = int(self.TlmItemAttr[iItem]['integer bit len'])    # include sign bit if any
+        a_coeff = self.TlmItemAttr[iItem]['a coeff']
+        b_coeff = self.TlmItemAttr[iItem]['b coeff']
+
+        total_bit_length = 8 * byte_length
+        fractional_bit_length = total_bit_length - integer_bit_length
         
         byte_string = []
-        for i in range(datum_attr.byte_length): byte_string.append(data[datum_attr.idx_byte_head+i])
+        for i in range(byte_length): byte_string.append(data[idx_byte+i])
 
-        physical_value =  datum_attr.b_coeff \
-                        + datum_attr.a_coeff \
-                            * (int.from_bytes(byte_string, byteorder='big', signed=datum_attr.signed)) \
-                            / 2**(datum_attr.total_bit_length - datum_attr.integer_bit_length)
+        physical_value =  b_coeff \
+                        + a_coeff \
+                            * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
+                            / 2**(fractional_bit_length)
 
         return physical_value
 
@@ -490,19 +552,6 @@ class DatagramServerProtocol:
         
         return y
 
-
-class TlmDatumAttribution:
-    def __init__(self, dfTlmDatumAttr):
-        # self.tlm_type  = 'smt'
-        self.idx_byte_head = 0
-        self.byte_length = 2
-        self.signed = True
-        self.integer_bit_length = 10        # include sign bit if any
-        self.a_coeff = 1
-        self.b_coeff = 0
-
-        self.total_bit_length = 8 * self.byte_length
-        self.fractional_bit_length = self.total_bit_length - self.integer_bit_length
 
  
 

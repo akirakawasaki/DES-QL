@@ -30,9 +30,10 @@ async def tlm(tlm_type, internal_flags, tlm_latest_data):
     # print('Starting {} handlar...'.format(tlm_type))
     
     # initialize
-    HOST = "192.168.1.255"
-    # HOST = "192.168.1.4"
-    # HOST = socket.gethostbyname(socket.gethostname())
+    # HOST = '192.168.1.255'
+    # HOST = '192.168.1.4'
+    # HOST = ''
+    HOST = socket.gethostbyname(socket.gethostname())
     PORT = 0
 
     ### TBREFAC. ###
@@ -112,10 +113,10 @@ if __name__ == "__main__":
     executor.submit(tlm_handler_wrapper, internal_flags, tlm_latest_data)
 
     # launch GUI
-    gui_handler(internal_flags, tlm_latest_data)
+    # gui_handler(internal_flags, tlm_latest_data)
 
     # 
     # executor.shutdown(wait=True)
     # executor.shutdown(wait=True, cancel_futures=True)  # valid after Python 3.9
 
-    print('... DES-QL quitted normally')
+    print('DES-QL quitted normally ...')
