@@ -113,7 +113,7 @@ if __name__ == "__main__":
     executor.submit(tlm_handler_wrapper, internal_flags, tlm_latest_data)
 
     # launch GUI
-    # gui_handler(internal_flags, tlm_latest_data)
+    gui_handler(internal_flags, tlm_latest_data)
 
     # 
     # executor.shutdown(wait=True)

@@ -1,6 +1,7 @@
 ### Standard libraries
 # import time
 import concurrent.futures
+import sys
 
 ### Third-party libraries
 import numpy as np
@@ -8,7 +9,6 @@ import pandas as pd
 import wx
 #import wx.lib
 #import wx.lib.plot as plt
-
 import matplotlib
 matplotlib.use('WxAgg')
 import matplotlib.pyplot as plt
@@ -94,13 +94,9 @@ Time History Plots & Current Value Indicators
 class ChartPanel(wx.Panel):
     __N_PLOTTER = 5
     __T_RANGE = 30    # [s]
-    __IND_TIME = 1
+    __IDX_TIME = 1
 
     __PLOT_SKIP = 20    ### TBREFAC. ###
-
-    sensor_type = ['Time [s]', 'Pressure [MPa]', 'Temperature [K]', 'IMU', 'House Keeping']
-    col_value = [6, 6, 6, 6, 6]
-    # col_value = [6, 8, 8, 9, 8]
 
     def __init__(self, parent, tlm_latest_data):
         super().__init__(parent, wx.ID_ANY)
@@ -113,11 +109,35 @@ class ChartPanel(wx.Panel):
         
         ### load configurations from external files
         # - smt&pcm config
-        self.df_cfg_smt = pd.read_excel('./config_tlm.xlsx', sheet_name='smt').dropna(how='all')
-        self.df_cfg_pcm = pd.read_excel('./config_tlm.xlsx', sheet_name='pcm').dropna(how='all')
+        # self.df_cfg_smt = pd.read_excel('./config_tlm.xlsx', sheet_name='smt').dropna(how='all')
+        # self.df_cfg_pcm = pd.read_excel('./config_tlm.xlsx', sheet_name='pcm').dropna(how='all')
 
-        self.df_cfg_smt.reset_index()
-        self.df_cfg_pcm.reset_index()
+        # self.df_cfg_smt.reset_index()
+        # self.df_cfg_pcm.reset_index()
+
+        # - smt
+        try: 
+            df_cfg_smt = pd.read_excel('./config_tlm_2.xlsx', 
+                                        sheet_name='smt', header=0, index_col=None).dropna(how='all')
+        except:
+            print('Error TLM: "config_tlm.xlsx"!')
+            print(self.TLM_TYPE)
+            sys.exit()
+
+        self.TlmItemList_smt = df_cfg_smt['item'].values.tolist()
+        self.TlmItemAttr_smt = df_cfg_smt.to_dict(orient='index')
+
+        # - pcm
+        try: 
+            df_cfg_pcm = pd.read_excel('./config_tlm_2.xlsx', 
+                                        sheet_name='pcm', header=0, index_col=None).dropna(how='all')
+        except:
+            print('Error TLM: "config_tlm.xlsx"!')
+            print(self.TLM_TYPE)
+            sys.exit()
+
+        self.TlmItemList_pcm = df_cfg_pcm['item'].values.tolist()
+        self.TlmItemAttr_pcm = df_cfg_pcm.to_dict(orient='index')
 
         # - digital indicator config
         self.load_config_digital_indicator()
@@ -132,7 +152,7 @@ class ChartPanel(wx.Panel):
         ### lay out GUI elements by sizer 
         self.layout = wx.FlexGridSizer(rows=1, cols=2, gap=(20, 0))
         self.layout.Add(self.canvas, flag=wx.EXPAND)                            # plotter
-        self.layout.Add(self.layout_Value, flag=wx.ALIGN_CENTER_HORIZONTAL)     # digital indicators
+        self.layout.Add(self.IndicatorPane, flag=wx.ALIGN_CENTER_HORIZONTAL)    # digital indicators
         self.SetSizer(self.layout)
 
         ### bind events
@@ -156,8 +176,10 @@ class ChartPanel(wx.Panel):
         # print('GUI FTC: fetched tlm data')
         
         # break off when tlm data not exist
-        if len(self.tlm_latest_data.df_smt.index) == 0:
-            print('GUI awaiting smt data')
+        if ( len(self.tlm_latest_data.df_smt.index) == 0 or
+             len(self.tlm_latest_data.df_pcm.index) == 0 ):
+            print('GUI awaiting SMT and/or PCM data')
+            # print('GUI awaiting smt data')
             self.__F_TLM_IS_ACTIVE = False
             return None
         
@@ -172,7 +194,9 @@ class ChartPanel(wx.Panel):
         #     return None
         
         # fetch current values & store
-        self.dfTlm = self.tlm_latest_data.df_smt
+        self.dfTlm_smt = self.tlm_latest_data.df_smt
+        self.dfTlm_pcm = self.tlm_latest_data.df_pcm
+        # self.dfTlm = self.tlm_latest_data.df_smt
         ### TBREFAC.: should be thread safe
 
     # Event handler: EVT_TIMER
@@ -180,11 +204,46 @@ class ChartPanel(wx.Panel):
         if self.__F_TLM_IS_ACTIVE == False: return None     # skip refresh
         
         # obtain time slice of dfTlm to avoid unexpected rewrite during refresh
-        df_tmp = self.dfTlm.copy()
+        df_smt_tmp = self.dfTlm_smt.copy()
+        df_pcm_tmp = self.dfTlm_pcm.copy()
+        # df_tmp = self.dfTlm.copy()
         
+        # refresh indicators
+        for i in self.GroupAttr.keys():
+            ### T.B.REFAC ###
+            for ii in range(self.GroupAttr[i]['rows'] * self.GroupAttr[i]['cols']):
+                # initialize
+                j = -1
+
+                # search throughout smt items
+                for iii in range(self.N_ITEM_SMT):
+                    if ( self.TlmItemAttr_smt[iii]['group'] == self.GroupAttr[i]['label'] and
+                         self.TlmItemAttr_smt[iii]['item order'] == ii ) :
+                        j = iii
+                        break    
+                print(f'GUI IND: j = {j}')
+
+                # assign items in grids
+                if j != -1:
+                    print('Im here')
+                    self.stxtIndicator[j].SetLabel(str(np.round(df_smt_tmp.iloc[-1, j], 2)))
+                    continue
+
+                # search throughout pcm items
+                for iii in range(self.N_ITEM_PCM):
+                    if ( self.TlmItemAttr_pcm[iii]['group'] == self.GroupAttr[i]['label'] and
+                         self.TlmItemAttr_pcm[iii]['item order'] == ii ) :
+                        j = iii + self.N_ITEM_SMT
+                        break
+                print(f'GUI IND: j = {j}')
+
+                # assign items in grids
+                if j != -1:
+                    self.stxtIndicator[j].SetLabel(str(np.round(df_pcm_tmp.iloc[-1, j-self.N_ITEM_SMT], 2)))
+                    
         # refresh display
-        for i_sensor in range(len(self.df_cfg_smt['item'])):
-            self.SensorValue[i_sensor].SetLabel(str(np.round(df_tmp.iloc[-1, i_sensor], 2)))
+        # for i_sensor in range(len(self.df_cfg_smt['item'])):
+        #     self.stxtIndicator[i_sensor].SetLabel(str(np.round(df_tmp.iloc[-1, i_sensor], 2)))
             
     # Event handler: EVT_TIMER
     def OnRefreshPlotter(self, event):
@@ -195,12 +254,13 @@ class ChartPanel(wx.Panel):
         ###
         ### update data set for plot
         # - obtain time slice of dfTlm by deep copy to avoid unexpected rewrite during refresh
-        df_tmp = self.dfTlm.copy()
+        df_smt_tmp = self.dfTlm_smt.copy()
+        # df_tmp = self.dfTlm.copy()
 
         # - update plot points by appending latest values
-        self.x_series = np.append(self.x_series, df_tmp.iloc[-1,self.__IND_TIME])        
+        self.x_series = np.append(self.x_series, df_smt_tmp.iloc[-1,self.__IDX_TIME])
         for i in range(self.__N_PLOTTER):
-            self.y_series = np.append(self.y_series, df_tmp.iloc[-1,self.index_plot[i]])
+            self.y_series = np.append(self.y_series, df_smt_tmp.iloc[-1,self.index_plot[i]])
         # print("GUI: append latest values {}".format(df_tmp.iloc[-1,self.index_x]))
         # print("GUI PLT: x_series = {}".format(self.x_series))
         # print("GUI PLT: y_series = {}".format(self.y_series))
@@ -217,7 +277,7 @@ class ChartPanel(wx.Panel):
             self.y_series = np.delete(self.y_series, np.s_[0:self.__N_PLOTTER])
 
         # skip redraw
-        ### TBREFAC. ###
+        ### T.B.REFAC ###
         if self.__PLOT_COUNT != self.__PLOT_SKIP:
             self.__PLOT_COUNT += 1
             return None
@@ -270,6 +330,22 @@ class ChartPanel(wx.Panel):
 
     # Load configurations from external files
     def load_config_digital_indicator(self):
+        self.GroupAttr = {
+            0: {'idx': 0, 'label': 'Time',          'rows': 1, 'cols' : 6},
+            1: {'idx': 1, 'label': 'DES State',     'rows': 5, 'cols' : 6},
+            2: {'idx': 2, 'label': 'Pressure',      'rows': 2, 'cols' : 6},
+            3: {'idx': 3, 'label': 'Temperature',   'rows': 2, 'cols' : 6},
+            4: {'idx': 4, 'label': 'IMU',           'rows': 2, 'cols' : 6},
+            5: {'idx': 5, 'label': 'House Keeping', 'rows': 3, 'cols' : 6}
+        }
+        
+        # self.sensor_type = ['Time [s]', 'Pressure [MPa]', 'Temperature [K]', 'IMU', 'House Keeping']
+        # self.col_value = [6, 6, 6, 6, 6]
+        # self.col_value = [6, 8, 8, 9, 8]
+
+        # self.GroupName = ['Time', 'DES State', 'Pressure', 'Temperature', 'IMU', 'House Keeping']
+        # self.GroupName = {0:'Time', 1:'DES State', 2:'Pressure', 3:'Temperature', 4:'IMU', 5:'House Keeping'}
+
         # Load digital indicator appearance config
         self.df_cfg_sensor = (pd.read_excel('./config_sensor.xlsx', sheet_name='smt')).dropna(how='all')
 
@@ -280,6 +356,153 @@ class ChartPanel(wx.Panel):
         self.id_hk = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'House Keeping']['ID'].astype(int)
 
         self.id = [self.id_time, self.id_p, self.id_T, self.id_imu, self.id_hk]
+
+        # self.TlmItemList_smt = df_cfg_smt['item'].values.tolist()
+        # self.TlmItemAttr_smt = df_cfg_smt.to_dict(orient='index')
+
+        # self.id_time = self.TlmItemList_smt
+        # df_cfg_sensor[self.df_cfg_sensor['group'] == 'Time [s]']['ID'].astype(int)
+
+    # Configure appearance for digital indicators to display current values
+    # <hierarchy>
+    #   IndicatorPane - lytSBoxGroup
+    #                 - sboxGroup    - 
+    #
+    def configure_digital_indicator(self):
+        self.IndicatorPane = wx.BoxSizer(wx.VERTICAL)
+
+        ### generate containers to groupe indicators (StaticBox)
+        self.SBoxGroup = []
+        self.lytSBoxGroup = []
+        # for name in self.sensor_type:
+        # for strGroupName in self.GroupName:
+        for i in self.GroupAttr.keys():
+            # - generate an instance
+            # self.sbox_type.append(wx.StaticBox(self, wx.ID_ANY, name))
+            self.SBoxGroup.append(wx.StaticBox(self, wx.ID_ANY, self.GroupAttr[i]['label']))
+            self.SBoxGroup[-1].SetForegroundColour('WHITE')
+            self.SBoxGroup[-1].SetFont(wx.Font(15, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+            
+            # - lay out the instance
+            self.lytSBoxGroup.append(wx.StaticBoxSizer(self.SBoxGroup[-1], wx.VERTICAL))
+
+            self.IndicatorPane.Add(self.lytSBoxGroup[-1])
+            # self.IndicatorPane.Add(self.lytSBoxGroup[self.GroupName.index(strGroupName)])
+
+        # self.IndicatorPane.Add(self.lytSBoxGroup)
+
+        ### generate indicators & their labels
+        self.N_ITEM_SMT = len(self.TlmItemList_smt)
+        self.N_ITEM_PCM = len(self.TlmItemList_pcm)
+        self.tbtnLabel = []
+        self.stxtIndicator = []
+        self.lytPair = []           # pair of Indicator & Label
+        
+        # smt items
+        # for i in range(len(self.df_cfg_smt['item'])):
+        for i in range(self.N_ITEM_SMT):
+            # generate instance 
+            # - item label (ToggleButton)
+            self.tbtnLabel.append(
+                wx.ToggleButton(self, wx.ID_ANY, self.TlmItemAttr_smt[i]['item'], size=(140,22)))
+            
+            # - digital indicator (StaticText)
+            self.stxtIndicator.append(
+                wx.StaticText(self, wx.ID_ANY, str(i), style=wx.ALIGN_CENTRE | wx.ST_NO_AUTORESIZE))
+            self.stxtIndicator[-1].SetBackgroundColour('BLACK')
+            self.stxtIndicator[-1].SetForegroundColour('GREEN')
+            
+            # - pair of item label & inidicator
+            self.lytPair.append(wx.GridSizer(rows=2, cols=1, gap=(0,0)))
+            self.lytPair[-1].Add(self.tbtnLabel[-1], flag=wx.EXPAND)
+            self.lytPair[-1].Add(self.stxtIndicator[-1], flag=wx.EXPAND)
+
+        # pcm items
+        # for i in range(N_ITEM_SMT, N_ITEM_SMT + N_ITEM_PCM):
+        for i in range(self.N_ITEM_PCM):
+            # generate instance 
+            # - item label (ToggleButton)
+            self.tbtnLabel.append(
+                wx.ToggleButton(self, wx.ID_ANY, self.TlmItemAttr_pcm[i]['item'], size=(120,22)))
+            
+            # - digital indicator (StaticText)
+            self.stxtIndicator.append(
+                wx.StaticText(self, wx.ID_ANY, str(i + self.N_ITEM_SMT), style=wx.ALIGN_CENTRE | wx.ST_NO_AUTORESIZE))
+            self.stxtIndicator[-1].SetBackgroundColour('BLACK')
+            self.stxtIndicator[-1].SetForegroundColour('GREEN')
+
+            # - pair of item label & inidicator
+            self.lytPair.append(wx.GridSizer(rows=2, cols=1, gap=(0,0)))
+            self.lytPair[-1].Add(self.tbtnLabel[-1], flag=wx.EXPAND)
+            self.lytPair[-1].Add(self.stxtIndicator[-1], flag=wx.EXPAND)
+
+        # - ToggleButton: item labels for indicators
+        # self.tbtnLabel = []
+        # for index in self.df_cfg_smt['item']:
+        #     self.tbtnLabel.append(wx.ToggleButton(self, wx.ID_ANY, index, size=(120,22)))
+
+        ### lay out digital indicators
+        # - containers by StaticBoxSizer
+        # self.lytSBoxGroup = []
+        # # for i in range(len(self.sensor_type)):
+        # for i in range(len(self.GroupName)):
+        #     self.lytSBoxGroup.append(wx.StaticBoxSizer(self.SBoxGroup[i], wx.VERTICAL))
+
+        # - pairs of an item label & an inidicator by GridSizer
+        # -- make pairs of an item label & an inidicator
+        # self.lytPair = []
+        # for i in range(len(self.df_cfg_smt['item'])):
+        #     # self.layout_Set.append(wx.GridSizer(rows=2, cols=1, gap=(5,5)))
+        #     self.lytPair.append(wx.GridSizer(rows=2, cols=1, gap=(0,0)))
+        #     self.lytPair[i].Add(self.tbtnLabel[i], flag=wx.EXPAND)
+        #     self.lytPair[i].Add(self.stxtIndicator[i], flag=wx.EXPAND)
+
+        # lay out pairs of indicators & labels in the grouping SBoxes
+        self.lytIndicator = []
+        # for i in range(len(self.sensor_type)):
+        for i in self.GroupAttr.keys():
+            # generate grid in the grouping SBox
+            self.lytIndicator.append(
+                wx.GridSizer(rows=self.GroupAttr[i]['rows'], cols=self.GroupAttr[i]['cols'], gap=(10,5)))
+            
+            # place items in the grid
+            for ii in range(self.GroupAttr[i]['rows'] * self.GroupAttr[i]['cols']):
+                # initialize
+                j = -1
+
+                # search throughout smt items
+                for iii in range(self.N_ITEM_SMT):
+                    if ( self.TlmItemAttr_smt[iii]['group'] == self.GroupAttr[i]['label'] and
+                         self.TlmItemAttr_smt[iii]['item order'] == ii ) :
+                        j = iii
+                        break    
+
+                # search throughout pcm items
+                for iii in range(self.N_ITEM_PCM):
+                    if ( self.TlmItemAttr_pcm[iii]['group'] == self.GroupAttr[i]['label'] and
+                         self.TlmItemAttr_pcm[iii]['item order'] == ii ) :
+                        j = iii + self.N_ITEM_SMT
+                        break    
+                
+                # assign items in grids
+                if j == -1:
+                    self.lytIndicator[i].Add((0,0))                         # empty cell
+                    # self.lytIndicator[i].Add(wx.StaticText(self, -1, ''))   # empty cell
+                else:
+                    self.lytIndicator[i].Add(self.lytPair[j], flag=wx.EXPAND)
+            
+            # for sensor in self.id[i]:
+            #     self.lytIndicator[i].Add(self.layout_Set[sensor], flag=wx.EXPAND)
+
+            # snap
+            self.lytSBoxGroup[i].Add(self.lytIndicator[i])
+
+        # set states for ToggleButton
+        for index in self.index_plot:
+            self.tbtnLabel[index].SetValue(True)
+
+        # for button in self.tbtnLabel:
+        #     button.Bind(wx.EVT_TOGGLEBUTTON, self.graphTest)
 
     # Load configurations from external files
     def load_config_plotter(self):
@@ -308,68 +531,6 @@ class ChartPanel(wx.Panel):
                 y_max = self.df_cfg_plot['y_max'][self.df_cfg_plot[str_tmp].astype(bool)].iat[0],
                 alart_lim_u = 10,
                 alart_lim_l = 0.0))
-
-    # Configure appearance for digital indicators to display current values
-    def configure_digital_indicator(self):
-        ### generate instances        
-        # - StaticText: digital indicators
-        self.SensorValue = []
-        for i in range(len(self.df_cfg_smt['item'])):
-            self.SensorValue.append(wx.StaticText(self, wx.ID_ANY, str(i+1), style=wx.ALIGN_CENTRE | wx.ST_NO_AUTORESIZE))
-            self.SensorValue[-1].SetBackgroundColour('BLACK')
-            self.SensorValue[-1].SetForegroundColour('GREEN')
-
-        # - ToggleButton: item labels for indicators
-        self.DataButton = []
-        for index in self.df_cfg_smt['item']:
-            self.DataButton.append(wx.ToggleButton(self, wx.ID_ANY, index, size=(120,22)))
-
-        # - StaticBox: container grouping labels and indicators
-        self.sbox_font = wx.Font(15, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
-        self.sbox_type = []
-        for name in self.sensor_type:
-            self.sbox_type.append(wx.StaticBox(self, wx.ID_ANY, name))
-            self.sbox_type[-1].SetFont(self.sbox_font)
-            self.sbox_type[-1].SetForegroundColour('WHITE')
-
-        ### lay out digital indicators
-        self.layout_Value = wx.BoxSizer(wx.VERTICAL)
-
-        # - containers by StaticBoxSizer
-        self.layout_type = []
-        for i in range(len(self.sensor_type)):
-            self.layout_type.append(wx.StaticBoxSizer(self.sbox_type[i], wx.VERTICAL))
-
-        # - pairs of an item label & an inidicator by GridSizer
-        # -- make pairs of an item label & an inidicator
-        self.layout_Set = []
-        for i in range(len(self.df_cfg_smt['item'])):
-            # self.layout_Set.append(wx.GridSizer(rows=2, cols=1, gap=(5,5)))
-            self.layout_Set.append(wx.GridSizer(rows=2, cols=1, gap=(0,0)))
-            self.layout_Set[i].Add(self.DataButton[i], flag=wx.EXPAND)
-            self.layout_Set[i].Add(self.SensorValue[i], flag=wx.EXPAND)
-
-        # -- snap the pairs into grid
-        self.layout_Data = []
-        for i in range(len(self.sensor_type)):
-            self.layout_Data.append(wx.GridSizer(rows=len(self.id[i])//self.col_value[i]+1,
-                                                 cols=self.col_value[i], 
-                                                 gap=(10,5)))
-            for sensor in self.id[i]:
-                self.layout_Data[i].Add(self.layout_Set[sensor], flag=wx.EXPAND)
-
-            # snap
-            self.layout_type[i].Add(self.layout_Data[i])
-            
-            self.layout_Value.Add(self.layout_type[i])
-
-        # set states for ToggleButton
-        for index in self.index_plot:
-            self.DataButton[index].SetValue(True)
-
-        # for button in self.DataButton:
-        #     button.Bind(wx.EVT_TOGGLEBUTTON, self.graphTest)
-
 
     # Configure appearance for plotters to display time histories
     def configure_plotter(self):
@@ -414,7 +575,7 @@ class ChartPanel(wx.Panel):
     # def graphTest(self, event):
     #     self.n_graph = 0
     #     self.parameter = []
-    #     for button in self.DataButton:
+    #     for button in self.tbtnLabel:
     #         if button.GetValue():
     #             self.n_graph += 1
     #             self.parameter.append(button.GetLabel())

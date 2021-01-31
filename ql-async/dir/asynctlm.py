@@ -133,7 +133,6 @@ class DatagramServerProtocol:
         # print(self.tlm_latest_values.df_smt)
         # print(self.tlm_latest_values.df_smt.index)
     
-
     # Internal method: 
     # Translate raw telemetry data into physical values
     def __translate(self, data):
