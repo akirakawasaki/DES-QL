@@ -195,16 +195,16 @@ class DatagramServerProtocol:
                 byte_idx =  byte_idx_head + self.__W2B * int(self.TlmItemAttr[iItem]['w idx'])
                 # byte_idx = byte_idx_head + self.__W2B * (self.__LEN_HEADER + int(self.df_cfg.at[iItem,'w idx']))
 
-                # Ordinary Items
+                # ordinary Items
                 if self.TlmItemAttr[iItem]['ordinary item'] == True :
                     self.df_mf.iat[iFrame,iItem] = self.get_physical_value_from_tlm_words(iItem, data, byte_idx)
 
-                # Days from January 1st on GSE
+                # days from January 1st on GSE
                 elif self.TlmItemAttr[iItem]['type'] == 'gse day':
                     # byte_idx = byte_idx_head + self.__W2B * 0
                     self.df_mf.iat[iFrame,iItem] =  (data[byte_idx]   >> 4  ) * 100 \
-                                                      + (data[byte_idx]   & 0x0F) * 10  \
-                                                      + (data[byte_idx+1] >> 4  ) * 1
+                                                  + (data[byte_idx]   & 0x0F) * 10  \
+                                                  + (data[byte_idx+1] >> 4  ) * 1
         
                 # GSE timestamp in [sec]
                 elif self.TlmItemAttr[iItem]['type'] == 'gse time':
@@ -220,6 +220,22 @@ class DatagramServerProtocol:
                               + (data[byte_idx+5] & 0x0F) * 1   / 1000
                     self.df_mf.iat[iFrame,iItem] = gse_time
 
+                # temperature in [K] <S,16,-2>
+                elif self.TlmItemAttr[iItem]['type'] == 'T':
+                # elif self.df_cfg.at[iItem,'type'] == 'T':
+                    # TC thermoelectric voltage in [uV]
+                    Vtc = self.get_physical_value_from_tlm_words(iItem, data, byte_idx)
+                    # Vtc =  self.df_cfg.at[iItem,'a coeff'] / 2**18 * 1e6 \
+                    #         * int.from_bytes((data[byte_idx], data[byte_idx+1]), 
+                    #                         byteorder='big', signed=True) \
+                    #      + self.df_cfg.at[iItem,'b coeff']
+
+                    Ttc = self.uv2k(Vtc + Vcjc - Vaz, 'K')
+
+                    # self.df_mf.iat[iFrame,iItem] = Ttc                 # Kelvin
+                    self.df_mf.iat[iFrame,iItem] = Ttc - 273.15         # deg-C
+                    # self.df_mf.iat[iFrame,iItem] = Ttc
+                
                 # cold-junction compensation coefficient in [uV]
                 elif self.TlmItemAttr[iItem]['type'] == 'cjc':
                 # elif self.df_cfg.at[iItem,'type'] == 'cjc':
@@ -247,24 +263,9 @@ class DatagramServerProtocol:
                     self.df_mf.iat[iFrame,iItem] = Vaz
                     # self.df_mf.iat[iFrame,iItem] = Vaz
 
-                # temperature in [K] <S,16,-2>
-                elif self.TlmItemAttr[iItem]['type'] == 'T':
-                # elif self.df_cfg.at[iItem,'type'] == 'T':
-                    # TC thermoelectric voltage in [uV]
-                    Vtc = self.get_physical_value_from_tlm_words(iItem, data, byte_idx)
-                    # Vtc =  self.df_cfg.at[iItem,'a coeff'] / 2**18 * 1e6 \
-                    #         * int.from_bytes((data[byte_idx], data[byte_idx+1]), 
-                    #                         byteorder='big', signed=True) \
-                    #      + self.df_cfg.at[iItem,'b coeff']
-
-                    Ttc = self.uv2k(Vtc + Vcjc - Vaz, 'K')
-
-                    # self.df_mf.iat[iFrame,iItem] = Ttc                 # Kelvin
-                    self.df_mf.iat[iFrame,iItem] = Ttc - 273.15         # deg-C
-                    # self.df_mf.iat[iFrame,iItem] = Ttc
-
                 # relay status (boolean)
-                elif self.TlmItemAttr[iItem]['type'] == 'rel':
+                elif self.TlmItemAttr[iItem]['type'] == 'bit':
+                # elif self.TlmItemAttr[iItem]['type'] == 'rel':
                 # elif self.df_cfg.at[iItem,'type'] == 'rel':
                     self.df_mf.iat[iFrame,iItem] = \
                         (  data[byte_idx + int(self.TlmItemAttr[iItem]['b coeff'])] 
@@ -314,11 +315,11 @@ class DatagramServerProtocol:
                     total_bit_length = 8 * byte_length
                     fractional_bit_length = total_bit_length - integer_bit_length
                     
-                    # - sutart of data 1
-                    byte_idx_sift = 0
+                    # - start of data 1
+                    byte_idx_shift = 0
                     #####
                     byte_string = []
-                    for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_sift])
+                    for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
 
                     physical_value =  b_coeff \
                                     + a_coeff \
@@ -328,10 +329,10 @@ class DatagramServerProtocol:
                     SOD_H = physical_value
 
                     # - start of data 2
-                    byte_idx_sift = 2
+                    byte_idx_shift = 2
                     #####
                     byte_string = []
-                    for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_sift])
+                    for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
 
                     physical_value =  b_coeff \
                                     + a_coeff \
@@ -341,10 +342,10 @@ class DatagramServerProtocol:
                     SOD_L = physical_value
 
                     # - sensor number
-                    byte_idx_sift = 8
+                    byte_idx_shift = 8
                     #####
                     byte_string = []
-                    for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_sift])
+                    for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
 
                     physical_value =  b_coeff \
                                     + a_coeff \
@@ -352,6 +353,8 @@ class DatagramServerProtocol:
                                         / 2**(fractional_bit_length)
                     #####
                     SENS_NUM = physical_value
+
+                    self.df_mf.iat[iFrame,iItem] = SENS_NUM
 
                 # high speed data payload
                 elif self.TlmItemAttr[iItem]['type'] == 'data pl1':
@@ -367,10 +370,10 @@ class DatagramServerProtocol:
                     fractional_bit_length = total_bit_length - integer_bit_length
                     
                     # - W018
-                    byte_idx_sift = 0
+                    byte_idx_shift = 0
                     #####
                     byte_string = []
-                    for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_sift])
+                    for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
 
                     physical_value =  b_coeff \
                                     + a_coeff \
@@ -379,6 +382,8 @@ class DatagramServerProtocol:
                     #####
                     W018 = byte_string
 
+                    self.df_mf.iat[iFrame,iItem] = W018
+
                     # if (SENS_NUM != 0) and (W018 != 0xFFFF):
                     if ((SENS_NUM == 1) or (SENS_NUM == 2) or (SENS_NUM == 3)) and (W018 != 0xFFFF):
                         # write history to an external file
@@ -386,10 +391,10 @@ class DatagramServerProtocol:
                         with open(DATA_PATH_HSD, 'a') as f:
                             writer = csv.writer(f)
                             for j in range(int(self.TlmItemAttr[iItem]['word len'])):
-                                byte_idx_sift = self.__W2B * j
+                                byte_idx_shift = self.__W2B * j
                                 #####
                                 byte_string = []
-                                for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_sift])
+                                for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
 
                                 physical_value =  b_coeff \
                                                 + a_coeff \
@@ -410,6 +415,21 @@ class DatagramServerProtocol:
                     total_bit_length = 8 * byte_length
                     fractional_bit_length = total_bit_length - integer_bit_length
                     
+                    # - W036
+                    byte_idx_shift = 0
+                    #####
+                    byte_string = []
+                    for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
+
+                    physical_value =  b_coeff \
+                                    + a_coeff \
+                                        * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
+                                        / 2**(fractional_bit_length)
+                    #####
+                    W036 = byte_string
+
+                    self.df_mf.iat[iFrame,iItem] = W036
+
                     # if (SENS_NUM != 0) and (W018 != 0xFFFF):
                     if ((SENS_NUM == 1) or (SENS_NUM == 2) or (SENS_NUM == 3)) and (W018 != 0xFFFF):
                         # write history to an external file
@@ -417,10 +437,10 @@ class DatagramServerProtocol:
                         with open(DATA_PATH_HSD, 'a') as f:
                             writer = csv.writer(f)
                             for j in range(int(self.TlmItemAttr[iItem]['word len'])):
-                                byte_idx_sift = self.__W2B * j
+                                byte_idx_shift = self.__W2B * j
                                 #####
                                 byte_string = []
-                                for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_sift])
+                                for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
 
                                 physical_value =  b_coeff \
                                                 + a_coeff \
