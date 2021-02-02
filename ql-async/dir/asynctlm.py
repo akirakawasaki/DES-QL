@@ -375,7 +375,7 @@ class DatagramServerProtocol:
                     W018 = byte_string
 
                     # if (SENS_NUM != 0) and (W018 != 0xFFFF):
-                    if ((SENS_NUM == 1) or (SENS_NUM == 2) or (SENS_NUM == 1)) and (W018 != 0xFFFF):
+                    if ((SENS_NUM == 1) or (SENS_NUM == 2) or (SENS_NUM == 3)) and (W018 != 0xFFFF):
                         # write history to an external file
                         DATA_PATH_HSD = f'./high_speed_data{int(SENS_NUM)}.csv'
                         with open(DATA_PATH_HSD, 'a') as f:
@@ -406,7 +406,7 @@ class DatagramServerProtocol:
                     fractional_bit_length = total_bit_length - integer_bit_length
                     
                     # if (SENS_NUM != 0) and (W018 != 0xFFFF):
-                    if ((SENS_NUM == 1) or (SENS_NUM == 2) or (SENS_NUM == 1)) and (W018 != 0xFFFF):
+                    if ((SENS_NUM == 1) or (SENS_NUM == 2) or (SENS_NUM == 3)) and (W018 != 0xFFFF):
                         # write history to an external file
                         DATA_PATH_HSD = f'./high_speed_data{int(SENS_NUM)}.csv'
                         with open(DATA_PATH_HSD, 'a') as f:
