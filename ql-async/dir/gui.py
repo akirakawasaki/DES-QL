@@ -126,6 +126,7 @@ class ChartPanel(wx.Panel):
 
         self.TlmItemList_smt = df_cfg_smt['item'].values.tolist()
         self.TlmItemAttr_smt = df_cfg_smt.to_dict(orient='index')
+        self.N_ITEM_SMT = len(self.TlmItemList_smt)
 
         # - pcm
         try: 
@@ -138,6 +139,7 @@ class ChartPanel(wx.Panel):
 
         self.TlmItemList_pcm = df_cfg_pcm['item'].values.tolist()
         self.TlmItemAttr_pcm = df_cfg_pcm.to_dict(orient='index')
+        self.N_ITEM_PCM = len(self.TlmItemList_pcm)
 
         # - digital indicator config
         self.load_config_digital_indicator()
@@ -255,12 +257,17 @@ class ChartPanel(wx.Panel):
         ### update data set for plot
         # - obtain time slice of dfTlm by deep copy to avoid unexpected rewrite during refresh
         df_smt_tmp = self.dfTlm_smt.copy()
+        df_pcm_tmp = self.dfTlm_pcm.copy()
         # df_tmp = self.dfTlm.copy()
+        df_tmp = pd.concat([df_smt_tmp, df_pcm_tmp], axis=1)
 
         # - update plot points by appending latest values
-        self.x_series = np.append(self.x_series, df_smt_tmp.iloc[-1,self.__IDX_TIME])
+        self.x_series = np.append(self.x_series, df_tmp.iloc[-1,self.__IDX_TIME])
         for i in range(self.__N_PLOTTER):
-            self.y_series = np.append(self.y_series, df_smt_tmp.iloc[-1,self.index_plot[i]])
+            self.y_series = np.append(self.y_series, df_tmp.iloc[-1,self.index_plot[i]])
+        # self.x_series = np.append(self.x_series, df_smt_tmp.iloc[-1,self.__IDX_TIME])
+        # for i in range(self.__N_PLOTTER):
+        #     self.y_series = np.append(self.y_series, df_smt_tmp.iloc[-1,self.index_plot[i]])
         # print("GUI: append latest values {}".format(df_tmp.iloc[-1,self.index_x]))
         # print("GUI PLT: x_series = {}".format(self.x_series))
         # print("GUI PLT: y_series = {}".format(self.y_series))
@@ -303,14 +310,14 @@ class ChartPanel(wx.Panel):
             self.axes[i].set_xlim([self.t_min, self.t_max])
 
             # set limit for y axis
-            self.axes[i].set_ylim([self.plt_attr[i].y_min, self.plt_attr[i].y_max])
+            self.axes[i].set_ylim([self.PltAttr[i].y_min, self.PltAttr[i].y_max])
 
             # set label for y axis
-            self.axes[i].set_ylabel(self.plt_attr[i].y_label)
+            self.axes[i].set_ylabel(self.PltAttr[i].y_label)
 
             # update alert line
-            self.axes[i].axhline(y=self.plt_attr[i].alart_lim_u, xmin=0, xmax=1, color='red')
-            self.axes[i].axhline(y=self.plt_attr[i].alart_lim_u, xmin=0, xmax=1, color='red')
+            self.axes[i].axhline(y=self.PltAttr[i].alart_lim_u, xmin=0, xmax=1, color='red')
+            self.axes[i].axhline(y=self.PltAttr[i].alart_lim_u, xmin=0, xmax=1, color='red')
         
             # update plot
             # NOTE: lines become iterrable hereafter
@@ -347,15 +354,15 @@ class ChartPanel(wx.Panel):
         # self.GroupName = {0:'Time', 1:'DES State', 2:'Pressure', 3:'Temperature', 4:'IMU', 5:'House Keeping'}
 
         # Load digital indicator appearance config
-        self.df_cfg_sensor = (pd.read_excel('./config_sensor.xlsx', sheet_name='smt')).dropna(how='all')
+        # self.df_cfg_sensor = (pd.read_excel('./config_sensor.xlsx', sheet_name='smt')).dropna(how='all')
 
-        self.id_time = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'Time [s]']['ID'].astype(int)
-        self.id_p = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'P [MPa]']['ID'].astype(int)
-        self.id_T = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'T [K]']['ID'].astype(int)
-        self.id_imu = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'IMU']['ID'].astype(int)
-        self.id_hk = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'House Keeping']['ID'].astype(int)
+        # self.id_time = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'Time [s]']['ID'].astype(int)
+        # self.id_p = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'P [MPa]']['ID'].astype(int)
+        # self.id_T = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'T [K]']['ID'].astype(int)
+        # self.id_imu = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'IMU']['ID'].astype(int)
+        # self.id_hk = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'House Keeping']['ID'].astype(int)
 
-        self.id = [self.id_time, self.id_p, self.id_T, self.id_imu, self.id_hk]
+        # self.id = [self.id_time, self.id_p, self.id_T, self.id_imu, self.id_hk]
 
         # self.TlmItemList_smt = df_cfg_smt['item'].values.tolist()
         # self.TlmItemAttr_smt = df_cfg_smt.to_dict(orient='index')
@@ -392,8 +399,6 @@ class ChartPanel(wx.Panel):
         # self.IndicatorPane.Add(self.lytSBoxGroup)
 
         ### generate indicators & their labels
-        self.N_ITEM_SMT = len(self.TlmItemList_smt)
-        self.N_ITEM_PCM = len(self.TlmItemList_pcm)
         self.tbtnLabel = []
         self.stxtIndicator = []
         self.lytPair = []           # pair of Indicator & Label
@@ -509,28 +514,65 @@ class ChartPanel(wx.Panel):
         ### TBREFAC.: TEMPORALLY DESIGNATED BY LITERALS ###
 
         # Load plotter appearance config
-        self.df_cfg_plot = (pd.read_excel('./config_plot.xlsx', sheet_name='smt')).dropna(how='all')
+        # self.df_cfg_plot = (pd.read_excel('./config_plot.xlsx', sheet_name='smt')).dropna(how='all')
 
-        self.index_plot = [self.df_cfg_plot['ID'][self.df_cfg_plot['plot_1'].astype(bool)].astype(int).iat[0],
-                           self.df_cfg_plot['ID'][self.df_cfg_plot['plot_2'].astype(bool)].astype(int).iat[0],
-                           self.df_cfg_plot['ID'][self.df_cfg_plot['plot_3'].astype(bool)].astype(int).iat[0],
-                           self.df_cfg_plot['ID'][self.df_cfg_plot['plot_4'].astype(bool)].astype(int).iat[0],
-                           self.df_cfg_plot['ID'][self.df_cfg_plot['plot_5'].astype(bool)].astype(int).iat[0]]
+        # self.index_plot = [self.df_cfg_plot['ID'][self.df_cfg_plot['plot_1'].astype(bool)].astype(int).iat[0],
+        #                    self.df_cfg_plot['ID'][self.df_cfg_plot['plot_2'].astype(bool)].astype(int).iat[0],
+        #                    self.df_cfg_plot['ID'][self.df_cfg_plot['plot_3'].astype(bool)].astype(int).iat[0],
+        #                    self.df_cfg_plot['ID'][self.df_cfg_plot['plot_4'].astype(bool)].astype(int).iat[0],
+        #                    self.df_cfg_plot['ID'][self.df_cfg_plot['plot_5'].astype(bool)].astype(int).iat[0]]
 
         # handle exception
         if self.__N_PLOTTER > 5: self.__N_PLOTTER = 5
 
         # load attributions
-        self.plt_attr = []
+        self.index_plot =[]
+        self.PltAttr = []
+        # for i in range(self.__N_PLOTTER):
+        #     str_tmp = 'plot_' + str(i+1)
+        #     self.PltAttr.append(PltAttr(
+        #         y_label = self.df_cfg_plot['item'][self.df_cfg_plot[str_tmp].astype(bool)].iat[0],
+        #         y_unit = self.df_cfg_plot['unit'][self.df_cfg_plot[str_tmp].astype(bool)].iat[0],
+        #         y_min = self.df_cfg_plot['y_min'][self.df_cfg_plot[str_tmp].astype(bool)].iat[0],
+        #         y_max = self.df_cfg_plot['y_max'][self.df_cfg_plot[str_tmp].astype(bool)].iat[0],
+        #         alart_lim_u = 10,
+        #         alart_lim_l = 0.0))
         for i in range(self.__N_PLOTTER):
-            str_tmp = 'plot_' + str(i+1)
-            self.plt_attr.append(PltAttr(
-                y_label = self.df_cfg_plot['item'][self.df_cfg_plot[str_tmp].astype(bool)].iat[0],
-                y_unit = self.df_cfg_plot['unit'][self.df_cfg_plot[str_tmp].astype(bool)].iat[0],
-                y_min = self.df_cfg_plot['y_min'][self.df_cfg_plot[str_tmp].astype(bool)].iat[0],
-                y_max = self.df_cfg_plot['y_max'][self.df_cfg_plot[str_tmp].astype(bool)].iat[0],
-                alart_lim_u = 10,
-                alart_lim_l = 0.0))
+            # search throughout smt items
+            for iii in range(self.N_ITEM_SMT):
+                if self.TlmItemAttr_smt[iii]['plot #'] == i:
+                    self.index_plot.append(iii)
+                    self.PltAttr.append(PlotterAttributions(
+                        y_label = self.TlmItemAttr_smt[iii]['item'],
+                        y_unit = self.TlmItemAttr_smt[iii]['unit'],
+                        y_min = float(self.TlmItemAttr_smt[iii]['y_min']),
+                        y_max = float(self.TlmItemAttr_smt[iii]['y_max']),
+                        alart_lim_l = float(self.TlmItemAttr_smt[iii]['alert_lim_l']),
+                        alart_lim_u = float(self.TlmItemAttr_smt[iii]['alert_lim_u'])))
+                    break
+            else:
+                # search throughout pcm items
+                for iii in range(self.N_ITEM_PCM):
+                    if self.TlmItemAttr_pcm[iii]['plot #'] == i:
+                        self.index_plot.append(iii + self.__N_PLOTTER)
+                        self.PltAttr.append(PlotterAttributions(
+                            y_label = self.TlmItemAttr_pcm[iii]['item'],
+                            y_unit = self.TlmItemAttr_pcm[iii]['unit'],
+                            y_min = float(self.TlmItemAttr_pcm[iii]['y_min']),
+                            y_max = float(self.TlmItemAttr_pcm[iii]['y_max']),
+                            alart_lim_l = float(self.TlmItemAttr_pcm[iii]['alert_lim_l']),
+                            alart_lim_u = float(self.TlmItemAttr_pcm[iii]['alert_lim_u'])))
+                        break
+            
+            continue
+        
+        # for debug
+        # print('GUI PLT: PltAttr')
+        # print(self.PltAttr[0].y_min)
+        # print(self.PltAttr[1].y_min)
+        # print(self.PltAttr[2].y_min)
+        # print(self.PltAttr[3].y_min)
+        # print(self.PltAttr[4].y_min)
 
     # Configure appearance for plotters to display time histories
     def configure_plotter(self):
@@ -558,10 +600,10 @@ class ChartPanel(wx.Panel):
             self.axes[i].set_xlim([t_min, t_min + self.__T_RANGE])
 
             # - set limit for y axis
-            self.axes[i].set_ylim([self.plt_attr[i].y_min, self.plt_attr[i].y_max])
+            self.axes[i].set_ylim([self.PltAttr[i].y_min, self.PltAttr[i].y_max])
 
             # - set label for y axis
-            self.axes[i].set_ylabel(self.plt_attr[i].y_label + f' [{self.plt_attr[i].y_unit}]')
+            self.axes[i].set_ylabel(self.PltAttr[i].y_label + f' [{self.PltAttr[i].y_unit}]')
 
         # tentatively draw canvas without plot points to save as background
         self.canvas.draw()                                            
@@ -586,11 +628,9 @@ class ChartPanel(wx.Panel):
 
 
 # retain plotter attributions
-class PltAttr():
-    def __init__(self, 
-                y_label="", y_unit="", 
-                y_min=0.0, y_max=1.0, 
-                alart_lim_l=0.0, alart_lim_u=1.0) -> None:
+class PlotterAttributions():
+    def __init__(self, y_label="", y_unit="", 
+                y_min=0.0, y_max=1.0, alart_lim_l=0.0, alart_lim_u=1.0) -> None:
         self.y_label = y_label
         self.y_unit = y_unit
         self.y_min = y_min

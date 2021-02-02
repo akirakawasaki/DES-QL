@@ -76,7 +76,7 @@ class DatagramServerProtocol:
         self.MAX_SUP_COM = df_cfg['sup com'].max()
 
         # for debug
-        print('Item List = {}'.format(self.TlmItemList))
+        # print('Item List = {}'.format(self.TlmItemList))
         # print('Item Attributions = {}'.format(self.TlmItemAttr))
 
         # initialize a DataFrame to store data of one major frame 
