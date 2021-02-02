@@ -38,7 +38,7 @@ plt.rcParams["figure.subplot.bottom"] = 0.03    # Bottom
 plt.rcParams["figure.subplot.top"]    = 0.99    # Top
 plt.rcParams["figure.subplot.left"]   = 0.15    # Left
 plt.rcParams["figure.subplot.right"]  = 0.97    # Right
-plt.rcParams["figure.subplot.hspace"] = 0.1     # Height Margin between subplots
+plt.rcParams["figure.subplot.hspace"] = 0.05     # Height Margin between subplots
 
 
 """
@@ -481,13 +481,13 @@ class ChartPanel(wx.Panel):
                          self.TlmItemAttr_smt[iii]['item order'] == ii ) :
                         j = iii
                         break    
-
-                # search throughout pcm items
-                for iii in range(self.N_ITEM_PCM):
-                    if ( self.TlmItemAttr_pcm[iii]['group'] == self.GroupAttr[i]['label'] and
-                         self.TlmItemAttr_pcm[iii]['item order'] == ii ) :
-                        j = iii + self.N_ITEM_SMT
-                        break    
+                else:
+                    # search throughout pcm items
+                    for iii in range(self.N_ITEM_PCM):
+                        if ( self.TlmItemAttr_pcm[iii]['group'] == self.GroupAttr[i]['label'] and
+                            self.TlmItemAttr_pcm[iii]['item order'] == ii ) :
+                            j = iii + self.N_ITEM_SMT
+                            break    
                 
                 # assign items in grids
                 if j == -1:
