@@ -209,6 +209,12 @@ class ChartPanel(wx.Panel):
         df_pcm_tmp = self.dfTlm_pcm.copy()
         # df_tmp = self.dfTlm.copy()
         
+        print(f'df_pcm_tmp = {df_pcm_tmp}')
+
+        # fill NaN
+        # df_smt_tmp.fillna(method='ffill')
+        # df_pcm_tmp.fillna(method='ffill')
+
         # refresh indicators
         for i in self.GroupAttr.keys():
             ### T.B.REFAC ###

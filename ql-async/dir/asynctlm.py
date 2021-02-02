@@ -122,9 +122,14 @@ class DatagramServerProtocol:
 
         # notify GUI of the latest values
         if self.TLM_TYPE == 'smt':
-            self.tlm_latest_data.df_smt = self.df_mf.tail(1)
+            self.tlm_latest_data.df_smt = self.df_mf.fillna(method='ffill').tail(1)
         else:
-            self.tlm_latest_data.df_pcm = self.df_mf.tail(1)
+            self.tlm_latest_data.df_pcm = self.df_mf.fillna(method='ffill').tail(1)
+        
+        # if self.TLM_TYPE == 'smt':
+        #     self.tlm_latest_data.df_smt = self.df_mf.tail(1)
+        # else:
+        #     self.tlm_latest_data.df_pcm = self.df_mf.tail(1)
 
         # for debug
         # print("TLM notifies GUI of df:")
