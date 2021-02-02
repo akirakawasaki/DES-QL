@@ -54,8 +54,8 @@ class frmMain(wx.Frame):
         # maxmize GUI window size
         self.Maximize(True)
 
-        self.SetBackgroundColour('Dark Grey')
-        #self.SetBackgroundColour('Black')
+        # self.SetBackgroundColour('Dark Grey')
+        self.SetBackgroundColour('Black')
 
         # generate Main Graphic
         root_panel = wx.Panel(self, wx.ID_ANY)
@@ -74,7 +74,6 @@ class frmMain(wx.Frame):
 
         # show
         self.Show()
-
 
     # Event handler: EVT_CLOSE
     def OnClose(self, event):
@@ -220,14 +219,14 @@ class ChartPanel(wx.Panel):
                 # search throughout smt items
                 for iii in range(self.N_ITEM_SMT):
                     if ( self.TlmItemAttr_smt[iii]['group'] == self.GroupAttr[i]['label'] and
-                         self.TlmItemAttr_smt[iii]['item order'] == ii ) :
+                         self.TlmItemAttr_smt[iii]['item order'] == ii ) : 
                         j = iii
+                        # print(f'GUI IND: j = {j}')
                         break    
-                print(f'GUI IND: j = {j}')
 
                 # assign items in grids
                 if j != -1:
-                    print('Im here')
+                    # print('Im here')
                     self.stxtIndicator[j].SetLabel(str(np.round(df_smt_tmp.iloc[-1, j], 2)))
                     continue
 
@@ -236,8 +235,8 @@ class ChartPanel(wx.Panel):
                     if ( self.TlmItemAttr_pcm[iii]['group'] == self.GroupAttr[i]['label'] and
                          self.TlmItemAttr_pcm[iii]['item order'] == ii ) :
                         j = iii + self.N_ITEM_SMT
+                        # print(f'GUI IND: j = {j}')
                         break
-                print(f'GUI IND: j = {j}')
 
                 # assign items in grids
                 if j != -1:
@@ -338,12 +337,12 @@ class ChartPanel(wx.Panel):
     # Load configurations from external files
     def load_config_digital_indicator(self):
         self.GroupAttr = {
-            0: {'idx': 0, 'label': 'Time',          'rows': 1, 'cols' : 6},
-            1: {'idx': 1, 'label': 'DES State',     'rows': 5, 'cols' : 6},
-            2: {'idx': 2, 'label': 'Pressure',      'rows': 2, 'cols' : 6},
-            3: {'idx': 3, 'label': 'Temperature',   'rows': 2, 'cols' : 6},
-            4: {'idx': 4, 'label': 'IMU',           'rows': 2, 'cols' : 6},
-            5: {'idx': 5, 'label': 'House Keeping', 'rows': 3, 'cols' : 6}
+            0: {'idx': 0, 'label': 'Time',          'rows': 1, 'cols': 6},
+            1: {'idx': 1, 'label': 'DES State',     'rows': 5, 'cols': 6},
+            2: {'idx': 2, 'label': 'Pressure',      'rows': 2, 'cols': 6},
+            3: {'idx': 3, 'label': 'Temperature',   'rows': 2, 'cols': 6},
+            4: {'idx': 4, 'label': 'IMU',           'rows': 2, 'cols': 6},
+            5: {'idx': 5, 'label': 'House Keeping', 'rows': 3, 'cols': 6}
         }
         
         # self.sensor_type = ['Time [s]', 'Pressure [MPa]', 'Temperature [K]', 'IMU', 'House Keeping']
