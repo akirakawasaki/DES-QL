@@ -264,7 +264,8 @@ class DatagramServerProtocol:
                     # self.df_mf.iat[iFrame,iItem] = Vaz
 
                 # relay status (boolean)
-                elif self.TlmItemAttr[iItem]['type'] == 'bit':
+                elif self.TlmItemAttr[iItem]['type'] == 'bool':
+                # elif self.TlmItemAttr[iItem]['type'] == 'bit':
                 # elif self.TlmItemAttr[iItem]['type'] == 'rel':
                 # elif self.df_cfg.at[iItem,'type'] == 'rel':
                     self.df_mf.iat[iFrame,iItem] = \
