@@ -204,35 +204,27 @@ class ChartPanel(wx.Panel):
         for i in self.GroupAttr.keys():
             ### T.B.REFAC. ###
             for ii in range(self.GroupAttr[i]['rows'] * self.GroupAttr[i]['cols']):
-                # initialize
-                j = -1
-
                 # search throughout smt items
                 for iii in range(self.N_ITEM_SMT):
-                    if ( self.TlmItemAttr_smt[iii]['group'] == self.GroupAttr[i]['label'] and
-                         self.TlmItemAttr_smt[iii]['item order'] == ii ) : 
-                        j = iii
-                        # print(f'GUI IND: j = {j}')
-                        break    
+                    if ( self.TlmItemAttr_smt[iii]['group']      != self.GroupAttr[i]['label'] or
+                         self.TlmItemAttr_smt[iii]['item order'] != ii ):
+                        continue
+                    
+                    # assign items in grids
+                    self.stxtIndicator[iii].SetLabel(str(np.round(df_smt_tmp.iloc[-1, iii], 2)))
+                    break
+                
+                else:
+                    # search throughout pcm items
+                    for iii in range(self.N_ITEM_PCM):
+                        if ( self.TlmItemAttr_pcm[iii]['group']      != self.GroupAttr[i]['label'] or
+                             self.TlmItemAttr_pcm[iii]['item order'] != ii ) :
+                            continue
 
-                # assign items in grids
-                if j != -1:
-                    # print('Im here')
-                    self.stxtIndicator[j].SetLabel(str(np.round(df_smt_tmp.iloc[-1, j], 2)))
-                    continue
-
-                # search throughout pcm items
-                for iii in range(self.N_ITEM_PCM):
-                    if ( self.TlmItemAttr_pcm[iii]['group'] == self.GroupAttr[i]['label'] and
-                         self.TlmItemAttr_pcm[iii]['item order'] == ii ) :
-                        j = iii + self.N_ITEM_SMT
-                        # print(f'GUI IND: j = {j}')
+                        # assign items in grids
+                        self.stxtIndicator[iii+self.N_ITEM_SMT].SetLabel(str(np.round(df_pcm_tmp.iloc[-1, iii], 2)))
                         break
 
-                # assign items in grids
-                if j != -1:
-                    self.stxtIndicator[j].SetLabel(str(np.round(df_pcm_tmp.iloc[-1, j-self.N_ITEM_SMT], 2)))
-                                
     # Event handler: EVT_TIMER
     def OnRefreshPlotter(self, event):
         if self.__F_TLM_IS_ACTIVE == False: return None     # skip refresh
@@ -252,7 +244,8 @@ class ChartPanel(wx.Panel):
         # - update plot points by appending latest values
         self.x_series = np.append(self.x_series, df_tmp.iloc[-1,self.__IDX_TIME])
         for i in range(self.__N_PLOTTER):
-            self.y_series = np.append(self.y_series, df_tmp.iloc[-1,self.index_plot[i]])
+            # self.y_series = np.append(self.y_series, df_tmp.iloc[-1,self.index_plot[i]])
+            self.y_series = np.append(self.y_series, df_tmp.iloc[-1,self.PlotterAttr[i]['idx_item']])
 
         # print("GUI PLT: append latest values {}".format(df_tmp.iloc[-1,self.index_x]))
         # print("GUI PLT: x_series = {}".format(self.x_series))
@@ -292,22 +285,18 @@ class ChartPanel(wx.Panel):
             # clear axes
             self.axes[i].cla()
 
-            # update limit for x axis
+            # update axex attributions
             self.axes[i].set_xlim([self.t_min, self.t_max])
-
-            # set limit for y axis
-            self.axes[i].set_ylim([self.PltAttr[i].y_min, self.PltAttr[i].y_max])
-
-            # set label for y axis
-            self.axes[i].set_ylabel(self.PltAttr[i].y_label)
-
-            # update alert line
-            self.axes[i].axhline(y=self.PltAttr[i].alart_lim_u, xmin=0, xmax=1, color='red')
-            self.axes[i].axhline(y=self.PltAttr[i].alart_lim_u, xmin=0, xmax=1, color='red')
+            self.axes[i].set_ylim([self.PlotterAttr[i]['y_min'], self.PlotterAttr[i]['y_max']])
+            self.axes[i].set_ylabel(self.PlotterAttr[i]['y_label'])
+            self.axes[i].axhline(y=self.PlotterAttr[i]['alart_lim_l'], xmin=0, xmax=1, color='FIREBRICK')
+            self.axes[i].axhline(y=self.PlotterAttr[i]['alart_lim_u'], xmin=0, xmax=1, color='FIREBRICK')
+            # self.axes[i].axhline(y=self.PlotterAttr[i]['alart_lim_l'], xmin=0, xmax=1, color='RED')
+            # self.axes[i].axhline(y=self.PlotterAttr[i]['alart_lim_u'], xmin=0, xmax=1, color='RED')
         
             # update plot
             # NOTE: lines become iterrable hereafter
-            self.lines.append(self.axes[i].plot(self.x_series, self.y_series[i::self.__N_PLOTTER])[0])
+            self.lines.append(self.axes[i].plot(self.x_series, self.y_series[i::self.__N_PLOTTER], color='LIME')[0])
      
             # reflect updates in lines
             self.axes[i].draw_artist(self.lines[i])
@@ -323,6 +312,7 @@ class ChartPanel(wx.Panel):
 
     # Load configurations from external files
     def load_config_digital_indicator(self):
+        ### T.B.REFAC.: TEMPORALLY DESIGNATED BY LITERALS ###
         self.GroupAttr = {
             0: {'idx': 0, 'label': 'Time',          'rows': 1, 'cols': 6},
             1: {'idx': 1, 'label': 'DES State',     'rows': 5, 'cols': 6},
@@ -431,50 +421,87 @@ class ChartPanel(wx.Panel):
             self.lytSBoxGroup[i].Add(self.lytIndicator[i])
 
         # set states for ToggleButton
-        for index in self.index_plot:
-            self.tbtnLabel[index].SetValue(True)
+        for i in range(self.__N_PLOTTER):
+            self.tbtnLabel[self.PlotterAttr[i]['idx_item']].SetValue(True)
+        # for index in self.index_plot:
+            # self.tbtnLabel[index].SetValue(True)
 
         # for button in self.tbtnLabel:
         #     button.Bind(wx.EVT_TOGGLEBUTTON, self.graphTest)
 
     # Load configurations from external files
     def load_config_plotter(self):
-        ### T.B.REFAC.: TEMPORALLY DESIGNATED BY LITERALS ###
-
         # handle exception
-        if self.__N_PLOTTER > 5: self.__N_PLOTTER = 5
+        # if self.__N_PLOTTER > 5: self.__N_PLOTTER = 5
+        self.__N_PLOTTER = max(1, min(5, self.__N_PLOTTER))
 
-        # load attributions
-        self.index_plot =[]
-        self.PltAttr = []
-        for i in range(self.__N_PLOTTER):
+        self.PlotterAttr = {}
+        for i in range(self.__N_PLOTTER):  
+            dict_tmp = {}
+
             # search throughout smt items
             for iii in range(self.N_ITEM_SMT):
-                if self.TlmItemAttr_smt[iii]['plot #'] == i:
-                    self.index_plot.append(iii)
-                    self.PltAttr.append(PlotterAttributions(
-                        y_label = self.TlmItemAttr_smt[iii]['item'],
-                        y_unit = self.TlmItemAttr_smt[iii]['unit'],
-                        y_min = float(self.TlmItemAttr_smt[iii]['y_min']),
-                        y_max = float(self.TlmItemAttr_smt[iii]['y_max']),
-                        alart_lim_l = float(self.TlmItemAttr_smt[iii]['alert_lim_l']),
-                        alart_lim_u = float(self.TlmItemAttr_smt[iii]['alert_lim_u'])))
-                    break
+                if self.TlmItemAttr_smt[iii]['plot #'] != i: continue       # skip
+      
+                dict_tmp['idx_item']    = iii
+                dict_tmp['y_label']     = str(self.TlmItemAttr_smt[iii]['item'])
+                dict_tmp['y_unit']      = str(self.TlmItemAttr_smt[iii]['unit'])
+                dict_tmp['y_min']       = float(self.TlmItemAttr_smt[iii]['y_min'])
+                dict_tmp['y_max']       = float(self.TlmItemAttr_smt[iii]['y_max'])
+                dict_tmp['alart_lim_l'] = float(self.TlmItemAttr_smt[iii]['alert_lim_l'])
+                dict_tmp['alart_lim_u'] = float(self.TlmItemAttr_smt[iii]['alert_lim_u'])
+
+                break
+            
             else:
                 # search throughout pcm items
                 for iii in range(self.N_ITEM_PCM):
-                    if self.TlmItemAttr_pcm[iii]['plot #'] == i:
-                        self.index_plot.append(iii + self.N_ITEM_SMT)
-                        self.PltAttr.append(PlotterAttributions(
-                            y_label = self.TlmItemAttr_pcm[iii]['item'],
-                            y_unit = self.TlmItemAttr_pcm[iii]['unit'],
-                            y_min = float(self.TlmItemAttr_pcm[iii]['y_min']),
-                            y_max = float(self.TlmItemAttr_pcm[iii]['y_max']),
-                            alart_lim_l = float(self.TlmItemAttr_pcm[iii]['alert_lim_l']),
-                            alart_lim_u = float(self.TlmItemAttr_pcm[iii]['alert_lim_u'])))
-                        break
+                    if self.TlmItemAttr_pcm[iii]['plot #'] != i: continue   # skip
+
+                    dict_tmp['idx_item']    = iii + self.N_ITEM_SMT
+                    dict_tmp['y_label']     = str(self.TlmItemAttr_pcm[iii]['item'])
+                    dict_tmp['y_unit']      = str(self.TlmItemAttr_pcm[iii]['unit'])
+                    dict_tmp['y_min']       = float(self.TlmItemAttr_pcm[iii]['y_min'])
+                    dict_tmp['y_max']       = float(self.TlmItemAttr_pcm[iii]['y_max'])
+                    dict_tmp['alart_lim_l'] = float(self.TlmItemAttr_pcm[iii]['alert_lim_l'])
+                    dict_tmp['alart_lim_u'] = float(self.TlmItemAttr_pcm[iii]['alert_lim_u'])
+
+                    break
+
+            # append attibutions for i-th plotter 
+            self.PlotterAttr[i] = dict_tmp
+
+        # # load attributions
+        # self.index_plot =[]
+        # self.PltAttr = []
+        # for i in range(self.__N_PLOTTER):
+        #     # search throughout smt items
+        #     for iii in range(self.N_ITEM_SMT):
+        #         if self.TlmItemAttr_smt[iii]['plot #'] == i:
+        #             self.index_plot.append(iii)
+        #             self.PltAttr.append(PlotterAttributions(
+        #                 y_label = self.TlmItemAttr_smt[iii]['item'],
+        #                 y_unit = self.TlmItemAttr_smt[iii]['unit'],
+        #                 y_min = float(self.TlmItemAttr_smt[iii]['y_min']),
+        #                 y_max = float(self.TlmItemAttr_smt[iii]['y_max']),
+        #                 alart_lim_l = float(self.TlmItemAttr_smt[iii]['alert_lim_l']),
+        #                 alart_lim_u = float(self.TlmItemAttr_smt[iii]['alert_lim_u'])))
+        #             break
+        #     else:
+        #         # search throughout pcm items
+        #         for iii in range(self.N_ITEM_PCM):
+        #             if self.TlmItemAttr_pcm[iii]['plot #'] == i:
+        #                 self.index_plot.append(iii + self.N_ITEM_SMT)
+        #                 self.PltAttr.append(PlotterAttributions(
+        #                     y_label = self.TlmItemAttr_pcm[iii]['item'],
+        #                     y_unit = self.TlmItemAttr_pcm[iii]['unit'],
+        #                     y_min = float(self.TlmItemAttr_pcm[iii]['y_min']),
+        #                     y_max = float(self.TlmItemAttr_pcm[iii]['y_max']),
+        #                     alart_lim_l = float(self.TlmItemAttr_pcm[iii]['alert_lim_l']),
+        #                     alart_lim_u = float(self.TlmItemAttr_pcm[iii]['alert_lim_u'])))
+        #                 break
             
-            continue
+        #     continue
         
         # for debug
         # print('GUI PLT: PltAttr')
@@ -510,10 +537,11 @@ class ChartPanel(wx.Panel):
             self.axes[i].set_xlim([t_min, t_min + self.__T_RANGE])
 
             # - set limit for y axis
-            self.axes[i].set_ylim([self.PltAttr[i].y_min, self.PltAttr[i].y_max])
+            self.axes[i].set_ylim([self.PlotterAttr[i]['y_min'], self.PlotterAttr[i]['y_max']])
 
             # - set label for y axis
-            self.axes[i].set_ylabel(self.PltAttr[i].y_label + f' [{self.PltAttr[i].y_unit}]')
+            self.axes[i].set_ylabel(self.PlotterAttr[i]['y_label'])
+            # self.axes[i].set_ylabel(self.PlotterAttr[i]['y_label'] + f' [{self.PlotterAttr[i]['y_unit']}]')
 
         # tentatively draw canvas without plot points to save as background
         self.canvas.draw()                                            
