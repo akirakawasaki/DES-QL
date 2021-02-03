@@ -3,6 +3,7 @@
 import csv
 #import decimal
 import math
+from os import spawnve
 # import socket
 import sys
 
@@ -87,6 +88,12 @@ class DatagramServerProtocol:
 
         # initialize data index
         self.iLine = 0
+
+        # initialize high-speed data functionality
+        self.w009_old = 0x00
+        self.w018_old = 0x00
+        self.high_speed_data_is_avtive = False
+        self.idx_high_speed_data = 0
 
     # Event handler
     def connection_made(self,transport):
@@ -307,43 +314,37 @@ class DatagramServerProtocol:
                 elif self.TlmItemAttr[iItem]['type'] == 'data hd':
                     ### T.B.REFAC ###
                     
-                    byte_length = 2
+                    # byte_length = 2
                     signed = self.TlmItemAttr[iItem]['signed']
                     integer_bit_length = int(self.TlmItemAttr[iItem]['integer bit len'])    # include sign bit if any
                     a_coeff = self.TlmItemAttr[iItem]['a coeff']
                     b_coeff = self.TlmItemAttr[iItem]['b coeff']
 
+                    # total_bit_length = 8 * byte_length
+                    # fractional_bit_length = total_bit_length - integer_bit_length
+
+                    # - W009 + W010: start of data
+                    byte_length = 4
                     total_bit_length = 8 * byte_length
                     fractional_bit_length = total_bit_length - integer_bit_length
-                    
-                    # - start of data 1
                     byte_idx_shift = 0
                     #####
                     byte_string = []
                     for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
 
-                    physical_value =  b_coeff \
-                                    + a_coeff \
-                                        * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
-                                        / 2**(fractional_bit_length)
+                    # physical_value =  b_coeff \
+                    #                 + a_coeff \
+                    #                     * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
+                    #                     / 2**(fractional_bit_length)
                     #####
-                    SOD_H = physical_value
+                    w009 = byte_string
+                    self.df_mf.iat[iFrame,iItem] = w009
 
-                    # - start of data 2
-                    byte_idx_shift = 2
-                    #####
-                    byte_string = []
-                    for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
-
-                    physical_value =  b_coeff \
-                                    + a_coeff \
-                                        * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
-                                        / 2**(fractional_bit_length)
-                    #####
-                    SOD_L = physical_value
-
-                    # - sensor number
-                    byte_idx_shift = 8
+                    # - W018
+                    byte_length = 2
+                    total_bit_length = 8 * byte_length
+                    fractional_bit_length = total_bit_length - integer_bit_length
+                    byte_idx_shift = 18
                     #####
                     byte_string = []
                     for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
@@ -353,9 +354,70 @@ class DatagramServerProtocol:
                                         * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
                                         / 2**(fractional_bit_length)
                     #####
-                    SENS_NUM = physical_value
+                    w018 = byte_string
 
-                    self.df_mf.iat[iFrame,iItem] = SENS_NUM
+                    # detect head of high-speed data
+                    if (self.w009_old == [0xFF, 0x53, 0x4F, 0x44] and self.w018_old == [0xFF, 0xFF]) \
+                        and (w009     != [0xFF, 0x53, 0x4F, 0x44] and      w018     != [0xFF, 0xFF]):
+                        self.high_speed_data_is_avtive = True
+                        self.idx_high_speed_data += 1
+                        print('TLM TRN: High-speed data is activated!')
+                    elif (self.w009_old != [0xFF, 0x53, 0x4F, 0x44] and self.w018_old != [0xFF, 0xFF]) \
+                        and (  w009     == [0xFF, 0x53, 0x4F, 0x44] and      w018     == [0xFF, 0xFF]):
+                        self.high_speed_data_is_avtive = False
+                        print('TLM TRN: High-speed data is deactivated!')
+
+                    self.w009_old = w009
+                    self.w018_old = w018
+
+                    # for debug
+                    # print(f'TLM TRN: W018 = {w018}')
+                    # if w018 == 0xFFFF :         print('TLM TRN: High-speed data is NOT active!')
+                    # if w018 == [0xFF, 0xFF] :   print('TLM TRN: High-speed data is NOT active!')
+                    # if w018 == [255, 255] :   print('TLM TRN: High-speed data is NOT active!')
+                    # if int.from_bytes(w018, byteorder='big', signed=False) == 65535 :
+                    #     print('TLM TRN: High-speed data is NOT active!')
+
+                    # # - start of data 1
+                    # byte_idx_shift = 0
+                    # #####
+                    # byte_string = []
+                    # for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
+
+                    # physical_value =  b_coeff \
+                    #                 + a_coeff \
+                    #                     * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
+                    #                     / 2**(fractional_bit_length)
+                    # #####
+                    # SOD_H = physical_value
+
+                    # # - start of data 2
+                    # byte_idx_shift = 2
+                    # #####
+                    # byte_string = []
+                    # for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
+
+                    # physical_value =  b_coeff \
+                    #                 + a_coeff \
+                    #                     * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
+                    #                     / 2**(fractional_bit_length)
+                    # #####
+                    # SOD_L = physical_value
+
+                    # # - sensor number
+                    # byte_idx_shift = 8
+                    # #####
+                    # byte_string = []
+                    # for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
+
+                    # physical_value =  b_coeff \
+                    #                 + a_coeff \
+                    #                     * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
+                    #                     / 2**(fractional_bit_length)
+                    # #####
+                    # SENS_NUM = physical_value
+
+                    # self.df_mf.iat[iFrame,iItem] = SENS_NUM
 
                 # high speed data payload
                 elif self.TlmItemAttr[iItem]['type'] == 'data pl1':
@@ -382,17 +444,16 @@ class DatagramServerProtocol:
                                         / 2**(fractional_bit_length)
                     #####
                     W018 = byte_string
-
                     self.df_mf.iat[iFrame,iItem] = W018
 
-                    # if (SENS_NUM != 0) and (W018 != 0xFFFF):
-                    if ((SENS_NUM == 1) or (SENS_NUM == 2) or (SENS_NUM == 3)) and (W018 != 0xFFFF):
-                        # write history to an external file
-                        DATA_PATH_HSD = f'./high_speed_data{int(SENS_NUM)}.csv'
+                    # write history to an external file
+                    if self.high_speed_data_is_avtive == True:
+                        DATA_PATH_HSD = './high_speed_data_{:0=4}.csv'.format(self.idx_high_speed_data)
                         with open(DATA_PATH_HSD, 'a') as f:
                             writer = csv.writer(f)
                             for j in range(int(self.TlmItemAttr[iItem]['word len'])):
                                 byte_idx_shift = self.__W2B * j
+                                
                                 #####
                                 byte_string = []
                                 for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
@@ -401,8 +462,28 @@ class DatagramServerProtocol:
                                                 + a_coeff \
                                                     * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
                                                     / 2**(fractional_bit_length)
+                                #####
                                 
                                 writer.writerow([format(gse_time,'.3f'), physical_value])
+
+                    # # if (SENS_NUM != 0) and (W018 != 0xFFFF):
+                    # if ((SENS_NUM == 1) or (SENS_NUM == 2) or (SENS_NUM == 3)) and (W018 != 0xFFFF):
+                    #     # write history to an external file
+                    #     DATA_PATH_HSD = f'./high_speed_data{int(SENS_NUM)}.csv'
+                    #     with open(DATA_PATH_HSD, 'a') as f:
+                    #         writer = csv.writer(f)
+                    #         for j in range(int(self.TlmItemAttr[iItem]['word len'])):
+                    #             byte_idx_shift = self.__W2B * j
+                    #             #####
+                    #             byte_string = []
+                    #             for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
+
+                    #             physical_value =  b_coeff \
+                    #                             + a_coeff \
+                    #                                 * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
+                    #                                 / 2**(fractional_bit_length)
+                                
+                    #             writer.writerow([format(gse_time,'.3f'), physical_value])
 
                 elif self.TlmItemAttr[iItem]['type'] == 'data pl2':
                     ### T.B.REFAC ###
@@ -428,17 +509,16 @@ class DatagramServerProtocol:
                                         / 2**(fractional_bit_length)
                     #####
                     W036 = byte_string
-
                     self.df_mf.iat[iFrame,iItem] = W036
 
-                    # if (SENS_NUM != 0) and (W018 != 0xFFFF):
-                    if ((SENS_NUM == 1) or (SENS_NUM == 2) or (SENS_NUM == 3)) and (W018 != 0xFFFF):
-                        # write history to an external file
-                        DATA_PATH_HSD = f'./high_speed_data{int(SENS_NUM)}.csv'
+                    # write history to an external file
+                    if self.high_speed_data_is_avtive == True:
+                        DATA_PATH_HSD = './high_speed_data_{:0=4}.csv'.format(self.idx_high_speed_data)
                         with open(DATA_PATH_HSD, 'a') as f:
                             writer = csv.writer(f)
                             for j in range(int(self.TlmItemAttr[iItem]['word len'])):
                                 byte_idx_shift = self.__W2B * j
+                                
                                 #####
                                 byte_string = []
                                 for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
@@ -447,8 +527,28 @@ class DatagramServerProtocol:
                                                 + a_coeff \
                                                     * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
                                                     / 2**(fractional_bit_length)
+                                #####
                                 
                                 writer.writerow([format(gse_time,'.3f'), physical_value])
+
+                    # # if (SENS_NUM != 0) and (W018 != 0xFFFF):
+                    # if ((SENS_NUM == 1) or (SENS_NUM == 2) or (SENS_NUM == 3)) and (W018 != 0xFFFF):
+                    #     # write history to an external file
+                    #     DATA_PATH_HSD = f'./high_speed_data{int(SENS_NUM)}.csv'
+                    #     with open(DATA_PATH_HSD, 'a') as f:
+                    #         writer = csv.writer(f)
+                    #         for j in range(int(self.TlmItemAttr[iItem]['word len'])):
+                    #             byte_idx_shift = self.__W2B * j
+                    #             #####
+                    #             byte_string = []
+                    #             for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
+
+                    #             physical_value =  b_coeff \
+                    #                             + a_coeff \
+                    #                                 * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
+                    #                                 / 2**(fractional_bit_length)
+                                
+                    #             writer.writerow([format(gse_time,'.3f'), physical_value])
 
                 # DES timestamp in [sec]
                 # if self.df_cfg.at[iItem,'type'] == 'des time':
