@@ -1,6 +1,6 @@
 ### Standard libraries
 # import time
-import concurrent.futures
+# import concurrent.futures
 import sys
 
 ### Third-party libraries
@@ -27,13 +27,12 @@ FETCH_RATE_LATEST_VALUES       = 20     # ms/cycle
 REFLESH_RATE_PLOTTER           = 20     # ms/cycle
 REFLESH_RATE_DIGITAL_INDICATOR = 350    # ms/cycle
 
-
 """
 Matplotlib configuration
 """
 plt.style.use('dark_background')
 
-# Margin
+# Plotter margins
 plt.rcParams["figure.subplot.bottom"] = 0.03    # Bottom
 plt.rcParams["figure.subplot.top"]    = 0.99    # Top
 plt.rcParams["figure.subplot.left"]   = 0.15    # Left
@@ -107,13 +106,6 @@ class ChartPanel(wx.Panel):
         self.__PLOT_COUNT = self.__PLOT_SKIP   ### TBREFAC. ###
         
         ### load configurations from external files
-        # - smt&pcm config
-        # self.df_cfg_smt = pd.read_excel('./config_tlm.xlsx', sheet_name='smt').dropna(how='all')
-        # self.df_cfg_pcm = pd.read_excel('./config_tlm.xlsx', sheet_name='pcm').dropna(how='all')
-
-        # self.df_cfg_smt.reset_index()
-        # self.df_cfg_pcm.reset_index()
-
         # - smt
         try: 
             df_cfg_smt = pd.read_excel('./config_tlm_2.xlsx', 
@@ -150,10 +142,10 @@ class ChartPanel(wx.Panel):
         self.configure_digital_indicator()
         self.configure_plotter()
 
-        ### lay out GUI elements by sizer 
+        ### lay out panes
         self.layout = wx.FlexGridSizer(rows=1, cols=2, gap=(20, 0))
-        self.layout.Add(self.canvas, flag=wx.EXPAND)                            # plotter
-        self.layout.Add(self.IndicatorPane, flag=wx.ALIGN_CENTER_HORIZONTAL)    # digital indicators
+        self.layout.Add(self.canvas, flag=wx.EXPAND)                            # plotter pane
+        self.layout.Add(self.IndicatorPane, flag=wx.ALIGN_CENTER_HORIZONTAL)    # digital indicator pane
         self.SetSizer(self.layout)
 
         ### bind events
@@ -177,10 +169,8 @@ class ChartPanel(wx.Panel):
         # print('GUI FTC: fetched tlm data')
         
         # break off when tlm data not exist
-        if ( len(self.tlm_latest_data.df_smt.index) == 0 or
-             len(self.tlm_latest_data.df_pcm.index) == 0 ):
-            print('GUI awaiting SMT and/or PCM data')
-            # print('GUI awaiting smt data')
+        if len(self.tlm_latest_data.df_smt.index) == 0 or len(self.tlm_latest_data.df_pcm.index) == 0:
+            print('GUI FTC: awaiting SMT and/or PCM data')
             self.__F_TLM_IS_ACTIVE = False
             return None
         
@@ -194,31 +184,25 @@ class ChartPanel(wx.Panel):
         #     print('GUI FTC: TLM data has NOT been updated!')
         #     return None
         
+        ### T.B.REFAC.: should be thread safe ###
         # fetch current values & store
         self.dfTlm_smt = self.tlm_latest_data.df_smt
-        self.dfTlm_pcm = self.tlm_latest_data.df_pcm
-        # self.dfTlm = self.tlm_latest_data.df_smt
-        ### TBREFAC.: should be thread safe
+        self.dfTlm_pcm = self.tlm_latest_data.df_pcm        
 
     # Event handler: EVT_TIMER
     def OnRefreshDigitalIndicator(self, event):
         if self.__F_TLM_IS_ACTIVE == False: return None     # skip refresh
         
-        # obtain time slice of dfTlm to avoid unexpected rewrite during refresh
+        # obtain time slice of dfTlm by DEEP COPY to avoid unexpected rewrite during refresh
         df_smt_tmp = self.dfTlm_smt.copy()
         df_pcm_tmp = self.dfTlm_pcm.copy()
-        # df_tmp = self.dfTlm.copy()
         
         # for debug
         # print(f'GUI IND: df_pcm_tmp = {df_pcm_tmp}')
 
-        # fill NaN
-        # df_smt_tmp.fillna(method='ffill')
-        # df_pcm_tmp.fillna(method='ffill')
-
         # refresh indicators
         for i in self.GroupAttr.keys():
-            ### T.B.REFAC ###
+            ### T.B.REFAC. ###
             for ii in range(self.GroupAttr[i]['rows'] * self.GroupAttr[i]['cols']):
                 # initialize
                 j = -1
@@ -248,11 +232,7 @@ class ChartPanel(wx.Panel):
                 # assign items in grids
                 if j != -1:
                     self.stxtIndicator[j].SetLabel(str(np.round(df_pcm_tmp.iloc[-1, j-self.N_ITEM_SMT], 2)))
-                    
-        # refresh display
-        # for i_sensor in range(len(self.df_cfg_smt['item'])):
-        #     self.stxtIndicator[i_sensor].SetLabel(str(np.round(df_tmp.iloc[-1, i_sensor], 2)))
-            
+                                
     # Event handler: EVT_TIMER
     def OnRefreshPlotter(self, event):
         if self.__F_TLM_IS_ACTIVE == False: return None     # skip refresh
@@ -261,27 +241,24 @@ class ChartPanel(wx.Panel):
 
         ###
         ### update data set for plot
-        # - obtain time slice of dfTlm by deep copy to avoid unexpected rewrite during refresh
+        # - obtain time slice of dfTlm by DEEP COPY to avoid unexpected rewrite during refresh
         df_smt_tmp = self.dfTlm_smt.copy()
         df_pcm_tmp = self.dfTlm_pcm.copy()
-        # df_tmp = self.dfTlm.copy()
         df_tmp = pd.concat([df_smt_tmp, df_pcm_tmp], axis=1)
 
         # - update plot points by appending latest values
         self.x_series = np.append(self.x_series, df_tmp.iloc[-1,self.__IDX_TIME])
         for i in range(self.__N_PLOTTER):
             self.y_series = np.append(self.y_series, df_tmp.iloc[-1,self.index_plot[i]])
-        # self.x_series = np.append(self.x_series, df_smt_tmp.iloc[-1,self.__IDX_TIME])
-        # for i in range(self.__N_PLOTTER):
-        #     self.y_series = np.append(self.y_series, df_smt_tmp.iloc[-1,self.index_plot[i]])
-        # print("GUI: append latest values {}".format(df_tmp.iloc[-1,self.index_x]))
+
+        # print("GUI PLT: append latest values {}".format(df_tmp.iloc[-1,self.index_x]))
         # print("GUI PLT: x_series = {}".format(self.x_series))
         # print("GUI PLT: y_series = {}".format(self.y_series))
 
         # - determine time max & min
         self.t_max = self.x_series[-1]
         self.t_min = self.t_max - self.__T_RANGE
-        # print("t_max = {}, t_min = {}".format(self.t_max, self.t_min))
+        # print("GUI PLT: t_max = {}, t_min = {}".format(self.t_max, self.t_min))
 
         # - delete plot points out of the designated time range
         while self.x_series[0] < self.t_min:
@@ -289,17 +266,17 @@ class ChartPanel(wx.Panel):
             self.x_series = np.delete(self.x_series, 0)
             self.y_series = np.delete(self.y_series, np.s_[0:self.__N_PLOTTER])
 
+        ### T.B.REFAC. ###
         # skip redraw
-        ### T.B.REFAC ###
         if self.__PLOT_COUNT != self.__PLOT_SKIP:
             self.__PLOT_COUNT += 1
             return None
         self.__PLOT_COUNT = 0
 
-    #     # run tlm_handler concurrently in other threads
-    #     executor = concurrent.futures.ThreadPoolExecutor()
-    #     # executor = concurrent.futures.ProcessPoolExecutor()
-    #     executor.submit(self.__redraw_plotter_pane)
+        # # run tlm_handler concurrently in other threads
+        # executor = concurrent.futures.ThreadPoolExecutor()
+        # # executor = concurrent.futures.ProcessPoolExecutor()
+        # executor.submit(self.__redraw_plotter_pane)
 
     # def __redraw_plotter_pane(self):
         ###
@@ -339,7 +316,7 @@ class ChartPanel(wx.Panel):
         self.fig.canvas.draw()
         # self.fig.canvas.flush_events()
         
-        print("GUI PLT: redraw plots...")   
+        # print("GUI PLT: redraw plots...")   
 
     # Load configurations from external files
     def load_config_digital_indicator(self):
@@ -352,30 +329,6 @@ class ChartPanel(wx.Panel):
             5: {'idx': 5, 'label': 'House Keeping', 'rows': 3, 'cols': 6}
         }
         
-        # self.sensor_type = ['Time [s]', 'Pressure [MPa]', 'Temperature [K]', 'IMU', 'House Keeping']
-        # self.col_value = [6, 6, 6, 6, 6]
-        # self.col_value = [6, 8, 8, 9, 8]
-
-        # self.GroupName = ['Time', 'DES State', 'Pressure', 'Temperature', 'IMU', 'House Keeping']
-        # self.GroupName = {0:'Time', 1:'DES State', 2:'Pressure', 3:'Temperature', 4:'IMU', 5:'House Keeping'}
-
-        # Load digital indicator appearance config
-        # self.df_cfg_sensor = (pd.read_excel('./config_sensor.xlsx', sheet_name='smt')).dropna(how='all')
-
-        # self.id_time = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'Time [s]']['ID'].astype(int)
-        # self.id_p = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'P [MPa]']['ID'].astype(int)
-        # self.id_T = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'T [K]']['ID'].astype(int)
-        # self.id_imu = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'IMU']['ID'].astype(int)
-        # self.id_hk = self.df_cfg_sensor[self.df_cfg_sensor['group'] == 'House Keeping']['ID'].astype(int)
-
-        # self.id = [self.id_time, self.id_p, self.id_T, self.id_imu, self.id_hk]
-
-        # self.TlmItemList_smt = df_cfg_smt['item'].values.tolist()
-        # self.TlmItemAttr_smt = df_cfg_smt.to_dict(orient='index')
-
-        # self.id_time = self.TlmItemList_smt
-        # df_cfg_sensor[self.df_cfg_sensor['group'] == 'Time [s]']['ID'].astype(int)
-
     # Configure appearance for digital indicators to display current values
     # <hierarchy>
     #   IndicatorPane - lytSBoxGroup
@@ -387,22 +340,15 @@ class ChartPanel(wx.Panel):
         ### generate containers to groupe indicators (StaticBox)
         self.SBoxGroup = []
         self.lytSBoxGroup = []
-        # for name in self.sensor_type:
-        # for strGroupName in self.GroupName:
         for i in self.GroupAttr.keys():
             # - generate an instance
-            # self.sbox_type.append(wx.StaticBox(self, wx.ID_ANY, name))
             self.SBoxGroup.append(wx.StaticBox(self, wx.ID_ANY, self.GroupAttr[i]['label']))
             self.SBoxGroup[-1].SetForegroundColour('WHITE')
             self.SBoxGroup[-1].SetFont(wx.Font(15, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
             
             # - lay out the instance
             self.lytSBoxGroup.append(wx.StaticBoxSizer(self.SBoxGroup[-1], wx.VERTICAL))
-
             self.IndicatorPane.Add(self.lytSBoxGroup[-1])
-            # self.IndicatorPane.Add(self.lytSBoxGroup[self.GroupName.index(strGroupName)])
-
-        # self.IndicatorPane.Add(self.lytSBoxGroup)
 
         ### generate indicators & their labels
         self.tbtnLabel = []
@@ -410,7 +356,6 @@ class ChartPanel(wx.Panel):
         self.lytPair = []           # pair of Indicator & Label
         
         # smt items
-        # for i in range(len(self.df_cfg_smt['item'])):
         for i in range(self.N_ITEM_SMT):
             # generate instance 
             # - item label (ToggleButton)
@@ -429,7 +374,6 @@ class ChartPanel(wx.Panel):
             self.lytPair[-1].Add(self.stxtIndicator[-1], flag=wx.EXPAND)
 
         # pcm items
-        # for i in range(N_ITEM_SMT, N_ITEM_SMT + N_ITEM_PCM):
         for i in range(self.N_ITEM_PCM):
             # generate instance 
             # - item label (ToggleButton)
@@ -447,30 +391,8 @@ class ChartPanel(wx.Panel):
             self.lytPair[-1].Add(self.tbtnLabel[-1], flag=wx.EXPAND)
             self.lytPair[-1].Add(self.stxtIndicator[-1], flag=wx.EXPAND)
 
-        # - ToggleButton: item labels for indicators
-        # self.tbtnLabel = []
-        # for index in self.df_cfg_smt['item']:
-        #     self.tbtnLabel.append(wx.ToggleButton(self, wx.ID_ANY, index, size=(120,22)))
-
-        ### lay out digital indicators
-        # - containers by StaticBoxSizer
-        # self.lytSBoxGroup = []
-        # # for i in range(len(self.sensor_type)):
-        # for i in range(len(self.GroupName)):
-        #     self.lytSBoxGroup.append(wx.StaticBoxSizer(self.SBoxGroup[i], wx.VERTICAL))
-
-        # - pairs of an item label & an inidicator by GridSizer
-        # -- make pairs of an item label & an inidicator
-        # self.lytPair = []
-        # for i in range(len(self.df_cfg_smt['item'])):
-        #     # self.layout_Set.append(wx.GridSizer(rows=2, cols=1, gap=(5,5)))
-        #     self.lytPair.append(wx.GridSizer(rows=2, cols=1, gap=(0,0)))
-        #     self.lytPair[i].Add(self.tbtnLabel[i], flag=wx.EXPAND)
-        #     self.lytPair[i].Add(self.stxtIndicator[i], flag=wx.EXPAND)
-
-        # lay out pairs of indicators & labels in the grouping SBoxes
+        ### lay out pairs of indicators & labels in the grouping SBoxes
         self.lytIndicator = []
-        # for i in range(len(self.sensor_type)):
         for i in self.GroupAttr.keys():
             # generate grid in the grouping SBox
             self.lytIndicator.append(
@@ -502,9 +424,6 @@ class ChartPanel(wx.Panel):
                 else:
                     self.lytIndicator[i].Add(self.lytPair[j], flag=wx.EXPAND)
             
-            # for sensor in self.id[i]:
-            #     self.lytIndicator[i].Add(self.layout_Set[sensor], flag=wx.EXPAND)
-
             # snap
             self.lytSBoxGroup[i].Add(self.lytIndicator[i])
 
@@ -517,16 +436,7 @@ class ChartPanel(wx.Panel):
 
     # Load configurations from external files
     def load_config_plotter(self):
-        ### TBREFAC.: TEMPORALLY DESIGNATED BY LITERALS ###
-
-        # Load plotter appearance config
-        # self.df_cfg_plot = (pd.read_excel('./config_plot.xlsx', sheet_name='smt')).dropna(how='all')
-
-        # self.index_plot = [self.df_cfg_plot['ID'][self.df_cfg_plot['plot_1'].astype(bool)].astype(int).iat[0],
-        #                    self.df_cfg_plot['ID'][self.df_cfg_plot['plot_2'].astype(bool)].astype(int).iat[0],
-        #                    self.df_cfg_plot['ID'][self.df_cfg_plot['plot_3'].astype(bool)].astype(int).iat[0],
-        #                    self.df_cfg_plot['ID'][self.df_cfg_plot['plot_4'].astype(bool)].astype(int).iat[0],
-        #                    self.df_cfg_plot['ID'][self.df_cfg_plot['plot_5'].astype(bool)].astype(int).iat[0]]
+        ### T.B.REFAC.: TEMPORALLY DESIGNATED BY LITERALS ###
 
         # handle exception
         if self.__N_PLOTTER > 5: self.__N_PLOTTER = 5
@@ -534,15 +444,6 @@ class ChartPanel(wx.Panel):
         # load attributions
         self.index_plot =[]
         self.PltAttr = []
-        # for i in range(self.__N_PLOTTER):
-        #     str_tmp = 'plot_' + str(i+1)
-        #     self.PltAttr.append(PltAttr(
-        #         y_label = self.df_cfg_plot['item'][self.df_cfg_plot[str_tmp].astype(bool)].iat[0],
-        #         y_unit = self.df_cfg_plot['unit'][self.df_cfg_plot[str_tmp].astype(bool)].iat[0],
-        #         y_min = self.df_cfg_plot['y_min'][self.df_cfg_plot[str_tmp].astype(bool)].iat[0],
-        #         y_max = self.df_cfg_plot['y_max'][self.df_cfg_plot[str_tmp].astype(bool)].iat[0],
-        #         alart_lim_u = 10,
-        #         alart_lim_l = 0.0))
         for i in range(self.__N_PLOTTER):
             # search throughout smt items
             for iii in range(self.N_ITEM_SMT):
@@ -620,19 +521,6 @@ class ChartPanel(wx.Panel):
         for i in range(self.__N_PLOTTER):
             self.backgrounds.append(self.canvas.copy_from_bbox(self.axes[i].bbox))
 
-    # def graphTest(self, event):
-    #     self.n_graph = 0
-    #     self.parameter = []
-    #     for button in self.tbtnLabel:
-    #         if button.GetValue():
-    #             self.n_graph += 1
-    #             self.parameter.append(button.GetLabel())
-
-    #     print(self.n_graph)
-    #     print(self.parameter)
-    #     self.chartGenerator(self.n_graph)
-
-
 # retain plotter attributions
 class PlotterAttributions():
     def __init__(self, y_label="", y_unit="", 
@@ -643,3 +531,8 @@ class PlotterAttributions():
         self.y_max = y_max
         self.alart_lim_l = alart_lim_l
         self.alart_lim_u = alart_lim_u
+
+
+
+
+
