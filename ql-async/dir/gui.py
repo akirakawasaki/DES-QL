@@ -94,7 +94,7 @@ class ChartPanel(wx.Panel):
     __T_RANGE = 30    # [s]
     __IDX_TIME = 1
 
-    __PLOT_SKIP = 20    ### TBREFAC. ###
+    __PLOT_SKIP = 20    ### T.B.REFAC. ###
 
     def __init__(self, parent, tlm_latest_data):
         super().__init__(parent, wx.ID_ANY)
@@ -103,7 +103,7 @@ class ChartPanel(wx.Panel):
         self.tlm_latest_data = tlm_latest_data      # receive instance of shared variables
         self.__F_TLM_IS_ACTIVE = False
         self.dfTlm = pd.DataFrame()
-        self.__PLOT_COUNT = self.__PLOT_SKIP   ### TBREFAC. ###
+        self.__PLOT_COUNT = self.__PLOT_SKIP   ### T.B.REFAC. ###
         
         ### load configurations from external files
         # - smt
@@ -245,6 +245,9 @@ class ChartPanel(wx.Panel):
         df_smt_tmp = self.dfTlm_smt.copy()
         df_pcm_tmp = self.dfTlm_pcm.copy()
         df_tmp = pd.concat([df_smt_tmp, df_pcm_tmp], axis=1)
+
+        # for debug
+        # df_tmp.to_csv('./debug.csv')
 
         # - update plot points by appending latest values
         self.x_series = np.append(self.x_series, df_tmp.iloc[-1,self.__IDX_TIME])
@@ -461,7 +464,7 @@ class ChartPanel(wx.Panel):
                 # search throughout pcm items
                 for iii in range(self.N_ITEM_PCM):
                     if self.TlmItemAttr_pcm[iii]['plot #'] == i:
-                        self.index_plot.append(iii + self.__N_PLOTTER)
+                        self.index_plot.append(iii + self.N_ITEM_SMT)
                         self.PltAttr.append(PlotterAttributions(
                             y_label = self.TlmItemAttr_pcm[iii]['item'],
                             y_unit = self.TlmItemAttr_pcm[iii]['unit'],

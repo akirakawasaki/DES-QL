@@ -29,8 +29,8 @@ async def tlm(tlm_type, internal_flags, tlm_latest_data):
     
     # initialize
     # HOST = ''
-    HOST = '192.168.1.255'                                  # mac
-    # HOST = socket.gethostbyname(socket.gethostname())       # windows / mac(debug)
+    # HOST = '192.168.1.255'                                  # mac
+    HOST = socket.gethostbyname(socket.gethostname())       # windows / mac(debug)
     PORT = 0
 
     ### TBREFAC. ###
