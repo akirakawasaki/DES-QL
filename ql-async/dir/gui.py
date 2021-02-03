@@ -210,8 +210,16 @@ class ChartPanel(wx.Panel):
                          self.TlmItemAttr_smt[iii]['item order'] != ii ):
                         continue
                     
-                    # assign items in grids
+                    # refresh indicator
                     self.stxtIndicator[iii].SetLabel(str(np.round(df_smt_tmp.iloc[-1, iii], 2)))
+
+                    # accentuate by color when 'bool' type datum is TRUE
+                    if self.TlmItemAttr_smt[iii]['type'] == 'bool':
+                        if df_smt_tmp.iloc[-1, iii] > 0:
+                            self.stxtIndicator[iii].SetBackgroundColour('GREY')
+                        else:
+                            self.stxtIndicator[iii].SetBackgroundColour('BLACK')
+
                     break
                 
                 else:
@@ -221,9 +229,10 @@ class ChartPanel(wx.Panel):
                              self.TlmItemAttr_pcm[iii]['item order'] != ii ) :
                             continue
 
-                        # assign items in grids
+                        # refresh indicator
                         self.stxtIndicator[iii+self.N_ITEM_SMT].SetLabel(str(np.round(df_pcm_tmp.iloc[-1, iii], 2)))
                         break
+                    
 
     # Event handler: EVT_TIMER
     def OnRefreshPlotter(self, event):
