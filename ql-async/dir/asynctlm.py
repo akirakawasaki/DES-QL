@@ -433,7 +433,7 @@ class DatagramServerProtocol:
                     fractional_bit_length = total_bit_length - integer_bit_length
                     
                     # - W018
-                    byte_idx_shift = 0
+                    byte_idx_shift = 18
                     #####
                     byte_string = []
                     for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
@@ -443,8 +443,8 @@ class DatagramServerProtocol:
                                         * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
                                         / 2**(fractional_bit_length)
                     #####
-                    W018 = byte_string
-                    self.df_mf.iat[iFrame,iItem] = W018
+                    w018 = byte_string
+                    self.df_mf.iat[iFrame,iItem] = w018
 
                     # write history to an external file
                     if self.high_speed_data_is_avtive == True:
@@ -508,8 +508,8 @@ class DatagramServerProtocol:
                                         * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
                                         / 2**(fractional_bit_length)
                     #####
-                    W036 = byte_string
-                    self.df_mf.iat[iFrame,iItem] = W036
+                    w036 = byte_string
+                    self.df_mf.iat[iFrame,iItem] = w036
 
                     # write history to an external file
                     if self.high_speed_data_is_avtive == True:
