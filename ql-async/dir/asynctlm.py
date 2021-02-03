@@ -3,6 +3,7 @@ import asyncio
 import csv
 import math
 from os import spawnve
+import socket
 import sys
 
 ### Third-party libraries
