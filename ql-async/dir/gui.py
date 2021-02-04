@@ -209,16 +209,21 @@ class ChartPanel(wx.Panel):
                     if ( self.TlmItemAttr_smt[iii]['group']      != self.GroupAttr[i]['label'] or
                          self.TlmItemAttr_smt[iii]['item order'] != ii ):
                         continue
-                    
+
+                    # accentuate indicator by colors
+                    if self.TlmItemAttr_smt[iii]['type'] == 'bool':
+                        # OFF
+                        if int(df_smt_tmp.iloc[-1, iii]) == 0:
+                            self.stxtIndicator[iii].SetBackgroundColour('BLACK')
+                            # self.stxtIndicator[iii].SetBackgroundColour('NAVY')
+                        # ON
+                        else:
+                            # self.stxtIndicator[iii].SetBackgroundColour('GREY')
+                            # self.stxtIndicator[iii].SetBackgroundColour('MAROON')
+                            self.stxtIndicator[iii].SetBackgroundColour('NAVY')
+
                     # refresh indicator
                     self.stxtIndicator[iii].SetLabel(str(np.round(df_smt_tmp.iloc[-1, iii], 2)))
-
-                    # accentuate by color when 'bool' type datum is TRUE
-                    if self.TlmItemAttr_smt[iii]['type'] == 'bool':
-                        if df_smt_tmp.iloc[-1, iii] > 0:
-                            self.stxtIndicator[iii].SetBackgroundColour('GREY')
-                        else:
-                            self.stxtIndicator[iii].SetBackgroundColour('BLACK')
 
                     break
                 
@@ -311,6 +316,7 @@ class ChartPanel(wx.Panel):
             self.axes[i].draw_artist(self.lines[i])
 
             # # redraw and show updated canvas
+        # for i in range(self.__N_PLOTTER):
             # self.fig.canvas.blit(self.axes[i].bbox)
 
         # redraw and show updated canvas
