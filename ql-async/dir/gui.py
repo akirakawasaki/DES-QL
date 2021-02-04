@@ -24,8 +24,8 @@ wxPython configurations
 """
 FETCH_RATE_LATEST_VALUES       = 20     # ms/cycle
 # FETCH_RATE_LATEST_VALUES       = 200     # ms/cycle
+REFLESH_RATE_DIGITAL_INDICATOR = 800    # ms/cycle
 REFLESH_RATE_PLOTTER           = 20     # ms/cycle
-REFLESH_RATE_DIGITAL_INDICATOR = 350    # ms/cycle
 
 """
 Matplotlib configuration
@@ -37,7 +37,7 @@ plt.rcParams["figure.subplot.bottom"] = 0.03    # Bottom
 plt.rcParams["figure.subplot.top"]    = 0.99    # Top
 plt.rcParams["figure.subplot.left"]   = 0.15    # Left
 plt.rcParams["figure.subplot.right"]  = 0.97    # Right
-plt.rcParams["figure.subplot.hspace"] = 0.05     # Height Margin between subplots
+plt.rcParams["figure.subplot.hspace"] = 0.05    # Height Margin between subplots
 
 
 """
@@ -94,7 +94,7 @@ class ChartPanel(wx.Panel):
     __T_RANGE = 30    # [s]
     __IDX_TIME = 1
 
-    __PLOT_SKIP = 20    ### T.B.REFAC. ###
+    __PLOT_SKIP = 39    ### T.B.REFAC. ###
 
     def __init__(self, parent, tlm_latest_data):
         super().__init__(parent, wx.ID_ANY)
@@ -227,8 +227,8 @@ class ChartPanel(wx.Panel):
                             # self.stxtIndicator[iii].SetBackgroundColour('GREY')
                             self.stxtIndicator[iii].SetBackgroundColour('MAROON')
                             # self.stxtIndicator[iii].SetBackgroundColour('NAVY')
-                        # self.stxtIndicator[iii].Refresh
-                        self.stxtIndicator[iii].Refresh
+                        # self.stxtIndicator[iii].Refresh()
+                        self.stxtIndicator[iii].Refresh()
 
                     break
                 
@@ -277,9 +277,9 @@ class ChartPanel(wx.Panel):
 
         # - delete plot points out of the designated time range
         while self.x_series[0] < self.t_min:
-            print("GUI PLT: a member of 'x_series' is out of the range")
             self.x_series = np.delete(self.x_series, 0)
             self.y_series = np.delete(self.y_series, np.s_[0:self.__N_PLOTTER])
+            # print('GUI PLT: a member of 'x_series' is out of the range')
 
         ### T.B.REFAC. ###
         # skip redraw
@@ -573,15 +573,15 @@ class ChartPanel(wx.Panel):
             self.backgrounds.append(self.canvas.copy_from_bbox(self.axes[i].bbox))
 
 # retain plotter attributions
-class PlotterAttributions():
-    def __init__(self, y_label="", y_unit="", 
-                y_min=0.0, y_max=1.0, alart_lim_l=0.0, alart_lim_u=1.0) -> None:
-        self.y_label = y_label
-        self.y_unit = y_unit
-        self.y_min = y_min
-        self.y_max = y_max
-        self.alart_lim_l = alart_lim_l
-        self.alart_lim_u = alart_lim_u
+# class PlotterAttributions():
+#     def __init__(self, y_label="", y_unit="", 
+#                 y_min=0.0, y_max=1.0, alart_lim_l=0.0, alart_lim_u=1.0) -> None:
+#         self.y_label = y_label
+#         self.y_unit = y_unit
+#         self.y_min = y_min
+#         self.y_max = y_max
+#         self.alart_lim_l = alart_lim_l
+#         self.alart_lim_u = alart_lim_u
 
 
 
