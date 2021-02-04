@@ -210,20 +210,25 @@ class ChartPanel(wx.Panel):
                          self.TlmItemAttr_smt[iii]['item order'] != ii ):
                         continue
 
+                    # refresh indicator
+                    self.stxtIndicator[iii].SetLabel(str(np.round(df_smt_tmp.iloc[-1, iii], 2)))
+
                     # accentuate indicator by colors
                     if self.TlmItemAttr_smt[iii]['type'] == 'bool':
                         # OFF
                         if int(df_smt_tmp.iloc[-1, iii]) == 0:
-                            self.stxtIndicator[iii].SetBackgroundColour('BLACK')
+                            self.tbtnLabel[iii].SetForegroundColour('NullColour')
+                            self.stxtIndicator[iii].SetBackgroundColour('NullColour')
                             # self.stxtIndicator[iii].SetBackgroundColour('NAVY')
                         # ON
                         else:
+                            self.tbtnLabel[iii].SetForegroundColour('RED')
+                            # self.tbtnLabel[iii].SetForegroundColour('BLUE')
                             # self.stxtIndicator[iii].SetBackgroundColour('GREY')
-                            # self.stxtIndicator[iii].SetBackgroundColour('MAROON')
-                            self.stxtIndicator[iii].SetBackgroundColour('NAVY')
-
-                    # refresh indicator
-                    self.stxtIndicator[iii].SetLabel(str(np.round(df_smt_tmp.iloc[-1, iii], 2)))
+                            self.stxtIndicator[iii].SetBackgroundColour('MAROON')
+                            # self.stxtIndicator[iii].SetBackgroundColour('NAVY')
+                        # self.stxtIndicator[iii].Refresh
+                        self.stxtIndicator[iii].Refresh
 
                     break
                 
