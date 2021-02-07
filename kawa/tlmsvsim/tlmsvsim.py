@@ -24,13 +24,17 @@ TLM_TYPE = sys.argv[1]
 if TLM_TYPE == 'smt':
     PORT = 49157
     FILE_NAME = 'smt.bin'
-    N_LB = 67000            # smt 20201020 shortened sequence
-    SLP_TIME = 0.01
+    N_LB = 0                # smt 20210205 full sequence
+    # N_LB = 67000            # smt 20201020 shortened sequence
+    SLP_TIME = 0.01         # smt
+    SLP_TIME = 0.04         # smt (safe mode)
 elif TLM_TYPE == 'pcm':
     PORT = 49158
     FILE_NAME = 'pcm.bin'
-    N_LB = 135000           # pcm 20201020 shortened sequence
-    SLP_TIME = 0.005
+    N_LB = 0                # pcm 20210205 full sequence
+    # N_LB = 135000           # pcm 20201020 shortened sequence
+    # SLP_TIME = 0.005        # pcm
+    SLP_TIME = 0.02         # pcm (safe mode)
 else :
     print("ERROR: TLM_TYPE is wrong!")
     sys.exit()
