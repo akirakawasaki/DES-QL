@@ -6,9 +6,9 @@ import concurrent.futures
 import wx
 
 ### Local libraries
-from dir import asynctlm
-from dir import gui
-from dir import common
+from src import asynctlm
+from src import gui
+from src import common
 
 ### T.B.REFAC.: TO BE MOVED TO ASYNCTLM.PY ###
 # async def tlm(tlm_type, internal_flags, tlm_latest_data):

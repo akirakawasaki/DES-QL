@@ -29,11 +29,11 @@ async def tlm(tlm_type, internal_flags, tlm_latest_data):
     
     # initialize
     # HOST = ''
-    HOST = '192.168.1.255'                                  # mac
-    # HOST = socket.gethostbyname(socket.gethostname())       # windows / mac(debug)
+    # HOST = '192.168.1.255'                                  # mac
+    HOST = socket.gethostbyname(socket.gethostname())       # windows / mac(debug)
     PORT = 0
 
-    ### TBREFAC. ###
+    ### T.B.REFAC. ###
     if tlm_type == 'smt':
         PORT = 49157
     elif tlm_type == 'pcm':
@@ -143,11 +143,14 @@ class DatagramServerProtocol:
             print(self.df_mf)
             print('')
 
+        ### T.B.REFAC.? ###
         # notify GUI of the latest values
         if self.TLM_TYPE == 'smt':
-            self.tlm_latest_data.df_smt = self.df_mf.fillna(method='ffill').tail(1)
+            self.tlm_latest_data.df_smt = self.df_mf.fillna(method='bfill').head(1)
+            # self.tlm_latest_data.df_smt = self.df_mf.fillna(method='ffill').tail(1)
         else:
-            self.tlm_latest_data.df_pcm = self.df_mf.fillna(method='ffill').tail(1)
+            self.tlm_latest_data.df_pcm = self.df_mf.fillna(method='bfill').head(1)
+            # self.tlm_latest_data.df_pcm = self.df_mf.fillna(method='ffill').tail(1)
         
         # for debug
         # print("TLM notifies GUI of df:")
