@@ -18,9 +18,9 @@ import wx.lib.plot as plot
 
 
 ### wxPython configurations
-# REFLESH_RATE_PLOTTER = 20       # ms/cycle
+REFLESH_RATE_PLOTTER = 20       # ms/cycle
 # REFLESH_RATE_PLOTTER = 500      # ms/cycle
-REFLESH_RATE_PLOTTER = 2000     # ms/cycle
+# REFLESH_RATE_PLOTTER = 2000     # ms/cycle
 
 ### Matplotlib configuration
 # plt.style.use('dark_background')
@@ -117,7 +117,7 @@ class MainPanel(wx.Panel):
             
     # Event handler: EVT_TIMER
     def OnRefreshPlotter(self, event):
-        # return None     # for debug
+        return None     # for debug
 
         ###
         ### update data set to plot
@@ -147,6 +147,8 @@ class MainPanel(wx.Panel):
         line = plot.PolyLine(list(zip(self.x_series, self.y_series[i::self.__N_PLOTTER])))
         self.graphic = plot.PlotGraphics([line])
         # self.graphic = plot.PlotGraphics([line], xLabel='UTC time, s', yLabel=self.PlotterAttr[i]['y_label'])
+        self.graphic.xLabel = 'UTC time, s'
+        self.graphic.yLabel = self.PlotterAttr[i]['y_label']
 
         # - axes
         self.plotter.xSpec = (self.t_min, self.t_max)
@@ -258,12 +260,13 @@ class MainPanel(wx.Panel):
         # self.graphic = plot.PlotGraphics([line], 'title', 'UTC time, s', self.PlotterAttr[i]['y_label'])
         # self.graphic = plot.PlotGraphics([line], xLabel='UTC time, s', yLabel=self.PlotterAttr[i]['y_label'])
 
+        self.graphic.xLabel = 'UTC time, s'
+        self.graphic.yLabel = self.PlotterAttr[i]['y_label']
+
         # - axes
         t_min = 0.0
         
-        self.graphic.xLabel = 'UTC time, s'
-        self.graphic.yLabel = self.PlotterAttr[i]['y_label']
-        
+        self.plotter.ForegroundColour('BLACK')
         self.plotter.xSpec = (t_min, t_min + self.__T_RANGE)
         self.plotter.ySpec = (self.PlotterAttr[i]['y_min'], self.PlotterAttr[i]['y_max'])
         # self.plotter.enableXAxisLabel = True
