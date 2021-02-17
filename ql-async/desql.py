@@ -54,12 +54,12 @@ from src import common
 #         tlm("pcm", internal_flags, tlm_latest_values))
     
 #
-# Socket Communication (UDP/IP) Handler (co-routine)
+# Socket Communication (UDP/IP) Handler
 #
 def tlm_handler_wrapper(internal_flags, tlm_latest_data):
     print('MAIN: Invoking Socket Communication Handlers...')
 
-    # define wrapper for tlm_handler co-routine   ### T.B.REFAC.? ###
+    # define wrapper for tlm_handler (co-routine)   ### T.B.REFAC.? ###
     async def tlm_handler(internal_flags, tlm_latest_values):
         await asyncio.gather(
             asynctlm.tlm("smt", internal_flags, tlm_latest_values),
@@ -97,12 +97,15 @@ if __name__ == "__main__":
     #     asyncio.run(tlm_handler(internal_flags, tlm_latest_data))
     #     print('Closing TLM...')
 
-    # launch socket communication handler concurrently in sub-threads
+    # launch UDP communication handler concurrently in sub-threads
     executor = concurrent.futures.ThreadPoolExecutor()
     executor.submit(tlm_handler_wrapper, internal_flags, tlm_latest_data)
 
     # launch GUI handler in Main thread
     gui_handler(internal_flags, tlm_latest_data)
+
+    # shutdown UDP communication handler
+    executor.shutdown()
 
     print('DES-QL quitted normally ...')
 

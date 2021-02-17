@@ -42,18 +42,61 @@ async def tlm(tlm_type, internal_flags, tlm_latest_data):
         print('Error: Type of the telemeter is wrong!')
         return
 
+    queue = asyncio.Queue()
+    
+    tasks = []
+    task = asyncio.create_task(save_tlm_data(tlm_type, internal_flags, queue))
+    tasks.append(task)
+    
+    # # Wait until all worker tasks are cancelled.
+    # await asyncio.gather(*tasks, return_exceptions=True)
+
     # create datagram listner in the running event loop
     loop = asyncio.get_running_loop()
     transport, protocol = await loop.create_datagram_endpoint(
-                                    lambda: DatagramServerProtocol(tlm_type, tlm_latest_data),
+                                    lambda: DatagramServerProtocol(tlm_type, tlm_latest_data, queue),
                                     local_addr=(HOST,PORT))
 
-    # psotpone quitting until GUI task is done
+    ### T.B.REFAC. ###
+    # wait until the GUI task is done
     while internal_flags.GUI_TASK_IS_DONE == False:
-        await asyncio.sleep(2)
+        await asyncio.sleep(1)
+
+    transport.close()
+
+    # Wait until the queue is fully processed.
+    await queue.join()
+
+    # Cancel our worker tasks.
+    for task in tasks:
+        task.cancel()
 
     # quit
     return (transport, protocol)
+
+async def save_tlm_data(tlm_type, internal_flags, queue):
+    # await asyncio.sleep(1)
+    
+    DATA_PATH = f'./data_{tlm_type}.csv'
+    # df = pd.DataFrame()
+    # df.to_csv(DATA_PATH, mode='w')
+
+    while True:
+        # print(f'len = {queue.qsize()}')
+        
+        # try:
+        #     pass    
+        # except asyncio.CancelledError:
+        #     if queue.empty() == True: break
+        #     raise
+
+        df = await queue.get()
+
+        df.to_csv(DATA_PATH, mode='a', header=False)
+        # print()
+        # print(f'item = {item}')
+
+        queue.task_done()
 
 #
 # Datagram Listner
@@ -70,7 +113,7 @@ class DatagramServerProtocol:
     __BUFSIZE = __W2B * (__LEN_HEADER + __LEN_PAYLOAD) * __NUM_OF_FRAMES       # 1088 bytes
     
     # Initialize instance
-    def __init__(self, tlm_type, tlm_latest_data):
+    def __init__(self, tlm_type, tlm_latest_data, queue):
         print(f'Starting {tlm_type} handlar...')
         
         self.TLM_TYPE = tlm_type
@@ -101,6 +144,7 @@ class DatagramServerProtocol:
         # initialize a DataFrame to store data of one major frame 
         self.df_mf = pd.DataFrame(index=[], columns=self.TlmItemList) 
         self.df_mf.to_csv(self.DATA_PATH, mode='w')
+        self.queue = queue
 
         # initialize data index
         self.iLine = 0
@@ -132,7 +176,8 @@ class DatagramServerProtocol:
         self.__translate(data)
         
         # append translated data to file
-        self.df_mf.to_csv(self.DATA_PATH, mode='a', header=False)
+        self.queue.put_nowait(self.df_mf)
+        # self.df_mf.to_csv(self.DATA_PATH, mode='a', header=False)
         
         #if self.iLine % 1 == 0:
         if self.iLine % 500 == 0:
