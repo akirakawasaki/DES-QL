@@ -66,7 +66,7 @@ if __name__ == "__main__":
     if tlm_type == '':
         print("ERROR: TLM_TYPE is NOT designated!")
         sys.exit()
-    elif tlm_type != 'smt' and tlm_type != 'smt':
+    elif tlm_type != 'smt' and tlm_type != 'pcm':
         print("ERROR: TLM_TYPE is wrong!")
         sys.exit()
 
