@@ -23,7 +23,6 @@ W2B = 2
 # LEN_PAYLOAD = 64
 # BUFSIZE = W2B * (LEN_HEADER + LEN_PAYLOAD) * NUM_OF_FRAMES       # 1088 bytes
 
-
 async def tlm(tlm_type, internal_flags, tlm_latest_data):
     # print('Starting socket communication handlar for {}...'.format(tlm_type))
     
@@ -41,20 +40,33 @@ async def tlm(tlm_type, internal_flags, tlm_latest_data):
     else :
         print('Error: Type of the telemeter is wrong!')
         return
-
-    queue = asyncio.Queue()
     
     tasks = []
-    task = asyncio.create_task(save_tlm_data(tlm_type, internal_flags, queue))
+
+    file_path = f'./data_{tlm_type}.csv'        ### T.B.REFAC. ###
+    queue = asyncio.Queue()
+    task = asyncio.create_task(save_tlm_data(file_path, queue))
     tasks.append(task)
-    
+
+    file_path = None                            ### T.B.REFAC. ###
+    q_hsd = asyncio.Queue()
+    task = asyncio.create_task(save_tlm_data_hsd(file_path, q_hsd))
+    tasks.append(task)
+
+    file_path = './error_history.csv'           ### T.B.REFAC. ###
+    q_err = asyncio.Queue()
+    task = asyncio.create_task(save_tlm_data_err(file_path, q_err))
+    tasks.append(task)
+
     # # Wait until all worker tasks are cancelled.
     # await asyncio.gather(*tasks, return_exceptions=True)
+
+    # print("I'm here!")
 
     # create datagram listner in the running event loop
     loop = asyncio.get_running_loop()
     transport, protocol = await loop.create_datagram_endpoint(
-                                    lambda: DatagramServerProtocol(tlm_type, tlm_latest_data, queue),
+                                    lambda: DatagramServerProtocol(tlm_type, tlm_latest_data, queue, q_hsd, q_err),
                                     local_addr=(HOST,PORT))
 
     ### T.B.REFAC. ###
@@ -66,6 +78,8 @@ async def tlm(tlm_type, internal_flags, tlm_latest_data):
 
     # Wait until the queue is fully processed.
     await queue.join()
+    await q_hsd.join()
+    await q_err.join()
 
     # Cancel our worker tasks.
     for task in tasks:
@@ -74,10 +88,13 @@ async def tlm(tlm_type, internal_flags, tlm_latest_data):
     # quit
     return (transport, protocol)
 
-async def save_tlm_data(tlm_type, internal_flags, queue):
+#
+#   for low-speed data
+#
+async def save_tlm_data(file_path, queue):
     # await asyncio.sleep(1)
     
-    DATA_PATH = f'./data_{tlm_type}.csv'
+    # DATA_PATH = f'./data_{tlm_type}.csv'
     # df = pd.DataFrame()
     # df.to_csv(DATA_PATH, mode='w')
 
@@ -92,9 +109,45 @@ async def save_tlm_data(tlm_type, internal_flags, queue):
 
         df = await queue.get()
 
-        df.to_csv(DATA_PATH, mode='a', header=False)
+        df.to_csv(file_path, mode='a', header=False)
+        # df.to_csv(DATA_PATH, mode='a', header=False)
         # print()
         # print(f'item = {item}')
+
+        queue.task_done()
+
+#
+#   for high-speed data
+#
+async def save_tlm_data_hsd(file_path, queue):
+    idx_high_speed_data = 0
+
+    while True:
+        # print(f'len = {queue.qsize()}')
+        
+        item = await queue.get()
+
+        file_path = './high_speed_data_{:0=4}.csv'.format(idx_high_speed_data)
+        with open(file_path, 'a') as f:
+            writer = csv.writer(f)
+            writer.writerows(item)
+
+        queue.task_done()
+
+        idx_high_speed_data =+ 1
+
+#
+#   for error history
+#
+async def save_tlm_data_err(file_path, queue):
+    while True:
+        # print(f'len = {queue.qsize()}')
+        
+        item = await queue.get()
+
+        with open(file_path, 'a') as f:
+            writer = csv.writer(f)
+            writer.writerow(item)
 
         queue.task_done()
 
@@ -113,7 +166,7 @@ class DatagramServerProtocol:
     __BUFSIZE = __W2B * (__LEN_HEADER + __LEN_PAYLOAD) * __NUM_OF_FRAMES       # 1088 bytes
     
     # Initialize instance
-    def __init__(self, tlm_type, tlm_latest_data, queue):
+    def __init__(self, tlm_type, tlm_latest_data, queue, q_hsd, q_err):
         print(f'Starting {tlm_type} handlar...')
         
         self.TLM_TYPE = tlm_type
@@ -144,7 +197,10 @@ class DatagramServerProtocol:
         # initialize a DataFrame to store data of one major frame 
         self.df_mf = pd.DataFrame(index=[], columns=self.TlmItemList) 
         self.df_mf.to_csv(self.DATA_PATH, mode='w')
+        
         self.queue = queue
+        self.q_hsd = q_hsd
+        self.q_err = q_err
 
         # initialize data index
         self.iLine = 0
@@ -304,16 +360,18 @@ class DatagramServerProtocol:
                     
                     # write history to an external file when an error occurs
                     if ecode != 0:
-                        DATA_PATH_EC = './error_history.csv'
-                        with open(DATA_PATH_EC, 'a') as f:
-                            writer = csv.writer(f)
-                            writer.writerow([format(gse_time,'.3f'), int(ecode)])
+                        datum = [format(gse_time,'.3f'), int(ecode)]
+                        self.q_err.put_nowait(datum)
+                        # DATA_PATH_EC = './error_history.csv'
+                        # with open(DATA_PATH_EC, 'a') as f:
+                        #     writer = csv.writer(f)
+                        #     writer.writerow([format(gse_time,'.3f'), int(ecode)])
 
                 ### T.B.REFAC. ###
                 # - high speed data header
                 elif self.TlmItemAttr[iItem]['type'] == 'data hd':
                     signed = self.TlmItemAttr[iItem]['signed']
-                    integer_bit_length = int(self.TlmItemAttr[iItem]['integer bit len'])    # include sign bit if any
+                    integer_bit_length = int(self.TlmItemAttr[iItem]['integer bit len'])    # includes a sign bit if any
                     a_coeff = self.TlmItemAttr[iItem]['a coeff']
                     b_coeff = self.TlmItemAttr[iItem]['b coeff']
 
@@ -334,42 +392,66 @@ class DatagramServerProtocol:
                     w009 = byte_string
                     self.df_mf.iat[iFrame,iItem] = w009
 
-                    # - W018
+                    # - W013 : senser number
                     byte_length = 2
                     total_bit_length = 8 * byte_length
                     fractional_bit_length = total_bit_length - integer_bit_length
-                    byte_idx_shift = 18
+                    byte_idx_shift = 8
                     #####
                     byte_string = []
                     for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
 
-                    physical_value =  b_coeff \
-                                    + a_coeff \
-                                        * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
-                                        / 2**(fractional_bit_length)
+                    # physical_value =  b_coeff \
+                    #                 + a_coeff \
+                    #                     * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
+                    #                     / 2**(fractional_bit_length)
                     #####
-                    w018 = byte_string
+                    w013 = byte_string
+
+                    # # - W018 : head of payload
+                    # byte_length = 2
+                    # total_bit_length = 8 * byte_length
+                    # fractional_bit_length = total_bit_length - integer_bit_length
+                    # byte_idx_shift = 18
+                    # #####
+                    # byte_string = []
+                    # for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
+
+                    # physical_value =  b_coeff \
+                    #                 + a_coeff \
+                    #                     * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
+                    #                     / 2**(fractional_bit_length)
+                    # #####
+                    # w018 = byte_string
 
                     # detect head of high-speed data
-                    if (self.w009_old == [0xFF, 0x53, 0x4F, 0x44] and self.w018_old == [0xFF, 0xFF]) \
-                        and (w009     != [0xFF, 0x53, 0x4F, 0x44] and      w018     != [0xFF, 0xFF]):
+                    if (self.high_speed_data_is_avtive == False \
+                            and w009 == [0xFF, 0x53, 0x4F, 0x44] \
+                            and (w013 == [0x00, 0x01] or w013 == [0x00, 0x02] or w013 == [0x00, 0x03])):
                         self.high_speed_data_is_avtive = True
                         self.idx_high_speed_data += 1
+                        self.high_speed_data = []
                         print('TLM TRN: High-speed data is activated!')
-                    elif (self.w009_old != [0xFF, 0x53, 0x4F, 0x44] and self.w018_old != [0xFF, 0xFF]) \
-                        and (  w009     == [0xFF, 0x53, 0x4F, 0x44] and      w018     == [0xFF, 0xFF]):
-                        self.high_speed_data_is_avtive = False
-                        print('TLM TRN: High-speed data is deactivated!')
 
-                    self.w009_old = w009
-                    self.w018_old = w018
+                    # if (self.w009_old == [0xFF, 0x53, 0x4F, 0x44] and self.w018_old == [0xFF, 0xFF]) \
+                    #     and (w009     != [0xFF, 0x53, 0x4F, 0x44] and      w018     != [0xFF, 0xFF]):
+                    #     self.high_speed_data_is_avtive = True
+                    #     self.idx_high_speed_data += 1
+                    #     print('TLM TRN: High-speed data is activated!')
+                    # elif (self.w009_old != [0xFF, 0x53, 0x4F, 0x44] and self.w018_old != [0xFF, 0xFF]) \
+                    #     and (  w009     == [0xFF, 0x53, 0x4F, 0x44] and      w018     == [0xFF, 0xFF]):
+                    #     self.high_speed_data_is_avtive = False
+                    #     print('TLM TRN: High-speed data is deactivated!')
+
+                    # self.w009_old = w009
+                    # self.w018_old = w018
 
                 ### T.B.REFAC. ###
                 # - high speed data payload (first half)
                 elif self.TlmItemAttr[iItem]['type'] == 'data pl1':
                     byte_length = 2
                     signed = self.TlmItemAttr[iItem]['signed']
-                    integer_bit_length = int(self.TlmItemAttr[iItem]['integer bit len'])    # include sign bit if any
+                    integer_bit_length = int(self.TlmItemAttr[iItem]['integer bit len'])    # includes a sign bit if any
                     a_coeff = self.TlmItemAttr[iItem]['a coeff']
                     b_coeff = self.TlmItemAttr[iItem]['b coeff']
 
@@ -382,40 +464,62 @@ class DatagramServerProtocol:
                     byte_string = []
                     for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
 
-                    physical_value =  b_coeff \
-                                    + a_coeff \
-                                        * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
-                                        / 2**(fractional_bit_length)
+                    # physical_value =  b_coeff \
+                    #                 + a_coeff \
+                    #                     * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
+                    #                     / 2**(fractional_bit_length)
                     #####
                     w018 = byte_string
                     self.df_mf.iat[iFrame,iItem] = w018
 
                     # write history to an external file
                     if self.high_speed_data_is_avtive == True:
-                        DATA_PATH_HSD = './high_speed_data_{:0=4}.csv'.format(self.idx_high_speed_data)
-                        with open(DATA_PATH_HSD, 'a') as f:
-                            writer = csv.writer(f)
-                            for j in range(int(self.TlmItemAttr[iItem]['word len'])):
-                                byte_idx_shift = self.__W2B * j
-                                
-                                #####
-                                byte_string = []
-                                for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
+                        for j in range(int(self.TlmItemAttr[iItem]['word len'])):
+                            byte_idx_shift = self.__W2B * j
+                            
+                            #####
+                            byte_string = []
+                            for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
 
-                                physical_value =  b_coeff \
-                                                + a_coeff \
-                                                    * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
-                                                    / 2**(fractional_bit_length)
-                                #####
+                            physical_value =  b_coeff \
+                                            + a_coeff \
+                                                * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
+                                                / 2**(fractional_bit_length)
+                            #####
+                          
+                            self.high_speed_data.append([format(gse_time,'.3f'), physical_value])
+
+                            # detect EOF
+                            if byte_string == [0xFF, 0xFF]:
+                                self.high_speed_data_is_avtive = False
+                                self.q_hsd.put_nowait(self.high_speed_data)
+                                print('TLM TRN: High-speed data is deactivated!')
+                                break
+
+                        # DATA_PATH_HSD = './high_speed_data_{:0=4}.csv'.format(self.idx_high_speed_data)
+                        # with open(DATA_PATH_HSD, 'a') as f:
+                        #     writer = csv.writer(f)
+                        #     for j in range(int(self.TlmItemAttr[iItem]['word len'])):
+                        #         byte_idx_shift = self.__W2B * j
                                 
-                                writer.writerow([format(gse_time,'.3f'), physical_value])
+                        #         #####
+                        #         byte_string = []
+                        #         for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
+
+                        #         physical_value =  b_coeff \
+                        #                         + a_coeff \
+                        #                             * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
+                        #                             / 2**(fractional_bit_length)
+                        #         #####
+                                
+                        #         writer.writerow([format(gse_time,'.3f'), physical_value])
 
                 ### T.B.REFAC. ###
                 # - high speed data payload (latter half)
                 elif self.TlmItemAttr[iItem]['type'] == 'data pl2':
                     byte_length = 2
                     signed = self.TlmItemAttr[iItem]['signed']
-                    integer_bit_length = int(self.TlmItemAttr[iItem]['integer bit len'])    # include sign bit if any
+                    integer_bit_length = int(self.TlmItemAttr[iItem]['integer bit len'])    # includes a sign bit if any
                     a_coeff = self.TlmItemAttr[iItem]['a coeff']
                     b_coeff = self.TlmItemAttr[iItem]['b coeff']
 
@@ -428,33 +532,55 @@ class DatagramServerProtocol:
                     byte_string = []
                     for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
 
-                    physical_value =  b_coeff \
-                                    + a_coeff \
-                                        * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
-                                        / 2**(fractional_bit_length)
+                    # physical_value =  b_coeff \
+                    #                 + a_coeff \
+                    #                     * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
+                    #                     / 2**(fractional_bit_length)
                     #####
                     w036 = byte_string
                     self.df_mf.iat[iFrame,iItem] = w036
 
                     # write history to an external file
                     if self.high_speed_data_is_avtive == True:
-                        DATA_PATH_HSD = './high_speed_data_{:0=4}.csv'.format(self.idx_high_speed_data)
-                        with open(DATA_PATH_HSD, 'a') as f:
-                            writer = csv.writer(f)
-                            for j in range(int(self.TlmItemAttr[iItem]['word len'])):
-                                byte_idx_shift = self.__W2B * j
-                                
-                                #####
-                                byte_string = []
-                                for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
+                        for j in range(int(self.TlmItemAttr[iItem]['word len'])):
+                            byte_idx_shift = self.__W2B * j
+                            
+                            #####
+                            byte_string = []
+                            for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
 
-                                physical_value =  b_coeff \
-                                                + a_coeff \
-                                                    * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
-                                                    / 2**(fractional_bit_length)
-                                #####
+                            physical_value =  b_coeff \
+                                            + a_coeff \
+                                                * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
+                                                / 2**(fractional_bit_length)
+                            #####
+                          
+                            self.high_speed_data.append([format(gse_time,'.3f'), physical_value])
+
+                            # detect EOF
+                            if byte_string == [0xFF, 0xFF]:
+                                self.high_speed_data_is_avtive = False
+                                self.q_hsd.put_nowait(self.high_speed_data)
+                                print('TLM TRN: High-speed data is deactivated!')
+                                break
+
+                        # DATA_PATH_HSD = './high_speed_data_{:0=4}.csv'.format(self.idx_high_speed_data)
+                        # with open(DATA_PATH_HSD, 'a') as f:
+                        #     writer = csv.writer(f)
+                        #     for j in range(int(self.TlmItemAttr[iItem]['word len'])):
+                        #         byte_idx_shift = self.__W2B * j
                                 
-                                writer.writerow([format(gse_time,'.3f'), physical_value])
+                        #         #####
+                        #         byte_string = []
+                        #         for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
+
+                        #         physical_value =  b_coeff \
+                        #                         + a_coeff \
+                        #                             * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
+                        #                             / 2**(fractional_bit_length)
+                        #         #####
+                                
+                        #         writer.writerow([format(gse_time,'.3f'), physical_value])
 
                 # - others
                 else:

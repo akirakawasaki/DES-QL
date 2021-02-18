@@ -77,15 +77,15 @@ if __name__ == "__main__":
         file_path = '../dat/' + 'smt.bin'
         n_lb = 0                # 20210205 full sequence
         # n_lb = 67000            # 20201020 shortened sequence
-        slp_time = 0.01         # 
-        # slp_time = 0.04         # safe mode
+        # slp_time = 0.01         # 
+        slp_time = 0.04         # safe mode
     elif tlm_type == 'pcm':
         dist_port = 49158
         file_path = '../dat/' + 'pcm.bin'
         n_lb = 0                # 20210205 full sequence
         # n_lb = 135000           # 20201020 shortened sequence
-        slp_time = 0.005        # 
-        # slp_time = 0.02         # safe mode
+        # slp_time = 0.005        # 
+        slp_time = 0.02         # safe mode
 
     tlmsvsim(dist_host, dist_port, file_path, n_lb, slp_time)
 

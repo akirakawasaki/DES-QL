@@ -57,7 +57,7 @@ from src import common
 # Socket Communication (UDP/IP) Handler
 #
 def tlm_handler_wrapper(internal_flags, tlm_latest_data):
-    print('MAIN: Invoking Socket Communication Handlers...')
+    print('MAIN: Invoking UDP Communication Handlers...')
 
     # define wrapper for tlm_handler (co-routine)   ### T.B.REFAC.? ###
     async def tlm_handler(internal_flags, tlm_latest_values):
