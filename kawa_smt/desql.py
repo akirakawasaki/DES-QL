@@ -250,7 +250,7 @@ class tlm():
             '''   
             for iItem in range(2, self.NUM_OF_ITEMS):
                 # designate byte addres with the datagram
-                adrs = adrs_tmp + self.W2B * (self.LEN_HEADER + self.df_cfg.at[iItem,'w assgn'])
+                adrs = adrs_tmp + self.W2B * (self.LEN_HEADER + int(self.df_cfg.at[iItem,'w assgn']))
 
                 # frame/loop counter
                 if self.df_cfg.at[iItem,'type'] == 'counter':
@@ -334,7 +334,7 @@ class tlm():
                 # relay status (boolean)
                 elif self.df_cfg.at[iItem,'type'] == 'rel':
                     self.df.iat[self.iData,iItem] = \
-                        (self.data[adrs + self.df_cfg.at[iItem,'coeff b']] & int(self.df_cfg.at[iItem,'coeff a'])) \
+                        (self.data[adrs + int(self.df_cfg.at[iItem,'coeff b'])] & int(self.df_cfg.at[iItem,'coeff a'])) \
                             / self.df_cfg.at[iItem,'coeff a']
                     #self.df.iat[self.iData,iItem] = \
                     #   int.from_bytes((self.data[adrs],self.data[adrs+1]), byteorder='big', signed=False)
