@@ -1,6 +1,7 @@
 ### Standard libraries
 import asyncio
 import concurrent.futures
+import time
 
 ### Third-party libraries
 import wx
@@ -54,29 +55,30 @@ from src import common
 #         tlm("pcm", internal_flags, tlm_latest_values))
     
 #
-# Socket Communication (UDP/IP) Handler
+#   Socket Communication (UDP/IP) Handler
 #
 def tlm_handler_wrapper(internal_flags, tlm_latest_data):
     print('MAIN: Invoking UDP Communication Handlers...')
 
     # define wrapper for tlm_handler (co-routine)   ### T.B.REFAC.? ###
-    async def tlm_handler(internal_flags, tlm_latest_values):
+    async def tlm_handlers(internal_flags, tlm_latest_values):
         await asyncio.gather(
-            asynctlm.tlm("smt", internal_flags, tlm_latest_values),
-            asynctlm.tlm("pcm", internal_flags, tlm_latest_values))
+            asynctlm.tlm_hundler("smt", internal_flags, tlm_latest_values),
+            asynctlm.tlm_hundler("pcm", internal_flags, tlm_latest_values))
         
-    asyncio.run(tlm_handler(internal_flags, tlm_latest_data))
+    asyncio.run(tlm_handlers(internal_flags, tlm_latest_data))
+    
     print('Closing TLM...')
 
 #
-# Graphical User Interface Handler
+#   Graphical User Interface Handler
 #
 def gui_handler(internal_flags, tlm_latest_data):
     print('MAIN: Invoking GUI...')
     
     app = wx.App()
 
-    # generate main window
+    # generate instance of the main window
     gui.frmMain(internal_flags, tlm_latest_data)
     
     # launch event loop for GUI
@@ -85,13 +87,13 @@ def gui_handler(internal_flags, tlm_latest_data):
     print('Closing GUI...')
 
 #
-# Main
+#   Main
 #
 if __name__ == "__main__":
     # initialize variables shared among threads
     internal_flags = common.InternalFlags()
     tlm_latest_data = common.TlmLatestData()
-
+    
     # define wrapper for tlm_handler co-routine   ### T.B.REFAC.? ###
     # def tlm_handler_wrapper(internal_flags, tlm_latest_data):
     #     asyncio.run(tlm_handler(internal_flags, tlm_latest_data))
@@ -103,8 +105,10 @@ if __name__ == "__main__":
 
     # launch GUI handler in Main thread
     gui_handler(internal_flags, tlm_latest_data)
+    
+    # time.sleep(3600)    # only for debug
 
-    # shutdown UDP communication handler
+    # shut down UDP communication handler
     executor.shutdown()
 
     print('DES-QL quitted normally ...')
