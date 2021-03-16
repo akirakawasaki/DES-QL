@@ -42,7 +42,7 @@ async def tlm_hundler(tlm_type, internal_flags, tlm_latest_data):
     # tasks = []
 
     queue = asyncio.Queue()
-    task = asyncio.create_task(tlm_data_decoder(tlm_type, tlm_latest_data, queue))
+    task = asyncio.create_task(tlm_data_decoder(tlm_type, queue, tlm_latest_data))
     # tasks.append(task)
 
     # file_path = f'./data_{tlm_type}.csv'        ### T.B.REFAC. ###
@@ -68,7 +68,7 @@ async def tlm_hundler(tlm_type, internal_flags, tlm_latest_data):
     # create datagram listner in the running event loop
     loop = asyncio.get_running_loop()
     (transport, protocol) = await loop.create_datagram_endpoint(
-                                    lambda: DatagramServerProtocol(tlm_type, tlm_latest_data, queue),
+                                    lambda: DatagramServerProtocol(tlm_type, queue),
                                     local_addr=(HOST,PORT))
     # transport, protocol = await loop.create_datagram_endpoint(
     #                                 lambda: DatagramServerProtocol(tlm_type, tlm_latest_data, queue, q_hsd, q_err),
@@ -81,10 +81,14 @@ async def tlm_hundler(tlm_type, internal_flags, tlm_latest_data):
 
     transport.close()
 
+    print(f'TLM {tlm_type}: queue size = {queue.qsize()}')
+
     # Wait until the queue is fully processed.
     await queue.join()
     # await q_hsd.join()
     # await q_err.join()
+
+    # print("I'm here!")
 
     # Cancel our worker tasks.
     task.cancel()
@@ -164,14 +168,12 @@ async def tlm_hundler(tlm_type, internal_flags, tlm_latest_data):
 #
 class DatagramServerProtocol:
     # Constant Definition
-    # __W2B = 2
+    __W2B = 2
+    __NUM_OF_FRAMES = 8
+    __LEN_HEADER  = 4
+    __LEN_PAYLOAD = 64
 
-    # __NUM_OF_FRAMES = 8
-
-    # __LEN_HEADER  = 4
-    # __LEN_PAYLOAD = 64
-    
-    # __BUFSIZE = __W2B * (__LEN_HEADER + __LEN_PAYLOAD) * __NUM_OF_FRAMES       # 1088 bytes
+    __BUFSIZE = __W2B * (__LEN_HEADER + __LEN_PAYLOAD) * __NUM_OF_FRAMES       # 1088 bytes
     
     # Initialize instance
     # def __init__(self, tlm_type, tlm_latest_data, queue, q_hsd, q_err):
@@ -236,6 +238,7 @@ class DatagramServerProtocol:
             print(f'ERROR TLM RCV: Size of received data = {len(data)}')
 
         self.data_queue.put_nowait(data)
+        # print(f'TLM RCV: queue size = {self.data_queue.qsize()}')
 
         # self.__translate(data)
         
@@ -274,20 +277,24 @@ class DatagramServerProtocol:
 #
 #   Telemetry Data Decoder
 #
-async def tlm_data_decoder(tlm_type, tlm_latest_data, data_queue):
+async def tlm_data_decoder(tlm_type, data_queue, tlm_latest_data):
     print(f'Starting {tlm_type} data decoder...')
     
-    tlm = Tlm(tlm_type, tlm_latest_data)
+    tlm = Tlm(tlm_type)
 
     while True:
         data = await data_queue.get()
         
-        tlm.translate(data)   
+        df_mf = tlm.translate(data)
 
         if tlm_type == 'smt':
-            tlm_latest_data.df_smt = tlm.notify_gui()
+            tlm_latest_data.df_smt = df_mf.fillna(method='bfill').head(1)
+            tlm_latest_data.df_smt = df_mf.fillna(method='ffill').tail(1)
         else:
-            tlm_latest_data.df_pcm = tlm.notify_gui()
+            tlm_latest_data.df_pcm = df_mf.fillna(method='bfill').head(1)
+            tlm_latest_data.df_pcm = df_mf.fillna(method='ffill').tail(1)
+
+        data_queue.task_done()
 
 #
 #   tlm
@@ -688,11 +695,13 @@ class Tlm :
             print(self.df_mf)
             print('')
 
+        return self.df_mf
+
     ### T.B.REFAC. ###
     # notify GUI of the latest values
-    def notify_gui(self) :
-        return self.df_mf.fillna(method='bfill').head(1)
-        # return self.df_mf.fillna(method='ffill').tail(1)
+    # def notify_gui(self) :
+    #     return self.df_mf.fillna(method='bfill').head(1)
+    #     # return self.df_mf.fillna(method='ffill').tail(1)
 
     ''' Utilities ''' 
     #
