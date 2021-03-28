@@ -491,46 +491,6 @@ class ChartPanel(wx.Panel):
             # append attibutions for i-th plotter 
             self.PlotterAttr[i] = dict_tmp
 
-        # # load attributions
-        # self.index_plot =[]
-        # self.PltAttr = []
-        # for i in range(self.__N_PLOTTER):
-        #     # search throughout smt items
-        #     for iii in range(self.N_ITEM_SMT):
-        #         if self.TlmItemAttr_smt[iii]['plot #'] == i:
-        #             self.index_plot.append(iii)
-        #             self.PltAttr.append(PlotterAttributions(
-        #                 y_label = self.TlmItemAttr_smt[iii]['item'],
-        #                 y_unit = self.TlmItemAttr_smt[iii]['unit'],
-        #                 y_min = float(self.TlmItemAttr_smt[iii]['y_min']),
-        #                 y_max = float(self.TlmItemAttr_smt[iii]['y_max']),
-        #                 alart_lim_l = float(self.TlmItemAttr_smt[iii]['alert_lim_l']),
-        #                 alart_lim_u = float(self.TlmItemAttr_smt[iii]['alert_lim_u'])))
-        #             break
-        #     else:
-        #         # search throughout pcm items
-        #         for iii in range(self.N_ITEM_PCM):
-        #             if self.TlmItemAttr_pcm[iii]['plot #'] == i:
-        #                 self.index_plot.append(iii + self.N_ITEM_SMT)
-        #                 self.PltAttr.append(PlotterAttributions(
-        #                     y_label = self.TlmItemAttr_pcm[iii]['item'],
-        #                     y_unit = self.TlmItemAttr_pcm[iii]['unit'],
-        #                     y_min = float(self.TlmItemAttr_pcm[iii]['y_min']),
-        #                     y_max = float(self.TlmItemAttr_pcm[iii]['y_max']),
-        #                     alart_lim_l = float(self.TlmItemAttr_pcm[iii]['alert_lim_l']),
-        #                     alart_lim_u = float(self.TlmItemAttr_pcm[iii]['alert_lim_u'])))
-        #                 break
-            
-        #     continue
-        
-        # for debug
-        # print('GUI PLT: PltAttr')
-        # print(self.PltAttr[0].y_min)
-        # print(self.PltAttr[1].y_min)
-        # print(self.PltAttr[2].y_min)
-        # print(self.PltAttr[3].y_min)
-        # print(self.PltAttr[4].y_min)
-
     # Configure appearance for plotters to display time histories
     def configure_plotter(self):
         # initialize data set for plot
@@ -572,16 +532,6 @@ class ChartPanel(wx.Panel):
         for i in range(self.__N_PLOTTER):
             self.backgrounds.append(self.canvas.copy_from_bbox(self.axes[i].bbox))
 
-# retain plotter attributions
-# class PlotterAttributions():
-#     def __init__(self, y_label="", y_unit="", 
-#                 y_min=0.0, y_max=1.0, alart_lim_l=0.0, alart_lim_u=1.0) -> None:
-#         self.y_label = y_label
-#         self.y_unit = y_unit
-#         self.y_min = y_min
-#         self.y_max = y_max
-#         self.alart_lim_l = alart_lim_l
-#         self.alart_lim_u = alart_lim_u
 
 
 

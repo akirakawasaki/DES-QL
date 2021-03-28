@@ -45,24 +45,6 @@ async def tlm_hundler(tlm_type, internal_flags, tlm_latest_data):
     task = asyncio.create_task(tlm_data_decoder(tlm_type, queue, tlm_latest_data))
     # tasks.append(task)
 
-    # file_path = f'./data_{tlm_type}.csv'        ### T.B.REFAC. ###
-    # queue = asyncio.Queue()
-    # task = asyncio.create_task(save_tlm_data(file_path, queue))
-    # tasks.append(task)
-
-    # file_path = None                            ### T.B.REFAC. ###
-    # q_hsd = asyncio.Queue()
-    # task = asyncio.create_task(save_tlm_data_hsd(file_path, q_hsd))
-    # tasks.append(task)
-
-    # file_path = './error_history.csv'           ### T.B.REFAC. ###
-    # q_err = asyncio.Queue()
-    # task = asyncio.create_task(save_tlm_data_err(file_path, q_err))
-    # tasks.append(task)
-
-    # # Wait until all worker tasks are cancelled.
-    # await asyncio.gather(*tasks, return_exceptions=True)
-
     # print("I'm here!")
 
     # create datagram listner in the running event loop
@@ -70,9 +52,6 @@ async def tlm_hundler(tlm_type, internal_flags, tlm_latest_data):
     (transport, protocol) = await loop.create_datagram_endpoint(
                                     lambda: DatagramServerProtocol(tlm_type, queue),
                                     local_addr=(HOST,PORT))
-    # transport, protocol = await loop.create_datagram_endpoint(
-    #                                 lambda: DatagramServerProtocol(tlm_type, tlm_latest_data, queue, q_hsd, q_err),
-    #                                 local_addr=(HOST,PORT))
 
     ### T.B.REFAC. ###
     # wait until the GUI task is done
@@ -85,10 +64,6 @@ async def tlm_hundler(tlm_type, internal_flags, tlm_latest_data):
 
     # Wait until the queue is fully processed.
     await queue.join()
-    # await q_hsd.join()
-    # await q_err.join()
-
-    # print("I'm here!")
 
     # Cancel our worker tasks.
     task.cancel()
@@ -96,72 +71,6 @@ async def tlm_hundler(tlm_type, internal_flags, tlm_latest_data):
     #     task.cancel()
 
     print('Closing {}...'.format(tlm_type))
-
-    # quit
-    # return (transport, protocol)
-
-#
-#   for low-speed data
-#
-# async def save_tlm_data(file_path, queue):
-#     # await asyncio.sleep(1)
-    
-#     # DATA_PATH = f'./data_{tlm_type}.csv'
-#     # df = pd.DataFrame()
-#     # df.to_csv(DATA_PATH, mode='w')
-
-#     while True:
-#         # print(f'len = {queue.qsize()}')
-        
-#         # try:
-#         #     pass    
-#         # except asyncio.CancelledError:
-#         #     if queue.empty() == True: break
-#         #     raise
-
-#         df = await queue.get()
-
-#         df.to_csv(file_path, mode='a', header=False)
-#         # df.to_csv(DATA_PATH, mode='a', header=False)
-#         # print()
-#         # print(f'item = {item}')
-
-#         queue.task_done()
-
-#
-#   for high-speed data
-#
-# async def save_tlm_data_hsd(file_path, queue):
-#     idx_high_speed_data = 0
-
-#     while True:
-#         # print(f'len = {queue.qsize()}')
-        
-#         item = await queue.get()
-
-#         file_path = './high_speed_data_{:0=4}.csv'.format(idx_high_speed_data)
-#         with open(file_path, 'a') as f:
-#             writer = csv.writer(f)
-#             writer.writerows(item)
-
-#         queue.task_done()
-
-#         idx_high_speed_data =+ 1
-
-#
-#   for error history
-#
-# async def save_tlm_data_err(file_path, queue):
-#     while True:
-#         # print(f'len = {queue.qsize()}')
-        
-#         item = await queue.get()
-
-#         with open(file_path, 'a') as f:
-#             writer = csv.writer(f)
-#             writer.writerow(item)
-
-#         queue.task_done()
 
 #
 #   Datagram Listner
@@ -176,52 +85,12 @@ class DatagramServerProtocol:
     __BUFSIZE = __W2B * (__LEN_HEADER + __LEN_PAYLOAD) * __NUM_OF_FRAMES       # 1088 bytes
     
     # Initialize instance
-    # def __init__(self, tlm_type, tlm_latest_data, queue, q_hsd, q_err):
     def __init__(self, tlm_type, data_queue):
         print(f'Starting {tlm_type} handlar...')
         
         self.TLM_TYPE = tlm_type
-        # self.tlm_latest_data = tlm_latest_data
-
-        # choose a destination file for data ouput
-        # self.DATA_PATH = f'./data_{self.TLM_TYPE}.csv'
-
-        # load configuration for word assignment
-        # try: 
-        #     df_cfg = pd.read_excel('./config_tlm_2.xlsx', 
-        #                         sheet_name=self.TLM_TYPE, header=0, index_col=None).dropna(how='all')
-        # except:
-        #     print('Error TLM: "config_tlm.xlsx"!')
-        #     print(self.TLM_TYPE)
-        #     sys.exit()
-        # print('df_cfg = {}'.format(df_cfg))
-
-        # self.TlmItemList = df_cfg['item'].values.tolist()
-        # self.TlmItemAttr = df_cfg.to_dict(orient='index')
-        # self.NUM_OF_ITEMS = len(df_cfg.index)
-        # self.MAX_SUP_COM = df_cfg['sup com'].max()
-
-        # for debug
-        # print('Item List = {}'.format(self.TlmItemList))
-        # print('Item Attributions = {}'.format(self.TlmItemAttr))
-
-        # initialize a DataFrame to store data of one major frame
-        # self.df_mf = pd.DataFrame(index=[], columns=self.TlmItemList) 
-        # self.df_mf.to_csv(self.DATA_PATH, mode='w')
         
         self.data_queue = data_queue
-        # self.queue = queue
-        # self.q_hsd = q_hsd
-        # self.q_err = q_err
-
-        # initialize data index
-        # self.iLine = 0
-
-        # initialize high-speed data functionality
-        # self.w009_old = 0x00
-        # self.w018_old = 0x00
-        # self.high_speed_data_is_avtive = False
-        # self.idx_high_speed_data = 0
 
     # Event handler
     def connection_made(self,transport):
@@ -240,35 +109,6 @@ class DatagramServerProtocol:
         self.data_queue.put_nowait(data)
         # print(f'TLM RCV: queue size = {self.data_queue.qsize()}')
 
-        # self.__translate(data)
-        
-        # append translated data to file
-        # self.queue.put_nowait(self.df_mf)
-        # self.df_mf.to_csv(self.DATA_PATH, mode='a', header=False)
-        
-        #if self.iLine % 1 == 0:
-        # if self.iLine % 500 == 0:
-        #     print('')
-        #     print(f'iLine: {self.iLine}')
-        #     print(f'From : {addr}')
-        #     # print(f'To   : {socket.gethostbyname(self.HOST)}')
-        #     print(self.df_mf)
-        #     print('')
-
-        ### T.B.REFAC.? ###
-        # notify GUI of the latest values
-        # if self.TLM_TYPE == 'smt':
-        #     self.tlm_latest_data.df_smt = self.df_mf.fillna(method='bfill').head(1)
-        #     # self.tlm_latest_data.df_smt = self.df_mf.fillna(method='ffill').tail(1)
-        # else:
-        #     self.tlm_latest_data.df_pcm = self.df_mf.fillna(method='bfill').head(1)
-        #     # self.tlm_latest_data.df_pcm = self.df_mf.fillna(method='ffill').tail(1)
-        
-        # for debug
-        # print("TLM notifies GUI of df:")
-        # print(self.tlm_latest_values.df_smt)
-        # print(self.tlm_latest_values.df_smt.index)
-    
     # Event handler
     def connection_lost(self,exec):
         print(f'Disconnected from {self.TLM_TYPE}')
