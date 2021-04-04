@@ -22,88 +22,132 @@ import pandas as pd
 class TelemeterHandler :
     # Class constants
     
+    # telemeter properties
     W2B = 2
     NUM_OF_FRAMES = 8
     LEN_HEADER  = 4
     LEN_PAYLOAD = 64
-
     BUFSIZE = W2B * (LEN_HEADER + LEN_PAYLOAD) * NUM_OF_FRAMES       # 1088 bytes
 
+    # input file pathes
     FPATH_CONFIG = './config_tlm_2.xlsx'
 
-    FPATH_LS_DATA = './data_***.csv'                # low-speed data
+    # output file pathes
+    __FPATH_LS_DATA = './data_***.csv'                # low-speed data    
     FPATH_HS_DATA = './high_speed_data_***.csv'     # high-speed data
     FPATH_ERR = './error_history.csv'               # error history
 
-    def __init__(self, tlm_type, q_message) -> None:
+
+    def __init__(self, tlm_type, q_message, q_latest_values) -> None:
         ### general settings
 
         self.tlm_type = tlm_type
-        self.q_message = q_message
+
+        # queues for inter-process message passing
+        self.q_message = q_message                  # only for receiving
+        self.q_latest_values = q_latest_values      # only for sending 
+
+        ### Initialize datagram listner
+        # self.HOST = ''
+        # self.HOST = '192.168.1.255'                                  # mac
+        self.HOST = socket.gethostbyname(socket.gethostname())       # windows / mac(debug)
+        self.PORT = 49157 if (self.tlm_type == 'smt') else 49158
+
+
+        ### Initialize decoder
+        # load configuration for word assignment
+        try: 
+            df_cfg = pd.read_excel(self.FPATH_CONFIG, 
+                            sheet_name=self.tlm_type, header=0, index_col=None).dropna(how='all')
+        except:
+            print(f'Error TLM {self.tlm_type}: Configuration file NOT exist!')
+            sys.exit()
+        
+        # print(f'df_cfg = {df_cfg}')     # for debug
+
+        self.TlmItemList = df_cfg['item'].values.tolist()
+        self.TlmItemAttr = df_cfg.to_dict(orient='index')
+        self.NUM_OF_ITEMS = len(df_cfg.index)
+        self.MAX_SUP_COM = df_cfg['sup com'].max()
+
+        # for debug
+        # print(f'Item List = {self.TlmItemList}')
+        # print(f'Item Attributions = {self.TlmItemAttr}')
+
+        # initialize a DataFrame to store data of one major frame
+        self.df_mf = pd.DataFrame(index=[], columns=self.TlmItemList)
+
+        # initialize data index
+        self.iLine = 0
+
+        # initialize high-speed data functionality
+        # self.w009_old = 0x00
+        # self.w018_old = 0x00
+        self.high_speed_data_is_avtive = False
+        # self.idx_high_speed_data = 0
+
+
+        ### Initialize file writer
+        self.fpath_ls_data = self.__FPATH_LS_DATA.replace('***', self.tlm_type)
+        self.df_mf.to_csv(self.fpath_ls_data, mode='w')        
+
+
+    # Telemetry data hundler
+    async def tlm_handler(self) -> None:
+        print(f'TLM {self.tlm_type}: Starting tlm handlar...')
 
         # create FIFO queues to communicate among async coroutines
         self.q_dgram = asyncio.Queue()          # transferring datagram                from listner to decorder
         self.q_write_data = asyncio.Queue()     # transferring decoded low-speed data  from decoder to general file writer
-        self.q_ls_data = asyncio.Queue()        # transferring decoded low-speed data  from decoder to dedicated file writer
-        self.q_hs_data = asyncio.Queue()        # transferring decoded high-speed data from decoder to dedicated file writer
-        self.q_errors = asyncio.Queue()         # transferring decoded errors          from decoder to dedicated file writer
+        # self.q_ls_data = asyncio.Queue()        # transferring decoded low-speed data  from decoder to dedicated file writer
+        # self.q_hs_data = asyncio.Queue()        # transferring decoded high-speed data from decoder to dedicated file writer
+        # self.q_errors = asyncio.Queue()         # transferring decoded errors          from decoder to dedicated file writer
 
-
-        ### setup decoder
-
-
-        ### setup file writer
-
-
-    # Telemetry data hundler
-    async def tlm_hundler(self) -> None:
-        print(f'Starting {self.tlm_type} handlar...')
-        
-        ### invoke async tasks in the running event loop (ORDER OF INVOCATION IS IMPORTAN)
-        task_fwriter_ls_data = asyncio.create_task( tlm.fwriter_ls_data() )
-        task_fweiter_hs_data = asyncio.create_task( tlm.fwriter_hs_data() )
-        task_fweiter_errors  = asyncio.create_task( tlm.fwriter_errors() )
+        ### invoke async tasks in the running event loop (ORDER OF INVOCATION IS IMPORTAN?)
+        # task_fwriter_ls_data = asyncio.create_task( tlm.fwriter_ls_data() )
+        # task_fweiter_hs_data = asyncio.create_task( tlm.fwriter_hs_data() )
+        # task_fweiter_errors  = asyncio.create_task( tlm.fwriter_errors() )
+        task_file_writer     = asyncio.create_task( tlm.file_writer() ) 
         task_decoder         = asyncio.create_task( tlm.decoder() )
 
-        # HOST = ''
-        # HOST = '192.168.1.255'                                  # mac
-        HOST = socket.gethostbyname(socket.gethostname())       # windows / mac(debug)
-        PORT = 0
-        if self.tlm_type == 'smt':
-            PORT = 49157
-        else:
-            PORT = 49158
-
+        # invoke datagram endpoint
         loop = asyncio.get_running_loop()
         (transport, protocol) = await loop.create_datagram_endpoint(
                                         protocol_factory=(lambda: DatagramServerProtocol(tlm_type, self.q_dgram)),
-                                        local_addr=(HOST,PORT))
+                                        local_addr=(self.HOST,self.PORT))
 
-        # wait until the GUI task is done
-        while True:
-            message = await q_message.get()
-            if message == "quit tlm":   break
+        # wait until the GUI task done
+        # while True:
+        #     message = await self.q_message.get()
+        #     if message == "quit tlm":   break
 
-        ### finalize
+        # wait until the GUI task done
+        while q_message != True:
+            await asyncio.sleep(1)
+
+        # quit detagram listner after GUI task done
         transport.close()
 
-        # Wait until the queue is fully processed.
+        # quit decoder after datagram queue fully processed
         # print(f'TLM {self.tlm_type}: queue size = {self.q_dgram.qsize()}')
         await self.q_dgram.join()
-
         task_decoder.cancel()
-        task_fwriter_ls_data.cancel()
-        task_fweiter_hs_data.cancel()
-        task_fweiter_errors.cancel()
+
+        # quit file writer after write data queue fully processed
+        await self.q_write_data.join()
+        task_file_writer.cancel()
+
+        # task_fwriter_ls_data.cancel()
+        # task_fweiter_hs_data.cancel()
+        # task_fweiter_errors.cancel()
 
         print(f'Closing {self.tlm_type} handler...')
 
 
     # General file writer
-    async def file_writer(self) -> None:
-        # initialize
-        # file_path = f'./data_{self.tlm_type}.csv'
-        
+    async def file_writer(self) -> None:    
+        print(f'TLM {self.tlm_type}: Starting file writer...')
+
         # 
         while True:
             (file_path, write_data) = await self.q_write_data.get()
@@ -150,62 +194,29 @@ class TelemeterHandler :
 
     # Datagram decoder
     async def decoder(self) -> None:
-        print(f'Starting {self.tlm_type} data decoder...')
+        print(f'TLM {self.tlm_type}: Starting data decoder...')
 
-        ### Initializing part
-
-        # load configuration for word assignment
-        try: 
-            df_cfg = pd.read_excel(self.FPATH_CONFIG, 
-                            sheet_name=self.tlm_type, header=0, index_col=None).dropna(how='all')
-        except:
-            print(f'Error TLM {self.tlm_type}: Configuration file NOT exist!')
-            sys.exit()
-        
-        # for debug
-        # print(f'df_cfg = {df_cfg}')   
-
-        self.TlmItemList = df_cfg['item'].values.tolist()
-        self.TlmItemAttr = df_cfg.to_dict(orient='index')
-        self.NUM_OF_ITEMS = len(df_cfg.index)
-        self.MAX_SUP_COM = df_cfg['sup com'].max()
-
-        # for debug
-        # print(f'Item List = {self.TlmItemList}')
-        # print(f'Item Attributions = {self.TlmItemAttr}')
-
-        # initialize a DataFrame to store data of one major frame
-        self.df_mf = pd.DataFrame(index=[], columns=self.TlmItemList)
-
-        # initialize data index
-        self.iLine = 0
-
-        # initialize high-speed data functionality
-        # self.w009_old = 0x00
-        # self.w018_old = 0x00
-        self.high_speed_data_is_avtive = False
-        # self.idx_high_speed_data = 0
-
-        ### Main part
         while True:
             data = await self.q_dgram.get()
             
-            df_mf = self.translate(data)
+            print('Im here!')
+
+            df_mf = self.decode(data)
 
             # # append translated data to file
             # self.df_mf.to_csv(self.data_path, mode='a', header=False)
 
-            # enqueue to save into file 
+            # enqueue to save decode data in a file
             write_data = df_mf.values.tolist()
-            self.q_write_data.put_nowait( (f'./data_{self.tlm_type}.csv', write_data) )
-
-            self.q_dgram.task_done()
+            self.q_write_data.put_nowait( (self.fpath_ls_data, write_data) )
 
             # notify GUI of latest values
             self.notify(df_mf)
 
+            self.q_dgram.task_done()
 
-    # Latest value notifier
+
+    # Notify GUI of latest values
     def notify(self, df_mf) -> None:
         pass
         # if self.tlm_type == 'smt':
@@ -216,9 +227,8 @@ class TelemeterHandler :
         #     # tlm_latest_data.df_pcm = df_mf.fillna(method='ffill').tail(1)
 
 
-    # Translate raw telemetry data into physical values
-    def translate(self, data):
-        ### T.B.REFAC. ###
+    # Decode raw telemetry data into physical values
+    def decode(self, data):
         # initialize a DataFrame to store data of one major frame
         self.df_mf = pd.DataFrame(index=[], columns=self.TlmItemList)
         
@@ -229,7 +239,7 @@ class TelemeterHandler :
         
         # sweep frames in a major frame
         for iFrame in range(self.NUM_OF_FRAMES):
-            #print(f"iLine: {self.iLine}")
+            # print(f"iLine: {self.iLine}")
 
             # initialize the row by filling wit NaN
             self.df_mf.loc[iFrame] = np.nan
@@ -244,20 +254,21 @@ class TelemeterHandler :
             for strItem in self.TlmItemList:
                 iItem = self.TlmItemList.index(strItem)
 
-                # byte index of datum within the datagram
+                # calc byte index of datum within the datagram
                 byte_idx =  byte_idx_head + self.W2B * int(self.TlmItemAttr[iItem]['w idx'])
 
-                ### Ordinary Items
-                if self.TlmItemAttr[iItem]['ordinary item'] == True :
-                    self.df_mf.iat[iFrame,iItem] = self.get_physical_value_from_tlm_words(iItem, data, byte_idx)
+                #
+                #   Decoding rules
+                #
 
-                ### other than ordinary items
-                # - days from January 1st on GSE
-                elif self.TlmItemAttr[iItem]['type'] == 'gse day':
+                ### Peculiar items ()
+                # - Number of days from January 1st on GSE
+                if self.TlmItemAttr[iItem]['type'] == 'gse day':
                     self.df_mf.iat[iFrame,iItem] =  (data[byte_idx]   >> 4  ) * 100 \
                                                   + (data[byte_idx]   & 0x0F) * 10  \
                                                   + (data[byte_idx+1] >> 4  ) * 1
-        
+                    continue
+
                 # - GSE timestamp in [sec]
                 elif self.TlmItemAttr[iItem]['type'] == 'gse time':
                     gse_time =  (data[byte_idx+1] & 0x0F) * 10  * 3600 \
@@ -270,69 +281,19 @@ class TelemeterHandler :
                               + (data[byte_idx+5] >> 4  ) * 10  / 1000 \
                               + (data[byte_idx+5] & 0x0F) * 1   / 1000
                     self.df_mf.iat[iFrame,iItem] = gse_time
+                    continue
 
-                # - temperature in [K] <S,16,-2>
-                elif self.TlmItemAttr[iItem]['type'] == 'T':
-                    # get TC thermoelectric voltage in [uV]
-                    Vtc = self.get_physical_value_from_tlm_words(iItem, data, byte_idx)
-
-                    # get temperature by converting thermoelectric voltage
-                    Ttc = self.uv2k(Vtc + Vcjc - Vaz, 'K')
-
-                    self.df_mf.iat[iFrame,iItem] = Ttc - 273.15         # in deg-C
-                    # self.df_mf.iat[iFrame,iItem] = Ttc                 # in Kelvin
-                
-                # - cold-junction compensation coefficient in [uV]
-                elif self.TlmItemAttr[iItem]['type'] == 'cjc':
-                    cjc = self.get_physical_value_from_tlm_words(iItem, data, byte_idx)
-
-                    Rcjc = self.v2ohm(cjc)
-                    Tcjc = self.ohm2k(Rcjc)
-                    Vcjc = self.k2uv(Tcjc, 'K')
-
-                    self.df_mf.iat[iFrame,iItem] = Vcjc
-
-                # - auto-zero coefficient in [uV]
-                elif self.TlmItemAttr[iItem]['type'] == 'az':
-                    Vaz = self.get_physical_value_from_tlm_words(iItem, data, byte_idx)
-                    
-                    self.df_mf.iat[iFrame,iItem] = Vaz
-
-                # - relay status (boolean)
+                # - Relay status (boolean)
                 elif self.TlmItemAttr[iItem]['type'] == 'bool':
                     self.df_mf.iat[iFrame,iItem] = \
                         (  data[byte_idx + int(self.TlmItemAttr[iItem]['b coeff'])] 
                             & int(self.TlmItemAttr[iItem]['a coeff'])) \
                             / int(self.TlmItemAttr[iItem]['a coeff'])
+                    continue
 
-                # - analog pressure in [MPa]
-                elif self.TlmItemAttr[iItem]['type'] == 'p ana':
-                    # handle sub-commutation
-                    if iFrame % self.TlmItemAttr[iItem]['sub com mod'] != self.TlmItemAttr[iItem]['sub com res']: 
-                        continue
-                    
-                    self.df_mf.iat[iFrame,iItem] = self.get_physical_value_from_tlm_words(iItem, data, byte_idx)
-
-                # - error code
-                elif self.TlmItemAttr[iItem]['type'] == 'ec':
-                    ecode = self.get_physical_value_from_tlm_words(iItem, data, byte_idx)
-                    self.df_mf.iat[iFrame,iItem] = ecode
-                    
-                    # write history to an external file when an error occurs
-                    if ecode != 0:
-                        datum = [format(gse_time,'.3f'), int(ecode)]
-                        
-                        ### T.B.REFAC. ###
-                        DATA_PATH_EC = './error_history.csv'
-                        with open(DATA_PATH_EC, 'a') as f:
-                            writer = csv.writer(f)
-                            writer.writerow([format(gse_time,'.3f'), int(ecode)])
-                        
-                        # q_err.put_nowait(datum)
-
-                ### T.B.REFAC. ###
-                # - high speed data header
-                elif self.TlmItemAttr[iItem]['type'] == 'data hd':
+                ### High-speed data    ### T.B.REFAC. ###
+                # - header
+                if self.TlmItemAttr[iItem]['type'] == 'data hd':
                     signed = self.TlmItemAttr[iItem]['signed']
                     integer_bit_length = int(self.TlmItemAttr[iItem]['integer bit len'])    # includes a sign bit if any
                     a_coeff = self.TlmItemAttr[iItem]['a coeff']
@@ -371,46 +332,19 @@ class TelemeterHandler :
                     #####
                     w013 = byte_string
 
-                    # # - W018 : head of payload
-                    # byte_length = 2
-                    # total_bit_length = 8 * byte_length
-                    # fractional_bit_length = total_bit_length - integer_bit_length
-                    # byte_idx_shift = 18
-                    # #####
-                    # byte_string = []
-                    # for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
-
-                    # physical_value =  b_coeff \
-                    #                 + a_coeff \
-                    #                     * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
-                    #                     / 2**(fractional_bit_length)
-                    # #####
-                    # w018 = byte_string
-
                     # detect head of high-speed data
-                    if (self.high_speed_data_is_avtive == False \
-                            and w009 == [0xFF, 0x53, 0x4F, 0x44] \
-                            and (w013 == [0x00, 0x01] or w013 == [0x00, 0x02] or w013 == [0x00, 0x03])):
-                        self.high_speed_data_is_avtive = True
-                        # idx_high_speed_data += 1
-                        high_speed_data = []
-                        print('TLM TRN: High-speed data is activated!')
+                    if self.high_speed_data_is_avtive == False:    
+                        if      (w009 == [0xFF, 0x53, 0x4F, 0x44]) \
+                            and (w013 == [0x00, 0x01] or w013 == [0x00, 0x02] or w013 == [0x00, 0x03]):
+                            
+                            self.high_speed_data_is_avtive = True
+                            # idx_high_speed_data += 1
+                            high_speed_data = []
+                            print('TLM TRN: Start of high-speed data is detected!')
 
-                    # if (self.w009_old == [0xFF, 0x53, 0x4F, 0x44] and self.w018_old == [0xFF, 0xFF]) \
-                    #     and (w009     != [0xFF, 0x53, 0x4F, 0x44] and      w018     != [0xFF, 0xFF]):
-                    #     self.high_speed_data_is_avtive = True
-                    #     self.idx_high_speed_data += 1
-                    #     print('TLM TRN: High-speed data is activated!')
-                    # elif (self.w009_old != [0xFF, 0x53, 0x4F, 0x44] and self.w018_old != [0xFF, 0xFF]) \
-                    #     and (  w009     == [0xFF, 0x53, 0x4F, 0x44] and      w018     == [0xFF, 0xFF]):
-                    #     self.high_speed_data_is_avtive = False
-                    #     print('TLM TRN: High-speed data is deactivated!')
+                    continue
 
-                    # self.w009_old = w009
-                    # self.w018_old = w018
-
-                ### T.B.REFAC. ###
-                # - high speed data payload (first half)
+                # - payload (first half)
                 elif self.TlmItemAttr[iItem]['type'] == 'data pl1':
                     byte_length = 2
                     signed = self.TlmItemAttr[iItem]['signed']
@@ -477,8 +411,9 @@ class TelemeterHandler :
                                 
                         #         writer.writerow([format(gse_time,'.3f'), physical_value])
 
-                ### T.B.REFAC. ###
-                # - high speed data payload (latter half)
+                    continue
+
+                # - payload (latter half)
                 elif self.TlmItemAttr[iItem]['type'] == 'data pl2':
                     byte_length = 2
                     signed = self.TlmItemAttr[iItem]['signed']
@@ -545,15 +480,73 @@ class TelemeterHandler :
                                 
                         #         writer.writerow([format(gse_time,'.3f'), physical_value])
 
+                    continue
+
+                ### Ordinary items
+                float_value = self.get_physical_value(iItem, data, byte_idx)
+
+                # - ordinary items
+                if self.TlmItemAttr[iItem]['ordinary item'] == True :
+                    self.df_mf.iat[iFrame,iItem] = float_value
+
+                # - analog pressure in [MPa]
+                elif self.TlmItemAttr[iItem]['type'] == 'p ana':
+                    # handle sub-commutation
+                    if iFrame % self.TlmItemAttr[iItem]['sub com mod'] != self.TlmItemAttr[iItem]['sub com res']: 
+                        continue
+                    
+                    self.df_mf.iat[iFrame,iItem] = float_value
+
+                # - Temperature in [K] <S,16,-2>
+                elif self.TlmItemAttr[iItem]['type'] == 'T':
+                    # get TC thermoelectric voltage in [uV]
+                    Vtc = float_value
+
+                    # get temperature by converting thermoelectric voltage
+                    Ttc = self.uv2k(Vtc + Vcjc - Vaz, 'K')
+
+                    self.df_mf.iat[iFrame,iItem] = Ttc - 273.15         # in deg-C
+                    # self.df_mf.iat[iFrame,iItem] = Ttc                 # in Kelvin
+                
+                # - Cold-junction compensation coefficient in [uV]
+                elif self.TlmItemAttr[iItem]['type'] == 'cjc':
+                    cjc = float_value
+
+                    Rcjc = self.v2ohm(cjc)
+                    Tcjc = self.ohm2k(Rcjc)
+                    Vcjc = self.k2uv(Tcjc, 'K')
+
+                    self.df_mf.iat[iFrame,iItem] = Vcjc
+
+                # - Auto-zero coefficient in [uV]
+                elif self.TlmItemAttr[iItem]['type'] == 'az':
+                    Vaz = float_value
+                    
+                    self.df_mf.iat[iFrame,iItem] = Vaz
+
+                # - error code
+                elif self.TlmItemAttr[iItem]['type'] == 'ec':
+                    ecode = float_value
+                    self.df_mf.iat[iFrame,iItem] = ecode
+                    
+                    ### T.B.REFAC. ###
+                    # write history to an external file when error occurs
+                    if ecode != 0:
+                        datum = [format(gse_time,'.3f'), int(ecode)]
+                        
+                        # DATA_PATH_EC = './error_history.csv'
+                        # with open(DATA_PATH_EC, 'a') as f:
+                        #     writer = csv.writer(f)
+                        #     writer.writerow([format(gse_time,'.3f'), int(ecode)])
+                        
+                        self.q_write_data.put_nowait( (self.FPATH_ERR, datum) )
+
                 # - others
                 else:
                     self.df_mf.iat[iFrame,iItem] = np.nan
-                    # print(f'TLM RCV: ITEM={iItem} has no translation rule!')
+                    print(f'TLM RCV: ITEM={iItem} has no decoding rule!')
 
             self.iLine += 1
-
-        # clean up
-        # self.df_mf.drop(self.df_mf.index[[0, -1]])
         
         #if iLine % 1 == 0:
         if self.iLine % 500 == 0:
@@ -586,8 +579,8 @@ class TelemeterHandler :
         print('')  
 
 
-    # Get a physical value from telemeter words
-    def get_physical_value_from_tlm_words(self, iItem, data, idx_byte):
+    # Get a physical value from raw telemeter words
+    def get_physical_value(self, iItem, data, idx_byte):
         byte_length = self.W2B * int(self.TlmItemAttr[iItem]['word len'])
         signed = self.TlmItemAttr[iItem]['signed']
         integer_bit_length = int(self.TlmItemAttr[iItem]['integer bit len'])    # include sign bit if any
@@ -740,19 +733,19 @@ class TelemeterHandler :
 class DatagramServerProtocol:    
     # Initialize instance
     def __init__(self, tlm_type, data_queue) -> None:
-        print(f'Starting socket communication for {tlm_type}...')
-
         self.TLM_TYPE = tlm_type
         self.data_queue = data_queue
 
+        print(f'TLM {self.TLM_TYPE}: Starting datagram listner...')
+
     # Event handler
     def connection_made(self,transport):
-        print(f"Connected to {self.TLM_TYPE}")
+        print(f'Connected to {self.TLM_TYPE}')
         #self.transport = transport
 
     # Event handler
     def datagram_received(self, data, addr):
-        print(f'Received a datagram from {self.TLM_TYPE}')
+        print(f'TLM {self.TLM_TYPE}: Received a datagram')
         
         # for debug
         # print_mf(data)      
@@ -781,22 +774,20 @@ if __name__ == "__main__":
         print("ERROR: TLM_TYPE is wrong!")
         sys.exit()
 
-    if tlm_type == 'smt':
-        q_current_values = queue.Queue
-    else:
-        q_current_values = queue.Queue
-    q_message = asyncio.Queue
-
-    tlm = TelemeterHandler(tlm_type, q_current_values, q_message)
-
-
+    # create instances
+    q_message = False
+    # q_message = asyncio.Queue
+    q_latest_values = queue.Queue if (tlm_type == 'smt') else queue.Queue
+    tlm = TelemeterHandler(tlm_type, q_message, q_latest_values)
 
     # invoke event loop to enter async coroutine
-    asyncio.run(tlm.tlm_handler(q_message), debug=True)
+    asyncio.run(tlm.tlm_handler(), debug=True)
 
-    time.sleep(60)
+    # print('Im here!')
 
-    message = "quit tlm"
-    q_message.put_nowait(message)
+    time.sleep(5)
+
+    # q_message.put_nowait('quit tlm')
+    q_message = True
 
     print('Closing TLM...')
