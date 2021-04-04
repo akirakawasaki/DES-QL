@@ -37,7 +37,7 @@ class TelemeterHandler :
 
     # output file pathes
     __FPATH_LS_DATA = './data_***.csv'                # low-speed data    
-    FPATH_HS_DATA = './high_speed_data_***.csv'     # high-speed data
+    __FPATH_HS_DATA = './high_speed_data_***.csv'     # high-speed data
     FPATH_ERR = './error_history.csv'               # error history
 
 
@@ -100,102 +100,67 @@ class TelemeterHandler :
         print(f'TLM {self.tlm_type}: Starting tlm handlar...')
 
         # create FIFO queues to communicate among async coroutines
-        self.q_dgram = asyncio.Queue()          # transferring datagram                from listner to decorder
-        self.q_write_data = asyncio.Queue()     # transferring decoded low-speed data  from decoder to general file writer
-        # self.q_ls_data = asyncio.Queue()        # transferring decoded low-speed data  from decoder to dedicated file writer
-        # self.q_hs_data = asyncio.Queue()        # transferring decoded high-speed data from decoder to dedicated file writer
-        # self.q_errors = asyncio.Queue()         # transferring decoded errors          from decoder to dedicated file writer
+        self.q_dgram = asyncio.Queue()          # transferring datagram     from listner to decorder
+        self.q_write_data = asyncio.Queue()     # transferring decoded data from decoder to file writer
 
-        ### invoke async tasks in the running event loop (ORDER OF INVOCATION IS IMPORTAN?)
-        # task_fwriter_ls_data = asyncio.create_task( tlm.fwriter_ls_data() )
-        # task_fweiter_hs_data = asyncio.create_task( tlm.fwriter_hs_data() )
-        # task_fweiter_errors  = asyncio.create_task( tlm.fwriter_errors() )
-        task_file_writer     = asyncio.create_task( tlm.file_writer() ) 
-        task_decoder         = asyncio.create_task( tlm.decoder() )
+        # invoke async tasks in the running event loop (ORDER OF INVOCATION IS IMPORTAN)
+        # - file writer
+        task_file_writer = asyncio.create_task( tlm.file_writer() ) 
+        
+        # - data decoder
+        task_decoder = asyncio.create_task( tlm.decoder() )
 
-        # invoke datagram endpoint
+        # - datagram endpoint
         loop = asyncio.get_running_loop()
         (transport, protocol) = await loop.create_datagram_endpoint(
                                         protocol_factory=(lambda: DatagramServerProtocol(tlm_type, self.q_dgram)),
                                         local_addr=(self.HOST,self.PORT))
 
-        # wait until the GUI task done
+        # wait until GUI task done
         # while True:
-        #     message = await self.q_message.get()
-        #     if message == "quit tlm":   break
-
-        # wait until the GUI task done
-        # while q_message != True:
         #     await asyncio.sleep(1)
+        #     if self.q_message.empty() != True:            
+        #         message = self.q_message.get_nowait()
+        #         if message == "quit tlm":   break
 
-        # for debug
-        await asyncio.sleep(10)
+        # !!! FOR TEST ONLY !!!
+        await asyncio.sleep(60)
 
-        # quit detagram listner after GUI task done
+        # quit async tasks after GUI task done
+        # - detagram listner
         transport.close()
 
-        # quit decoder after datagram queue fully processed
+        # - deta decoder
         # print(f'TLM {self.tlm_type}: queue size = {self.q_dgram.qsize()}')
-        await self.q_dgram.join()
+        await self.q_dgram.join()           # wait for queue to be fully processed
         task_decoder.cancel()
+        await task_decoder                  # wait for task to be cancelled
 
-        # quit file writer after write data queue fully processed
-        await self.q_write_data.join()
+        # - file writer
+        await self.q_write_data.join()      # wait for queue to be fully processed
         task_file_writer.cancel()
+        await task_file_writer              # wait for task to be cancelled
 
-        # task_fwriter_ls_data.cancel()
-        # task_fweiter_hs_data.cancel()
-        # task_fweiter_errors.cancel()
-
-        print(f'Closing {self.tlm_type} handler...')
+        print(f'TLM {self.tlm_type}: Closing tlm handler...')
 
 
     # General file writer
     async def file_writer(self) -> None:    
         print(f'TLM {self.tlm_type}: Starting file writer...')
 
-        # 
         while True:
-            (file_path, write_data) = await self.q_write_data.get()
-            
+            try:
+                (file_path, write_data) = await self.q_write_data.get()
+            except asyncio.CancelledError:
+                break
+
             with open(file_path, 'a') as f:
                 writer = csv.writer(f)
                 writer.writerows(write_data)
             
             self.q_write_data.task_done()
-
-
-    # # File writer for low-speed data
-    # async def fwriter_ls_data(self) -> None:
-    #     file_path = f'./data_{self.tlm_type}.csv'
         
-    #     while True:
-    #         df_mf = await self.q_ls_data.get()
-    #         df_mf.to_csv(file_path, mode='w')
-            
-    #         self.q_ls_data.task_done()
-
-
-    # # File writer for high-speed data
-    # async def fwriter_hs_data(self) -> None:
-    #     file_path = f'./data_{self.tlm_type}.csv'
-        
-    #     while True:
-    #         df_mf = await self.q_ls_data.get()
-    #         df_mf.to_csv(file_path, mode='w')
-            
-    #         self.q_ls_data.task_done()
-
-    
-    # # File writer for error history
-    # async def fwriter_errors(self) -> None:
-    #     file_path = './error.csv'
-        
-    #     while True:
-    #         df_mf = await self.q_ls_data.get()
-    #         df_mf.to_csv(file_path, mode='w')
-            
-    #         self.q_ls_data.task_done()
+        print(f'TLM {self.tlm_type}: Closing file writer...')
 
 
     # Datagram decoder
@@ -203,16 +168,14 @@ class TelemeterHandler :
         print(f'TLM {self.tlm_type}: Starting data decoder...')
 
         while True:
-            data = await self.q_dgram.get()
-            
-            # print('Im here!')
+            try:
+                data = await self.q_dgram.get()
+            except asyncio.CancelledError:
+                break
 
             df_mf = self.decode(data)
 
-            # # append translated data to file
-            # self.df_mf.to_csv(self.data_path, mode='a', header=False)
-
-            # enqueue to save decode data in a file
+            # enqueue decoded data to save in a file
             write_data = df_mf.values.tolist()
             self.q_write_data.put_nowait( (self.fpath_ls_data, write_data) )
 
@@ -220,6 +183,8 @@ class TelemeterHandler :
             self.notify(df_mf)
 
             self.q_dgram.task_done()
+
+        print(f'TLM {self.tlm_type}: Closing data decoder...')
 
 
     # Notify GUI of latest values
@@ -242,6 +207,11 @@ class TelemeterHandler :
         gse_time = 0.0
         Vcjc = 0.0
         Vaz = 0.0
+
+        sensor_number = 0
+        fpath_hs_data = self.__FPATH_HS_DATA.replace('***', '{:0=4}'.format(sensor_number))
+        hs_data = []
+        err_history = []
         
         # sweep frames in a major frame
         for iFrame in range(self.NUM_OF_FRAMES):
@@ -263,6 +233,7 @@ class TelemeterHandler :
                 # calc byte index of datum within the datagram
                 byte_idx =  byte_idx_head + self.W2B * int(self.TlmItemAttr[iItem]['w idx'])
 
+
                 #
                 #   Decoding rules
                 #
@@ -277,24 +248,23 @@ class TelemeterHandler :
 
                 # - GSE timestamp in [sec]
                 elif self.TlmItemAttr[iItem]['type'] == 'gse time':
-                    gse_time =  (data[byte_idx+1] & 0x0F) * 10  * 3600 \
-                              + (data[byte_idx+2] >> 4  ) * 1   * 3600 \
-                              + (data[byte_idx+2] & 0x0F) * 10  * 60   \
-                              + (data[byte_idx+3] >> 4  ) * 1   * 60   \
-                              + (data[byte_idx+3] & 0x0F) * 10         \
-                              + (data[byte_idx+4] >> 4  ) * 1          \
-                              + (data[byte_idx+4] & 0x0F) * 100 / 1000 \
-                              + (data[byte_idx+5] >> 4  ) * 10  / 1000 \
-                              + (data[byte_idx+5] & 0x0F) * 1   / 1000
+                    gse_time =  (data[byte_idx+1] & 0x0F) * 10  * 3600  \
+                              + (data[byte_idx+2] >> 4  ) * 1   * 3600  \
+                              + (data[byte_idx+2] & 0x0F) * 10  * 60    \
+                              + (data[byte_idx+3] >> 4  ) * 1   * 60    \
+                              + (data[byte_idx+3] & 0x0F) * 10          \
+                              + (data[byte_idx+4] >> 4  ) * 1           \
+                              + (data[byte_idx+4] & 0x0F) * 100 * 0.001 \
+                              + (data[byte_idx+5] >> 4  ) * 10  * 0.001 \
+                              + (data[byte_idx+5] & 0x0F) * 1   * 0.001
                     self.df_mf.iat[iFrame,iItem] = gse_time
                     continue
 
                 # - Relay status (boolean)
                 elif self.TlmItemAttr[iItem]['type'] == 'bool':
-                    self.df_mf.iat[iFrame,iItem] = \
-                        (  data[byte_idx + int(self.TlmItemAttr[iItem]['b coeff'])] 
-                            & int(self.TlmItemAttr[iItem]['a coeff'])) \
-                            / int(self.TlmItemAttr[iItem]['a coeff'])
+                    self.df_mf.iat[iFrame,iItem] = (  data[byte_idx + int(self.TlmItemAttr[iItem]['b coeff'])] 
+                                                    & int(self.TlmItemAttr[iItem]['a coeff']) ) \
+                                                    / int(self.TlmItemAttr[iItem]['a coeff'])
                     continue
 
                 ### High-speed data    ### T.B.REFAC. ###
@@ -331,12 +301,13 @@ class TelemeterHandler :
                     byte_string = []
                     for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
 
-                    # physical_value =  b_coeff \
-                    #                 + a_coeff \
-                    #                     * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
-                    #                     / 2**(fractional_bit_length)
+                    physical_value =  b_coeff \
+                                    + a_coeff \
+                                        * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
+                                        * 2**(-fractional_bit_length)
                     #####
                     w013 = byte_string
+                    sensor_number = int(physical_value)
 
                     # detect head of high-speed data
                     if self.high_speed_data_is_avtive == False:    
@@ -344,9 +315,8 @@ class TelemeterHandler :
                             and (w013 == [0x00, 0x01] or w013 == [0x00, 0x02] or w013 == [0x00, 0x03]):
                             
                             self.high_speed_data_is_avtive = True
-                            # idx_high_speed_data += 1
-                            high_speed_data = []
-                            print('TLM TRN: Start of high-speed data is detected!')
+                            fpath_hs_data = self.__FPATH_HS_DATA.replace('***', '{:0=4}'.format(sensor_number))
+                            print('TLM DCD: Start of high-speed data is detected!')
 
                     continue
 
@@ -387,35 +357,16 @@ class TelemeterHandler :
                             physical_value =  b_coeff \
                                             + a_coeff \
                                                 * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
-                                                / 2**(fractional_bit_length)
+                                                * 2**(-fractional_bit_length)
                             #####
                             
-                            high_speed_data.append([format(gse_time,'.3f'), physical_value])
+                            hs_data.append([format(gse_time,'.3f'), physical_value])
 
-                            # detect EOF
+                            # detect End Of Data
                             if byte_string == [0xFF, 0xFF]:
                                 self.high_speed_data_is_avtive = False
-                                # q_hsd.put_nowait(high_speed_data)
-                                print('TLM TRN: High-speed data is deactivated!')
+                                print('TLM DCD: End of high-speed data detected!')
                                 break
-
-                        # DATA_PATH_HSD = './high_speed_data_{:0=4}.csv'.format(self.idx_high_speed_data)
-                        # with open(DATA_PATH_HSD, 'a') as f:
-                        #     writer = csv.writer(f)
-                        #     for j in range(int(TlmItemAttr[iItem]['word len'])):
-                        #         byte_idx_shift = self.__W2B * j
-                                
-                        #         #####
-                        #         byte_string = []
-                        #         for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
-
-                        #         physical_value =  b_coeff \
-                        #                         + a_coeff \
-                        #                             * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
-                        #                             / 2**(fractional_bit_length)
-                        #         #####
-                                
-                        #         writer.writerow([format(gse_time,'.3f'), physical_value])
 
                     continue
 
@@ -456,35 +407,16 @@ class TelemeterHandler :
                             physical_value =  b_coeff \
                                             + a_coeff \
                                                 * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
-                                                / 2**(fractional_bit_length)
+                                                * 2**(-fractional_bit_length)
                             #####
                             
-                            high_speed_data.append([format(gse_time,'.3f'), physical_value])
+                            hs_data.append([format(gse_time,'.3f'), physical_value])
 
-                            # detect EOF
+                            # detect End Of Data
                             if byte_string == [0xFF, 0xFF]:
                                 self.high_speed_data_is_avtive = False
-                                # q_hsd.put_nowait(high_speed_data)
-                                print('TLM TRN: High-speed data is deactivated!')
+                                print('TLM DCD: End of high-speed data detected!')
                                 break
-
-                        # DATA_PATH_HSD = './high_speed_data_{:0=4}.csv'.format(self.idx_high_speed_data)
-                        # with open(DATA_PATH_HSD, 'a') as f:
-                        #     writer = csv.writer(f)
-                        #     for j in range(int(self.TlmItemAttr[iItem]['word len'])):
-                        #         byte_idx_shift = self.__W2B * j
-                                
-                        #         #####
-                        #         byte_string = []
-                        #         for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
-
-                        #         physical_value =  b_coeff \
-                        #                         + a_coeff \
-                        #                             * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
-                        #                             / 2**(fractional_bit_length)
-                        #         #####
-                                
-                        #         writer.writerow([format(gse_time,'.3f'), physical_value])
 
                     continue
 
@@ -534,26 +466,25 @@ class TelemeterHandler :
                 elif self.TlmItemAttr[iItem]['type'] == 'ec':
                     ecode = float_value
                     self.df_mf.iat[iFrame,iItem] = ecode
-                    
-                    ### T.B.REFAC. ###
-                    # write history to an external file when error occurs
-                    if ecode != 0:
-                        datum = [format(gse_time,'.3f'), int(ecode)]
+                
+                    # memory when error occcures
+                    if ecode != 0:  err_history.append([format(gse_time,'.3f'), int(ecode)])
                         
-                        # DATA_PATH_EC = './error_history.csv'
-                        # with open(DATA_PATH_EC, 'a') as f:
-                        #     writer = csv.writer(f)
-                        #     writer.writerow([format(gse_time,'.3f'), int(ecode)])
-                        
-                        self.q_write_data.put_nowait( (self.FPATH_ERR, datum) )
-
                 # - others
                 else:
                     self.df_mf.iat[iFrame,iItem] = np.nan
                     print(f'TLM RCV: ITEM={iItem} has no decoding rule!')
 
             self.iLine += 1
-        
+
+        # write high-speed data to an external file when detected
+        if hs_data != []:
+            self.q_write_data.put_nowait( (fpath_hs_data, hs_data) )
+
+        # write error history to an external file when error occurs
+        if err_history != []:
+            self.q_write_data.put_nowait( (self.FPATH_ERR, err_history) )
+
         #if iLine % 1 == 0:
         if self.iLine % 500 == 0:
             print('')
@@ -602,7 +533,7 @@ class TelemeterHandler :
         physical_value =  b_coeff \
                         + a_coeff \
                             * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
-                            / 2**(fractional_bit_length)
+                            * 2**(-fractional_bit_length)
 
         return physical_value
 
@@ -761,7 +692,7 @@ class DatagramServerProtocol:
 
     # Event handler
     def connection_lost(self,exec):
-        print(f'Disconnected from {self.TLM_TYPE}')
+        print(f'Disconnected from {self.TLM_TYPE}')    
 
 
 #
@@ -786,7 +717,6 @@ if __name__ == "__main__":
     # sys.setswitchinterval(0.001)
 
     # create instances
-    # q_message = False
     # q_message = asyncio.Queue
     q_message = queue.Queue
     q_latest_values = queue.Queue if (tlm_type == 'smt') else queue.Queue
@@ -794,12 +724,5 @@ if __name__ == "__main__":
 
     # invoke event loop to enter async coroutine
     asyncio.run(tlm.tlm_handler(), debug=True)
-
-    # print('Im here!')
-
-    # time.sleep(5)
-
-    # q_message.put_nowait('quit tlm')
-    # q_message = True
 
     print('Program terminated normally')
