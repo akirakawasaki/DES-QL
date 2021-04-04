@@ -8,6 +8,9 @@ import socket
 import sys
 import time
 
+import cProfile
+import pstats
+
 ### Third-party libraries
 import numpy as np
 import pandas as pd
@@ -122,8 +125,11 @@ class TelemeterHandler :
         #     if message == "quit tlm":   break
 
         # wait until the GUI task done
-        while q_message != True:
-            await asyncio.sleep(1)
+        # while q_message != True:
+        #     await asyncio.sleep(1)
+
+        # for debug
+        await asyncio.sleep(10)
 
         # quit detagram listner after GUI task done
         transport.close()
@@ -199,7 +205,7 @@ class TelemeterHandler :
         while True:
             data = await self.q_dgram.get()
             
-            print('Im here!')
+            # print('Im here!')
 
             df_mf = self.decode(data)
 
@@ -762,6 +768,8 @@ class DatagramServerProtocol:
 #   Main
 #
 if __name__ == "__main__":
+    # cProfile.run('main()', filename='main.prof')
+    
     print('MAIN: Invoking Telemetry Data Handler...')
 
     tlm_type = sys.argv[1]
@@ -774,9 +782,13 @@ if __name__ == "__main__":
         print("ERROR: TLM_TYPE is wrong!")
         sys.exit()
 
+    # set GIL switching time to a vlaue other than the default [s]
+    # sys.setswitchinterval(0.001)
+
     # create instances
-    q_message = False
+    # q_message = False
     # q_message = asyncio.Queue
+    q_message = queue.Queue
     q_latest_values = queue.Queue if (tlm_type == 'smt') else queue.Queue
     tlm = TelemeterHandler(tlm_type, q_message, q_latest_values)
 
@@ -785,9 +797,9 @@ if __name__ == "__main__":
 
     # print('Im here!')
 
-    time.sleep(5)
+    # time.sleep(5)
 
     # q_message.put_nowait('quit tlm')
-    q_message = True
+    # q_message = True
 
-    print('Closing TLM...')
+    print('Program terminated normally')
