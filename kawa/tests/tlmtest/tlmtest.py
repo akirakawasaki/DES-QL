@@ -42,21 +42,22 @@ class TelemeterHandler :
 
 
     def __init__(self, tlm_type, q_message, q_latest_values) -> None:
-        ### general settings
-
         self.tlm_type = tlm_type
 
+        #
+        ### general settings
         # queues for inter-process message passing
         self.q_message = q_message                  # only for receiving
         self.q_latest_values = q_latest_values      # only for sending 
 
+        #
         ### Initialize datagram listner
         # self.HOST = ''
         # self.HOST = '192.168.1.255'                                  # mac
         self.HOST = socket.gethostbyname(socket.gethostname())       # windows / mac(debug)
         self.PORT = 49157 if (self.tlm_type == 'smt') else 49158
 
-
+        #
         ### Initialize decoder
         # load configuration for word assignment
         try: 
@@ -87,9 +88,9 @@ class TelemeterHandler :
         # self.w009_old = 0x00
         # self.w018_old = 0x00
         self.high_speed_data_is_avtive = False
-        # self.idx_high_speed_data = 0
+        self.idx_high_speed_data = 0
 
-
+        #
         ### Initialize file writer
         self.fpath_ls_data = self.__FPATH_LS_DATA.replace('***', self.tlm_type)
         self.df_mf.to_csv(self.fpath_ls_data, mode='w')        
@@ -110,7 +111,7 @@ class TelemeterHandler :
         # - data decoder
         task_decoder = asyncio.create_task( tlm.decoder() )
 
-        # - datagram endpoint
+        # - datagram listner
         loop = asyncio.get_running_loop()
         (transport, protocol) = await loop.create_datagram_endpoint(
                                         protocol_factory=(lambda: DatagramServerProtocol(tlm_type, self.q_dgram)),
@@ -176,8 +177,9 @@ class TelemeterHandler :
             df_mf = self.decode(data)
 
             # enqueue decoded data to save in a file
-            write_data = df_mf.values.tolist()
-            self.q_write_data.put_nowait( (self.fpath_ls_data, write_data) )
+            if self.iLine % 2 == 0:
+                write_data = df_mf.values.tolist()
+                self.q_write_data.put_nowait( (self.fpath_ls_data, write_data) )
 
             # notify GUI of latest values
             self.notify(df_mf)
@@ -208,8 +210,8 @@ class TelemeterHandler :
         Vcjc = 0.0
         Vaz = 0.0
 
-        sensor_number = 0
-        fpath_hs_data = self.__FPATH_HS_DATA.replace('***', '{:0=4}'.format(sensor_number))
+        # sensor_number = 0
+        # fpath_hs_data = self.__FPATH_HS_DATA.replace('***', '{:0=4}'.format(sensor_number))
         hs_data = []
         err_history = []
         
@@ -315,7 +317,7 @@ class TelemeterHandler :
                             and (w013 == [0x00, 0x01] or w013 == [0x00, 0x02] or w013 == [0x00, 0x03]):
                             
                             self.high_speed_data_is_avtive = True
-                            fpath_hs_data = self.__FPATH_HS_DATA.replace('***', '{:0=4}'.format(sensor_number))
+                            self.fpath_hs_data = self.__FPATH_HS_DATA.replace('***', '{:0=4}'.format(self.idx_high_speed_data))
                             print('TLM DCD: Start of high-speed data is detected!')
 
                     continue
@@ -365,6 +367,7 @@ class TelemeterHandler :
                             # detect End Of Data
                             if byte_string == [0xFF, 0xFF]:
                                 self.high_speed_data_is_avtive = False
+                                self.idx_high_speed_data =+ 1
                                 print('TLM DCD: End of high-speed data detected!')
                                 break
 
@@ -415,6 +418,7 @@ class TelemeterHandler :
                             # detect End Of Data
                             if byte_string == [0xFF, 0xFF]:
                                 self.high_speed_data_is_avtive = False
+                                self.idx_high_speed_data =+ 1
                                 print('TLM DCD: End of high-speed data detected!')
                                 break
 
@@ -479,7 +483,7 @@ class TelemeterHandler :
 
         # write high-speed data to an external file when detected
         if hs_data != []:
-            self.q_write_data.put_nowait( (fpath_hs_data, hs_data) )
+            self.q_write_data.put_nowait( (self.fpath_hs_data, hs_data) )
 
         # write error history to an external file when error occurs
         if err_history != []:
