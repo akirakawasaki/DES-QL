@@ -9,6 +9,7 @@ import sys
 import time
 
 import cProfile
+import pprint as pp
 import pstats
 
 ### Third-party libraries
@@ -33,7 +34,8 @@ class TelemeterHandler :
     BUFSIZE = W2B * (LEN_HEADER + LEN_PAYLOAD) * NUM_OF_FRAMES       # 1088 bytes
 
     # input file pathes
-    FPATH_CONFIG = './config_tlm_2.xlsx'
+    FPATH_CONFIG = './config_tlm_3.xlsx'
+    # FPATH_CONFIG = './config_tlm_2.xlsx'
 
     # output file pathes
     __FPATH_LS_DATA = './data_***.csv'                # low-speed data    
@@ -62,21 +64,22 @@ class TelemeterHandler :
         # load configuration for word assignment
         try: 
             df_cfg = pd.read_excel(self.FPATH_CONFIG, 
-                            sheet_name=self.tlm_type, header=0, index_col=None).dropna(how='all')
+                            sheet_name=self.tlm_type, header=0, index_col=0).dropna(how='all')
         except:
             print(f'Error TLM {self.tlm_type}: Configuration file NOT exist!')
             sys.exit()
         
-        # print(f'df_cfg = {df_cfg}')     # for debug
+        print(f'df_cfg = {df_cfg}')     # for debug
 
-        self.TlmItemList = df_cfg['item'].values.tolist()
+        self.TlmItemList = df_cfg.index.tolist()
         self.TlmItemAttr = df_cfg.to_dict(orient='index')
         self.NUM_OF_ITEMS = len(df_cfg.index)
         self.MAX_SUP_COM = df_cfg['sup com'].max()
 
         # for debug
-        # print(f'Item List = {self.TlmItemList}')
-        # print(f'Item Attributions = {self.TlmItemAttr}')
+        print(f'Item List = {self.TlmItemList}')
+        print(f'Item Attributions = {self.TlmItemAttr}')
+        # pp.pprint(self.TlmItemAttr)
 
         # initialize a DataFrame to store data of one major frame
         self.df_mf = pd.DataFrame(index=[], columns=self.TlmItemList)
@@ -113,9 +116,12 @@ class TelemeterHandler :
 
         # - datagram listner
         loop = asyncio.get_running_loop()
-        (transport, protocol) = await loop.create_datagram_endpoint(
+        transport, _ = await loop.create_datagram_endpoint(
                                         protocol_factory=(lambda: DatagramServerProtocol(tlm_type, self.q_dgram)),
                                         local_addr=(self.HOST,self.PORT))
+        # transport, protocol = await loop.create_datagram_endpoint(
+        #                                 protocol_factory=(lambda: DatagramServerProtocol(tlm_type, self.q_dgram)),
+        #                                 local_addr=(self.HOST,self.PORT))
 
         # wait until GUI task done
         # while True:
@@ -177,6 +183,7 @@ class TelemeterHandler :
             df_mf = self.decode(data)
 
             # enqueue decoded data to save in a file
+            # if self.iLine % 1 == 0:
             if self.iLine % 2 == 0:
                 write_data = df_mf.values.tolist()
                 self.q_write_data.put_nowait( (self.fpath_ls_data, write_data) )
@@ -229,11 +236,13 @@ class TelemeterHandler :
             # print(f"byte_idx_head: {byte_idx_head}") 
             
             # pick up data from the datagram (Get physical values from raw words)
-            for strItem in self.TlmItemList:
+            # for strItem in self.TlmItemList:
+            #     iItem = self.TlmItemList.index(strItem)
+            for strItem in self.TlmItemAttr:
                 iItem = self.TlmItemList.index(strItem)
 
                 # calc byte index of datum within the datagram
-                byte_idx =  byte_idx_head + self.W2B * int(self.TlmItemAttr[iItem]['w idx'])
+                byte_idx =  byte_idx_head + self.W2B * int(self.TlmItemAttr[strItem]['w idx'])
 
 
                 #
@@ -242,14 +251,14 @@ class TelemeterHandler :
 
                 ### Peculiar items ()
                 # - Number of days from January 1st on GSE
-                if self.TlmItemAttr[iItem]['type'] == 'gse day':
+                if self.TlmItemAttr[strItem]['type'] == 'gse day':
                     self.df_mf.iat[iFrame,iItem] =  (data[byte_idx]   >> 4  ) * 100 \
                                                   + (data[byte_idx]   & 0x0F) * 10  \
                                                   + (data[byte_idx+1] >> 4  ) * 1
                     continue
 
                 # - GSE timestamp in [sec]
-                elif self.TlmItemAttr[iItem]['type'] == 'gse time':
+                elif self.TlmItemAttr[strItem]['type'] == 'gse time':
                     gse_time =  (data[byte_idx+1] & 0x0F) * 10  * 3600  \
                               + (data[byte_idx+2] >> 4  ) * 1   * 3600  \
                               + (data[byte_idx+2] & 0x0F) * 10  * 60    \
@@ -263,19 +272,19 @@ class TelemeterHandler :
                     continue
 
                 # - Relay status (boolean)
-                elif self.TlmItemAttr[iItem]['type'] == 'bool':
-                    self.df_mf.iat[iFrame,iItem] = (  data[byte_idx + int(self.TlmItemAttr[iItem]['b coeff'])] 
-                                                    & int(self.TlmItemAttr[iItem]['a coeff']) ) \
-                                                    / int(self.TlmItemAttr[iItem]['a coeff'])
+                elif self.TlmItemAttr[strItem]['type'] == 'bool':
+                    self.df_mf.iat[iFrame,iItem] = (  data[byte_idx + int(self.TlmItemAttr[strItem]['b coeff'])] 
+                                                    & int(self.TlmItemAttr[strItem]['a coeff']) ) \
+                                                    / int(self.TlmItemAttr[strItem]['a coeff'])
                     continue
 
                 ### High-speed data    ### T.B.REFAC. ###
                 # - header
-                if self.TlmItemAttr[iItem]['type'] == 'data hd':
-                    signed = self.TlmItemAttr[iItem]['signed']
-                    integer_bit_length = int(self.TlmItemAttr[iItem]['integer bit len'])    # includes a sign bit if any
-                    a_coeff = self.TlmItemAttr[iItem]['a coeff']
-                    b_coeff = self.TlmItemAttr[iItem]['b coeff']
+                if self.TlmItemAttr[strItem]['type'] == 'data hd':
+                    signed = self.TlmItemAttr[strItem]['signed']
+                    integer_bit_length = int(self.TlmItemAttr[strItem]['integer bit len'])    # includes a sign bit if any
+                    a_coeff = self.TlmItemAttr[strItem]['a coeff']
+                    b_coeff = self.TlmItemAttr[strItem]['b coeff']
 
                     # - W009 + W010: start of data
                     byte_length = 4
@@ -323,12 +332,12 @@ class TelemeterHandler :
                     continue
 
                 # - payload (first half)
-                elif self.TlmItemAttr[iItem]['type'] == 'data pl1':
+                elif self.TlmItemAttr[strItem]['type'] == 'data pl1':
                     byte_length = 2
-                    signed = self.TlmItemAttr[iItem]['signed']
-                    integer_bit_length = int(self.TlmItemAttr[iItem]['integer bit len'])    # includes a sign bit if any
-                    a_coeff = self.TlmItemAttr[iItem]['a coeff']
-                    b_coeff = self.TlmItemAttr[iItem]['b coeff']
+                    signed = self.TlmItemAttr[strItem]['signed']
+                    integer_bit_length = int(self.TlmItemAttr[strItem]['integer bit len'])    # includes a sign bit if any
+                    a_coeff = self.TlmItemAttr[strItem]['a coeff']
+                    b_coeff = self.TlmItemAttr[strItem]['b coeff']
 
                     total_bit_length = 8 * byte_length
                     fractional_bit_length = total_bit_length - integer_bit_length
@@ -349,7 +358,7 @@ class TelemeterHandler :
 
                     # write history to an external file
                     if self.high_speed_data_is_avtive == True:
-                        for j in range(int(self.TlmItemAttr[iItem]['word len'])):
+                        for j in range(int(self.TlmItemAttr[strItem]['word len'])):
                             byte_idx_shift = self.W2B * j
                             
                             #####
@@ -374,12 +383,12 @@ class TelemeterHandler :
                     continue
 
                 # - payload (latter half)
-                elif self.TlmItemAttr[iItem]['type'] == 'data pl2':
+                elif self.TlmItemAttr[strItem]['type'] == 'data pl2':
                     byte_length = 2
-                    signed = self.TlmItemAttr[iItem]['signed']
-                    integer_bit_length = int(self.TlmItemAttr[iItem]['integer bit len'])    # includes a sign bit if any
-                    a_coeff = self.TlmItemAttr[iItem]['a coeff']
-                    b_coeff = self.TlmItemAttr[iItem]['b coeff']
+                    signed = self.TlmItemAttr[strItem]['signed']
+                    integer_bit_length = int(self.TlmItemAttr[strItem]['integer bit len'])    # includes a sign bit if any
+                    a_coeff = self.TlmItemAttr[strItem]['a coeff']
+                    b_coeff = self.TlmItemAttr[strItem]['b coeff']
 
                     total_bit_length = 8 * byte_length
                     fractional_bit_length = total_bit_length - integer_bit_length
@@ -400,7 +409,7 @@ class TelemeterHandler :
 
                     # write history to an external file
                     if self.high_speed_data_is_avtive == True:
-                        for j in range(int(self.TlmItemAttr[iItem]['word len'])):
+                        for j in range(int(self.TlmItemAttr[strItem]['word len'])):
                             byte_idx_shift = self.W2B * j
                             
                             #####
@@ -425,22 +434,22 @@ class TelemeterHandler :
                     continue
 
                 ### Ordinary items
-                float_value = self.get_physical_value(iItem, data, byte_idx)
+                float_value = self.get_physical_value(self.TlmItemAttr[strItem], data, byte_idx)
 
                 # - ordinary items
-                if self.TlmItemAttr[iItem]['ordinary item'] == True :
+                if self.TlmItemAttr[strItem]['ordinary item'] == True :
                     self.df_mf.iat[iFrame,iItem] = float_value
 
                 # - analog pressure in [MPa]
-                elif self.TlmItemAttr[iItem]['type'] == 'p ana':
+                elif self.TlmItemAttr[strItem]['type'] == 'p ana':
                     # handle sub-commutation
-                    if iFrame % self.TlmItemAttr[iItem]['sub com mod'] != self.TlmItemAttr[iItem]['sub com res']: 
+                    if iFrame % self.TlmItemAttr[strItem]['sub com mod'] != self.TlmItemAttr[strItem]['sub com res']: 
                         continue
                     
                     self.df_mf.iat[iFrame,iItem] = float_value
 
                 # - Temperature in [K] <S,16,-2>
-                elif self.TlmItemAttr[iItem]['type'] == 'T':
+                elif self.TlmItemAttr[strItem]['type'] == 'T':
                     # get TC thermoelectric voltage in [uV]
                     Vtc = float_value
 
@@ -451,7 +460,7 @@ class TelemeterHandler :
                     # self.df_mf.iat[iFrame,iItem] = Ttc                 # in Kelvin
                 
                 # - Cold-junction compensation coefficient in [uV]
-                elif self.TlmItemAttr[iItem]['type'] == 'cjc':
+                elif self.TlmItemAttr[strItem]['type'] == 'cjc':
                     cjc = float_value
 
                     Rcjc = self.v2ohm(cjc)
@@ -461,13 +470,13 @@ class TelemeterHandler :
                     self.df_mf.iat[iFrame,iItem] = Vcjc
 
                 # - Auto-zero coefficient in [uV]
-                elif self.TlmItemAttr[iItem]['type'] == 'az':
+                elif self.TlmItemAttr[strItem]['type'] == 'az':
                     Vaz = float_value
                     
                     self.df_mf.iat[iFrame,iItem] = Vaz
 
                 # - error code
-                elif self.TlmItemAttr[iItem]['type'] == 'ec':
+                elif self.TlmItemAttr[strItem]['type'] == 'ec':
                     ecode = float_value
                     self.df_mf.iat[iFrame,iItem] = ecode
                 
@@ -521,23 +530,33 @@ class TelemeterHandler :
 
 
     # Get a physical value from raw telemeter words
-    def get_physical_value(self, iItem, data, idx_byte):
-        byte_length = self.W2B * int(self.TlmItemAttr[iItem]['word len'])
-        signed = self.TlmItemAttr[iItem]['signed']
-        integer_bit_length = int(self.TlmItemAttr[iItem]['integer bit len'])    # include sign bit if any
-        a_coeff = self.TlmItemAttr[iItem]['a coeff']
-        b_coeff = self.TlmItemAttr[iItem]['b coeff']
+    def get_physical_value(self, itemAttr, data, idx_byte):
+        byte_length = self.W2B * int(itemAttr['word len'])
+        signed = itemAttr['signed']
+        integer_bit_length = int(itemAttr['integer bit len'])    # include sign bit if any
+        a_coeff = itemAttr['a coeff']
+        b_coeff = itemAttr['b coeff']
 
         total_bit_length = 8 * byte_length
         fractional_bit_length = total_bit_length - integer_bit_length
         
-        byte_string = []
-        for i in range(byte_length): byte_string.append(data[idx_byte+i])
+        # byte_string = []
+        # for i in range(byte_length): byte_string.append(data[idx_byte+i])
+
+        # print(f'byte string = {byte_string}')
+        # print(f'slice = {data[idx_byte:idx_byte+byte_length]}')
+
+        # physical_value =  b_coeff \
+        #                 + a_coeff \
+        #                     * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
+        #                     * 2**(-fractional_bit_length)
+        # print(f'value from byte string = {physical_value}')
 
         physical_value =  b_coeff \
                         + a_coeff \
-                            * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
+                            * (int.from_bytes(data[idx_byte:idx_byte+byte_length], byteorder='big', signed=signed)) \
                             * 2**(-fractional_bit_length)
+        # print(f'value from slice = {physical_value}')
 
         return physical_value
 
@@ -686,7 +705,7 @@ class DatagramServerProtocol:
 
     # Event handler
     def datagram_received(self, data, addr):
-        print(f'TLM {self.TLM_TYPE}: Received a datagram')
+        # print(f'TLM {self.TLM_TYPE}: Received a datagram')
         
         # for debug
         # print_mf(data)      
