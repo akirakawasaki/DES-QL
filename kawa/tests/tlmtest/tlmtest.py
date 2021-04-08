@@ -69,7 +69,7 @@ class TelemeterHandler :
             print(f'Error TLM {self.tlm_type}: Configuration file NOT exist!')
             sys.exit()
         
-        print(f'df_cfg = {df_cfg}')     # for debug
+        # print(f'df_cfg = {df_cfg}')     # for debug
 
         self.TlmItemList = df_cfg.index.tolist()
         self.TlmItemAttr = df_cfg.to_dict(orient='index')
@@ -77,8 +77,8 @@ class TelemeterHandler :
         self.MAX_SUP_COM = df_cfg['sup com'].max()
 
         # for debug
-        print(f'Item List = {self.TlmItemList}')
-        print(f'Item Attributions = {self.TlmItemAttr}')
+        # print(f'Item List = {self.TlmItemList}')
+        # print(f'Item Attributions = {self.TlmItemAttr}')
         # pp.pprint(self.TlmItemAttr)
 
         # initialize a DataFrame to store data of one major frame
@@ -184,7 +184,8 @@ class TelemeterHandler :
 
             # enqueue decoded data to save in a file
             # if self.iLine % 1 == 0:
-            if self.iLine % 2 == 0:
+            # if self.iLine % 2 == 0:
+            if self.iLine % 10 == 0:
                 write_data = df_mf.values.tolist()
                 self.q_write_data.put_nowait( (self.fpath_ls_data, write_data) )
 
@@ -210,8 +211,9 @@ class TelemeterHandler :
     # Decode raw telemetry data into physical values
     def decode(self, data):
         # initialize a DataFrame to store data of one major frame
-        self.df_mf = pd.DataFrame(index=[], columns=self.TlmItemList)
-        
+        # self.df_mf = pd.DataFrame(index=[], columns=self.TlmItemList)
+        # df_mf = pd.DataFrame(index=[], columns=self.TlmItemList)
+
         # initialize   
         gse_time = 0.0
         Vcjc = 0.0
@@ -222,19 +224,30 @@ class TelemeterHandler :
         hs_data = []
         err_history = []
         
+        dict_data_matrix = {}
+        # dict_data_row_null = dict.fromkeys(['Line#'] + self.TlmItemList, math.nan)
+        # print('')
+        # print(f'dict_data_row_null = {dict_data_row_null}')
+
         # sweep frames in a major frame
         for iFrame in range(self.NUM_OF_FRAMES):
             # print(f"iLine: {self.iLine}")
 
-            # initialize the row by filling wit NaN
-            self.df_mf.loc[iFrame] = np.nan
-            # print(self.df_mf)
+            # initialize row by filling with NaN
+            # df_mf.loc[iFrame] = np.nan
+            # print(df_mf)
+
+            # initialize row by filling with NaN
+            dict_data_row = dict.fromkeys(['Line#'] + self.TlmItemList, math.nan)
+            # print(f'dict_data_row = {dict_data_row}')
+
+            dict_data_row.update({'Line#':self.iLine})
 
             # byte index of the head of the frame (without header)
             byte_idx_head =   self.W2B * (self.LEN_HEADER + self.LEN_PAYLOAD) * iFrame \
                             + self.W2B *  self.LEN_HEADER
             # print(f"byte_idx_head: {byte_idx_head}") 
-            
+
             # pick up data from the datagram (Get physical values from raw words)
             # for strItem in self.TlmItemList:
             #     iItem = self.TlmItemList.index(strItem)
@@ -252,30 +265,36 @@ class TelemeterHandler :
                 ### Peculiar items ()
                 # - Number of days from January 1st on GSE
                 if self.TlmItemAttr[strItem]['type'] == 'gse day':
-                    self.df_mf.iat[iFrame,iItem] =  (data[byte_idx]   >> 4  ) * 100 \
-                                                  + (data[byte_idx]   & 0x0F) * 10  \
-                                                  + (data[byte_idx+1] >> 4  ) * 1
+                    decoded_value =  (data[byte_idx]   >> 4  ) * 100 \
+                                   + (data[byte_idx]   & 0x0F) * 10  \
+                                   + (data[byte_idx+1] >> 4  ) * 1
+                    # df_mf.iat[iFrame,iItem] = decoded_value
+                    dict_data_row.update({strItem:decoded_value})
                     continue
 
                 # - GSE timestamp in [sec]
                 elif self.TlmItemAttr[strItem]['type'] == 'gse time':
-                    gse_time =  (data[byte_idx+1] & 0x0F) * 10  * 3600  \
-                              + (data[byte_idx+2] >> 4  ) * 1   * 3600  \
-                              + (data[byte_idx+2] & 0x0F) * 10  * 60    \
-                              + (data[byte_idx+3] >> 4  ) * 1   * 60    \
-                              + (data[byte_idx+3] & 0x0F) * 10          \
-                              + (data[byte_idx+4] >> 4  ) * 1           \
-                              + (data[byte_idx+4] & 0x0F) * 100 * 0.001 \
-                              + (data[byte_idx+5] >> 4  ) * 10  * 0.001 \
-                              + (data[byte_idx+5] & 0x0F) * 1   * 0.001
-                    self.df_mf.iat[iFrame,iItem] = gse_time
+                    decoded_value =  (data[byte_idx+1] & 0x0F) * 10  * 3600  \
+                                   + (data[byte_idx+2] >> 4  ) * 1   * 3600  \
+                                   + (data[byte_idx+2] & 0x0F) * 10  * 60    \
+                                   + (data[byte_idx+3] >> 4  ) * 1   * 60    \
+                                   + (data[byte_idx+3] & 0x0F) * 10          \
+                                   + (data[byte_idx+4] >> 4  ) * 1           \
+                                   + (data[byte_idx+4] & 0x0F) * 100 * 0.001 \
+                                   + (data[byte_idx+5] >> 4  ) * 10  * 0.001 \
+                                   + (data[byte_idx+5] & 0x0F) * 1   * 0.001
+                    gse_time = decoded_value
+                    # df_mf.iat[iFrame,iItem] = decoded_value
+                    dict_data_row.update({strItem:decoded_value})
                     continue
 
                 # - Relay status (boolean)
                 elif self.TlmItemAttr[strItem]['type'] == 'bool':
-                    self.df_mf.iat[iFrame,iItem] = (  data[byte_idx + int(self.TlmItemAttr[strItem]['b coeff'])] 
+                    decoded_value = (  data[byte_idx + int(self.TlmItemAttr[strItem]['b coeff'])] 
                                                     & int(self.TlmItemAttr[strItem]['a coeff']) ) \
                                                     / int(self.TlmItemAttr[strItem]['a coeff'])
+                    # df_mf.iat[iFrame,iItem] = decoded_value
+                    dict_data_row.update({strItem:decoded_value})
                     continue
 
                 ### High-speed data    ### T.B.REFAC. ###
@@ -292,8 +311,9 @@ class TelemeterHandler :
                     fractional_bit_length = total_bit_length - integer_bit_length
                     byte_idx_shift = 0
                     #####
-                    byte_string = []
-                    for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
+                    # byte_string = []
+                    # for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
+                    byte_string = [data[byte_idx+byte_idx_shift:byte_idx+byte_idx_shift+byte_length]]
 
                     # physical_value =  b_coeff \
                     #                 + a_coeff \
@@ -301,7 +321,8 @@ class TelemeterHandler :
                     #                     / 2**(fractional_bit_length)
                     #####
                     w009 = byte_string
-                    self.df_mf.iat[iFrame,iItem] = w009
+                    # df_mf.iat[iFrame,iItem] = w009
+                    dict_data_row.update({strItem:w009})
 
                     # - W013 : senser number
                     byte_length = 2
@@ -309,8 +330,9 @@ class TelemeterHandler :
                     fractional_bit_length = total_bit_length - integer_bit_length
                     byte_idx_shift = 8
                     #####
-                    byte_string = []
-                    for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
+                    # byte_string = []
+                    # for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
+                    byte_string = [data[byte_idx+byte_idx_shift:byte_idx+byte_idx_shift+byte_length]]
 
                     physical_value =  b_coeff \
                                     + a_coeff \
@@ -322,12 +344,17 @@ class TelemeterHandler :
 
                     # detect head of high-speed data
                     if self.high_speed_data_is_avtive == False:    
-                        if      (w009 == [0xFF, 0x53, 0x4F, 0x44]) \
-                            and (w013 == [0x00, 0x01] or w013 == [0x00, 0x02] or w013 == [0x00, 0x03]):
+                        # if      (w009 == [0xFF, 0x53, 0x4F, 0x44]) \
+                        #     and (w013 == [0x00, 0x01] or w013 == [0x00, 0x02] or w013 == [0x00, 0x03]):
+                        if      (w009 == b'\xff\x53\x4f\x44') \
+                            and (w013 == b'\x00\x01' or w013 == b'\x00\x02' or w013 == b'\x00\x03'):
                             
                             self.high_speed_data_is_avtive = True
                             self.fpath_hs_data = self.__FPATH_HS_DATA.replace('***', '{:0=4}'.format(self.idx_high_speed_data))
                             print('TLM DCD: Start of high-speed data is detected!')
+                            
+                            hs_data.append(['sensor_number=', sensor_number])
+                            hs_data.append([])      # blank line
 
                     continue
 
@@ -345,8 +372,9 @@ class TelemeterHandler :
                     # - W018
                     byte_idx_shift = 18
                     #####
-                    byte_string = []
-                    for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
+                    # byte_string = []
+                    # for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
+                    byte_string = [data[byte_idx+byte_idx_shift:byte_idx+byte_idx_shift+byte_length]]
 
                     # physical_value =  b_coeff \
                     #                 + a_coeff \
@@ -354,7 +382,8 @@ class TelemeterHandler :
                     #                     / 2**(fractional_bit_length)
                     #####
                     w018 = byte_string
-                    self.df_mf.iat[iFrame,iItem] = w018
+                    # df_mf.iat[iFrame,iItem] = w018
+                    dict_data_row.update({strItem:w018})
 
                     # write history to an external file
                     if self.high_speed_data_is_avtive == True:
@@ -362,8 +391,9 @@ class TelemeterHandler :
                             byte_idx_shift = self.W2B * j
                             
                             #####
-                            byte_string = []
-                            for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
+                            # byte_string = []
+                            # for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
+                            byte_string = [data[byte_idx+byte_idx_shift:byte_idx+byte_idx_shift+byte_length]]
 
                             physical_value =  b_coeff \
                                             + a_coeff \
@@ -396,8 +426,9 @@ class TelemeterHandler :
                     # - W036
                     byte_idx_shift = 0
                     #####
-                    byte_string = []
-                    for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
+                    # byte_string = []
+                    # for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
+                    byte_string = [data[byte_idx+byte_idx_shift:byte_idx+byte_idx_shift+byte_length]]
 
                     # physical_value =  b_coeff \
                     #                 + a_coeff \
@@ -405,7 +436,8 @@ class TelemeterHandler :
                     #                     / 2**(fractional_bit_length)
                     #####
                     w036 = byte_string
-                    self.df_mf.iat[iFrame,iItem] = w036
+                    # df_mf.iat[iFrame,iItem] = w036
+                    dict_data_row.update({strItem:w036})
 
                     # write history to an external file
                     if self.high_speed_data_is_avtive == True:
@@ -413,8 +445,9 @@ class TelemeterHandler :
                             byte_idx_shift = self.W2B * j
                             
                             #####
-                            byte_string = []
-                            for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
+                            # byte_string = []
+                            # for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
+                            byte_string = [data[byte_idx+byte_idx_shift:byte_idx+byte_idx_shift+byte_length]]
 
                             physical_value =  b_coeff \
                                             + a_coeff \
@@ -434,11 +467,12 @@ class TelemeterHandler :
                     continue
 
                 ### Ordinary items
-                float_value = self.get_physical_value(self.TlmItemAttr[strItem], data, byte_idx)
+                decoded_value = self.get_physical_value(self.TlmItemAttr[strItem], data, byte_idx)
 
                 # - ordinary items
                 if self.TlmItemAttr[strItem]['ordinary item'] == True :
-                    self.df_mf.iat[iFrame,iItem] = float_value
+                    # df_mf.iat[iFrame,iItem] = decoded_value
+                    dict_data_row.update({strItem:decoded_value})
 
                 # - analog pressure in [MPa]
                 elif self.TlmItemAttr[strItem]['type'] == 'p ana':
@@ -446,47 +480,55 @@ class TelemeterHandler :
                     if iFrame % self.TlmItemAttr[strItem]['sub com mod'] != self.TlmItemAttr[strItem]['sub com res']: 
                         continue
                     
-                    self.df_mf.iat[iFrame,iItem] = float_value
+                    # df_mf.iat[iFrame,iItem] = decoded_value
+                    dict_data_row.update({strItem:decoded_value})
 
                 # - Temperature in [K] <S,16,-2>
                 elif self.TlmItemAttr[strItem]['type'] == 'T':
                     # get TC thermoelectric voltage in [uV]
-                    Vtc = float_value
+                    Vtc = decoded_value
 
                     # get temperature by converting thermoelectric voltage
                     Ttc = self.uv2k(Vtc + Vcjc - Vaz, 'K')
 
-                    self.df_mf.iat[iFrame,iItem] = Ttc - 273.15         # in deg-C
-                    # self.df_mf.iat[iFrame,iItem] = Ttc                 # in Kelvin
-                
+                    # df_mf.iat[iFrame,iItem] = Ttc - 273.15         # in deg-C
+                    # df_mf.iat[iFrame,iItem] = Ttc                 # in Kelvin
+                    dict_data_row.update({strItem:(Ttc - 273.15)})
+
                 # - Cold-junction compensation coefficient in [uV]
                 elif self.TlmItemAttr[strItem]['type'] == 'cjc':
-                    cjc = float_value
+                    cjc = decoded_value
 
                     Rcjc = self.v2ohm(cjc)
                     Tcjc = self.ohm2k(Rcjc)
                     Vcjc = self.k2uv(Tcjc, 'K')
 
-                    self.df_mf.iat[iFrame,iItem] = Vcjc
+                    # df_mf.iat[iFrame,iItem] = Vcjc
+                    dict_data_row.update({strItem:Vcjc})
 
                 # - Auto-zero coefficient in [uV]
                 elif self.TlmItemAttr[strItem]['type'] == 'az':
-                    Vaz = float_value
+                    Vaz = decoded_value
                     
-                    self.df_mf.iat[iFrame,iItem] = Vaz
+                    # df_mf.iat[iFrame,iItem] = decoded_value
+                    dict_data_row.update({strItem:decoded_value})
 
                 # - error code
                 elif self.TlmItemAttr[strItem]['type'] == 'ec':
-                    ecode = float_value
-                    self.df_mf.iat[iFrame,iItem] = ecode
-                
+                    ecode = decoded_value                
                     # memory when error occcures
                     if ecode != 0:  err_history.append([format(gse_time,'.3f'), int(ecode)])
-                        
+                    
+                    # df_mf.iat[iFrame,iItem] = decoded_value
+                    dict_data_row.update({strItem:decoded_value})
+
                 # - others
                 else:
-                    self.df_mf.iat[iFrame,iItem] = np.nan
+                    # df_mf.iat[iFrame,iItem] = np.nan
                     print(f'TLM RCV: ITEM={iItem} has no decoding rule!')
+
+            dict_data_matrix[iFrame] = dict_data_row
+            df_mf = pd.DataFrame.from_dict(dict_data_matrix, orient='index')
 
             self.iLine += 1
 
@@ -504,10 +546,15 @@ class TelemeterHandler :
             print(f'iLine: {self.iLine}')
             # print(f'From : {addr}')
             # print(f'To   : {socket.gethostbyname(self.HOST)}')
-            print(self.df_mf)
+            print(df_mf)
+            # print(pd.DataFrame.from_dict(dict_data_matrix, orient='index'))
             print('')
 
-        return self.df_mf
+        # return self.df_mf
+        return df_mf
+
+
+    ''' Decoding-Rule Implimentations '''
 
 
     ''' Utilities ''' 
