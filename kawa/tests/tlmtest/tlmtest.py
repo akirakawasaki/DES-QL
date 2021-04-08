@@ -183,9 +183,9 @@ class TelemeterHandler :
             df_mf = self.decode(data)
 
             # enqueue decoded data to save in a file
-            # if self.iLine % 1 == 0:
+            if self.iLine % 1 == 0:
             # if self.iLine % 2 == 0:
-            if self.iLine % 10 == 0:
+            # if self.iLine % 10 == 0:
                 write_data = df_mf.values.tolist()
                 self.q_write_data.put_nowait( (self.fpath_ls_data, write_data) )
 
@@ -210,10 +210,6 @@ class TelemeterHandler :
 
     # Decode raw telemetry data into physical values
     def decode(self, data):
-        # initialize a DataFrame to store data of one major frame
-        # self.df_mf = pd.DataFrame(index=[], columns=self.TlmItemList)
-        # df_mf = pd.DataFrame(index=[], columns=self.TlmItemList)
-
         # initialize   
         gse_time = 0.0
         Vcjc = 0.0
@@ -225,16 +221,10 @@ class TelemeterHandler :
         err_history = []
         
         dict_data_matrix = {}
-        # print('')
-        # print(f'dict_data_row_null = {dict_data_row_null}')
 
         # sweep frames in a major frame
         for iFrame in range(self.NUM_OF_FRAMES):
             # print(f"iLine: {self.iLine}")
-
-            # initialize row by filling with NaN
-            # df_mf.loc[iFrame] = np.nan
-            # print(df_mf)
 
             # initialize row by filling with NaN
             dict_data_row = dict.fromkeys(['Line#'] + self.TlmItemList, math.nan)
@@ -538,7 +528,8 @@ class TelemeterHandler :
         df_mf = pd.DataFrame.from_dict(dict_data_matrix, orient='index')
 
         #if iLine % 1 == 0:
-        if self.iLine % 500 == 0:
+        # if self.iLine % 500 == 0:
+        if self.iLine % 2000 == 0:            
             print('')
             print(f'iLine: {self.iLine}')
             # print(f'From : {addr}')
@@ -563,24 +554,6 @@ class TelemeterHandler :
 
 
     ''' Utilities ''' 
-    # Print a major flame
-    def print_mf(self, data):
-        # header
-        for k in range(self.W2B * self.LEN_HEADER):   
-            print(hex(data[k]).zfill(4), end=' ')
-        print('')   # linefeed
-        
-        # payload
-        for j in range(4):                  
-            print(f"message {0}-{j}: ",end='')
-            for k in range(self.W2B * int(self.LEN_PAYLOAD / 4)): 
-                print(hex(data[k + self.W2B * (self.LEN_HEADER + j * int(self.LEN_PAYLOAD / 4))]).zfill(4), end=' ')
-            print('')   # linefeed
-        
-        # empty line
-        print('')  
-
-
     # Get a physical value from raw telemeter words
     def get_physical_value(self, itemAttr, data, idx_byte):
         byte_length = self.W2B * int(itemAttr['word len'])
@@ -725,6 +698,26 @@ class TelemeterHandler :
             y = 273.15
         
         return y   
+
+
+    # Print a major flame
+    def print_mf(self, data):
+        # header
+        for k in range(self.W2B * self.LEN_HEADER):   
+            print(hex(data[k]).zfill(4), end=' ')
+        print('')   # linefeed
+        
+        # payload
+        for j in range(4):                  
+            print(f"message {0}-{j}: ",end='')
+            for k in range(self.W2B * int(self.LEN_PAYLOAD / 4)): 
+                print(hex(data[k + self.W2B * (self.LEN_HEADER + j * int(self.LEN_PAYLOAD / 4))]).zfill(4), end=' ')
+            print('')   # linefeed
+        
+        # empty line
+        print('')  
+
+
 
 
 #
