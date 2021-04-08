@@ -225,7 +225,6 @@ class TelemeterHandler :
         err_history = []
         
         dict_data_matrix = {}
-        # dict_data_row_null = dict.fromkeys(['Line#'] + self.TlmItemList, math.nan)
         # print('')
         # print(f'dict_data_row_null = {dict_data_row_null}')
 
@@ -239,6 +238,7 @@ class TelemeterHandler :
 
             # initialize row by filling with NaN
             dict_data_row = dict.fromkeys(['Line#'] + self.TlmItemList, math.nan)
+            # dict_data_row = dict.fromkeys(['Line#'] + self.TlmItemList, np.nan)
             # print(f'dict_data_row = {dict_data_row}')
 
             dict_data_row.update({'Line#':self.iLine})
@@ -249,8 +249,6 @@ class TelemeterHandler :
             # print(f"byte_idx_head: {byte_idx_head}") 
 
             # pick up data from the datagram (Get physical values from raw words)
-            # for strItem in self.TlmItemList:
-            #     iItem = self.TlmItemList.index(strItem)
             for strItem in self.TlmItemAttr:
                 iItem = self.TlmItemList.index(strItem)
 
@@ -258,211 +256,212 @@ class TelemeterHandler :
                 byte_idx =  byte_idx_head + self.W2B * int(self.TlmItemAttr[strItem]['w idx'])
 
 
-                #
-                #   Decoding rules
-                #
+                ''' Decoding rules '''
 
                 ### Peculiar items ()
                 # - Number of days from January 1st on GSE
                 if self.TlmItemAttr[strItem]['type'] == 'gse day':
-                    decoded_value =  (data[byte_idx]   >> 4  ) * 100 \
-                                   + (data[byte_idx]   & 0x0F) * 10  \
-                                   + (data[byte_idx+1] >> 4  ) * 1
-                    # df_mf.iat[iFrame,iItem] = decoded_value
+                    # decoded_value =  (data[byte_idx]   >> 4  ) * 100 \
+                    #                + (data[byte_idx]   & 0x0F) * 10  \
+                    #                + (data[byte_idx+1] >> 4  ) * 1
+
+                    byte_length = self.W2B * int(self.TlmItemAttr[strItem]['word len'])
+                    byte_string = data[byte_idx:byte_idx+byte_length]
+
+                    decoded_value =  (byte_string[0]   >> 4  ) * 100 \
+                                   + (byte_string[0]   & 0x0F) * 10  \
+                                   + (byte_string[1] >> 4  ) * 1
+
                     dict_data_row.update({strItem:decoded_value})
+
                     continue
 
                 # - GSE timestamp in [sec]
                 elif self.TlmItemAttr[strItem]['type'] == 'gse time':
-                    decoded_value =  (data[byte_idx+1] & 0x0F) * 10  * 3600  \
-                                   + (data[byte_idx+2] >> 4  ) * 1   * 3600  \
-                                   + (data[byte_idx+2] & 0x0F) * 10  * 60    \
-                                   + (data[byte_idx+3] >> 4  ) * 1   * 60    \
-                                   + (data[byte_idx+3] & 0x0F) * 10          \
-                                   + (data[byte_idx+4] >> 4  ) * 1           \
-                                   + (data[byte_idx+4] & 0x0F) * 100 * 0.001 \
-                                   + (data[byte_idx+5] >> 4  ) * 10  * 0.001 \
-                                   + (data[byte_idx+5] & 0x0F) * 1   * 0.001
+                    # decoded_value =  (data[byte_idx+1] & 0x0F) * 10  * 3600  \
+                    #                + (data[byte_idx+2] >> 4  ) * 1   * 3600  \
+                    #                + (data[byte_idx+2] & 0x0F) * 10  * 60    \
+                    #                + (data[byte_idx+3] >> 4  ) * 1   * 60    \
+                    #                + (data[byte_idx+3] & 0x0F) * 10          \
+                    #                + (data[byte_idx+4] >> 4  ) * 1           \
+                    #                + (data[byte_idx+4] & 0x0F) * 100 * 0.001 \
+                    #                + (data[byte_idx+5] >> 4  ) * 10  * 0.001 \
+                    #                + (data[byte_idx+5] & 0x0F) * 1   * 0.001
+                    
+                    byte_length = self.W2B * int(self.TlmItemAttr[strItem]['word len'])
+                    byte_string = data[byte_idx:byte_idx+byte_length]
+                    
+                    decoded_value =  (byte_string[1] & 0x0F) * 10  * 3600  \
+                                   + (byte_string[2] >> 4  ) * 1   * 3600  \
+                                   + (byte_string[2] & 0x0F) * 10  * 60    \
+                                   + (byte_string[3] >> 4  ) * 1   * 60    \
+                                   + (byte_string[3] & 0x0F) * 10          \
+                                   + (byte_string[4] >> 4  ) * 1           \
+                                   + (byte_string[4] & 0x0F) * 100 * 0.001 \
+                                   + (byte_string[5] >> 4  ) * 10  * 0.001 \
+                                   + (byte_string[5] & 0x0F) * 1   * 0.001
+
                     gse_time = decoded_value
-                    # df_mf.iat[iFrame,iItem] = decoded_value
+                    
                     dict_data_row.update({strItem:decoded_value})
+                    
                     continue
 
                 # - Relay status (boolean)
                 elif self.TlmItemAttr[strItem]['type'] == 'bool':
-                    decoded_value = (  data[byte_idx + int(self.TlmItemAttr[strItem]['b coeff'])] 
-                                                    & int(self.TlmItemAttr[strItem]['a coeff']) ) \
-                                                    / int(self.TlmItemAttr[strItem]['a coeff'])
-                    # df_mf.iat[iFrame,iItem] = decoded_value
+                    # decoded_value = (  data[byte_idx + int(self.TlmItemAttr[strItem]['b coeff'])] 
+                    #                                  & int(self.TlmItemAttr[strItem]['a coeff']) ) \
+                    #                                  / int(self.TlmItemAttr[strItem]['a coeff'])
+
+                    byte_length = self.W2B * int(self.TlmItemAttr[strItem]['word len'])
+                    byte_string = data[byte_idx:byte_idx+byte_length]
+
+                    byte_idx_offset = int(self.TlmItemAttr[strItem]['b coeff'])
+                    bit_filter = int(self.TlmItemAttr[strItem]['a coeff'])
+                    decoded_value = 1.0 if ((byte_string[byte_idx_offset] & bit_filter) > 0) \
+                                    else 0.0
+
                     dict_data_row.update({strItem:decoded_value})
+
                     continue
 
                 ### High-speed data    ### T.B.REFAC. ###
                 # - header
                 if self.TlmItemAttr[strItem]['type'] == 'data hd':
-                    signed = self.TlmItemAttr[strItem]['signed']
-                    integer_bit_length = int(self.TlmItemAttr[strItem]['integer bit len'])    # includes a sign bit if any
-                    a_coeff = self.TlmItemAttr[strItem]['a coeff']
-                    b_coeff = self.TlmItemAttr[strItem]['b coeff']
-
-                    # - W009 + W010: start of data
+                    # - W009 + W010: start of data (SOD)
                     byte_length = 4
-                    total_bit_length = 8 * byte_length
-                    fractional_bit_length = total_bit_length - integer_bit_length
-                    byte_idx_shift = 0
-                    #####
-                    # byte_string = []
-                    # for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
-                    byte_string = [data[byte_idx+byte_idx_shift:byte_idx+byte_idx_shift+byte_length]]
+                    byte_idx_offset = 0
+                    byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]
 
-                    # physical_value =  b_coeff \
-                    #                 + a_coeff \
-                    #                     * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
-                    #                     / 2**(fractional_bit_length)
-                    #####
                     w009 = byte_string
-                    # df_mf.iat[iFrame,iItem] = w009
-                    dict_data_row.update({strItem:w009})
+
+                    decoded_value = byte_string
+                    dict_data_row.update({strItem:decoded_value})
+
+                    # skip below when high speed data is active
+                    if self.high_speed_data_is_avtive == True:     continue   
 
                     # - W013 : senser number
                     byte_length = 2
-                    total_bit_length = 8 * byte_length
-                    fractional_bit_length = total_bit_length - integer_bit_length
-                    byte_idx_shift = 8
-                    #####
-                    # byte_string = []
-                    # for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
-                    byte_string = [data[byte_idx+byte_idx_shift:byte_idx+byte_idx_shift+byte_length]]
+                    byte_idx_offset = 8 
+                    byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]
 
-                    physical_value =  b_coeff \
-                                    + a_coeff \
-                                        * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
-                                        * 2**(-fractional_bit_length)
-                    #####
                     w013 = byte_string
-                    sensor_number = int(physical_value)
 
                     # detect head of high-speed data
-                    if self.high_speed_data_is_avtive == False:    
-                        # if      (w009 == [0xFF, 0x53, 0x4F, 0x44]) \
-                        #     and (w013 == [0x00, 0x01] or w013 == [0x00, 0x02] or w013 == [0x00, 0x03]):
-                        if      (w009 == b'\xff\x53\x4f\x44') \
-                            and (w013 == b'\x00\x01' or w013 == b'\x00\x02' or w013 == b'\x00\x03'):
-                            
-                            self.high_speed_data_is_avtive = True
-                            self.fpath_hs_data = self.__FPATH_HS_DATA.replace('***', '{:0=4}'.format(self.idx_high_speed_data))
-                            print('TLM DCD: Start of high-speed data is detected!')
-                            
-                            hs_data.append(['sensor_number=', sensor_number])
-                            hs_data.append([])      # blank line
+                    if      (w009 == b'\xff\x53\x4f\x44') \
+                        and (w013 == b'\x00\x01' or w013 == b'\x00\x02' or w013 == b'\x00\x03'):
+
+                        self.high_speed_data_is_avtive = True
+                        self.fpath_hs_data = self.__FPATH_HS_DATA.replace('***', '{:0=4}'.format(self.idx_high_speed_data))
+                        print('TLM DCD: Start of high-speed data is detected!')
+
+                        # file header
+                        #####
+                        signed = self.TlmItemAttr[strItem]['signed']
+                        integer_bit_length = int(self.TlmItemAttr[strItem]['integer bit len'])    # includes a sign bit if any
+                        a_coeff = self.TlmItemAttr[strItem]['a coeff']
+                        b_coeff = self.TlmItemAttr[strItem]['b coeff']
+
+                        total_bit_length = 8 * byte_length
+                        fractional_bit_length = total_bit_length - integer_bit_length
+    
+                        decoded_value =  b_coeff \
+                                       + a_coeff * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
+                                                    * 2**(-fractional_bit_length)
+                        #####
+                        sensor_number = decoded_value
+
+                        hs_data.append(['sensor_number=', sensor_number])
+                        hs_data.append([])      # blank line
 
                     continue
 
                 # - payload (first half)
                 elif self.TlmItemAttr[strItem]['type'] == 'data pl1':
-                    byte_length = 2
-                    signed = self.TlmItemAttr[strItem]['signed']
-                    integer_bit_length = int(self.TlmItemAttr[strItem]['integer bit len'])    # includes a sign bit if any
-                    a_coeff = self.TlmItemAttr[strItem]['a coeff']
-                    b_coeff = self.TlmItemAttr[strItem]['b coeff']
-
-                    total_bit_length = 8 * byte_length
-                    fractional_bit_length = total_bit_length - integer_bit_length
-                    
                     # - W018
-                    byte_idx_shift = 18
-                    #####
-                    # byte_string = []
-                    # for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
-                    byte_string = [data[byte_idx+byte_idx_shift:byte_idx+byte_idx_shift+byte_length]]
+                    byte_length = 2
+                    byte_idx_offset = 18
+                    byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]
+                    
+                    decoded_value = byte_string
+                    dict_data_row.update({strItem:decoded_value})
 
-                    # physical_value =  b_coeff \
-                    #                 + a_coeff \
-                    #                     * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
-                    #                     / 2**(fractional_bit_length)
-                    #####
-                    w018 = byte_string
-                    # df_mf.iat[iFrame,iItem] = w018
-                    dict_data_row.update({strItem:w018})
+                    # skip below when high speed data is NOT active
+                    if self.high_speed_data_is_avtive == False:     continue
 
-                    # write history to an external file
-                    if self.high_speed_data_is_avtive == True:
-                        for j in range(int(self.TlmItemAttr[strItem]['word len'])):
-                            byte_idx_shift = self.W2B * j
-                            
-                            #####
-                            # byte_string = []
-                            # for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
-                            byte_string = [data[byte_idx+byte_idx_shift:byte_idx+byte_idx_shift+byte_length]]
+                    # output history to an external file
+                    for j in range(int(self.TlmItemAttr[strItem]['word len'])):
+                        byte_length = 2
+                        byte_idx_offset = self.W2B * j
+                        byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]                            
+                        
+                        #####
+                        signed = self.TlmItemAttr[strItem]['signed']
+                        integer_bit_length = int(self.TlmItemAttr[strItem]['integer bit len'])    # includes a sign bit if any
+                        a_coeff = self.TlmItemAttr[strItem]['a coeff']
+                        b_coeff = self.TlmItemAttr[strItem]['b coeff']
 
-                            physical_value =  b_coeff \
-                                            + a_coeff \
-                                                * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
-                                                * 2**(-fractional_bit_length)
-                            #####
-                            
-                            hs_data.append([format(gse_time,'.3f'), physical_value])
+                        total_bit_length = 8 * byte_length
+                        fractional_bit_length = total_bit_length - integer_bit_length
 
-                            # detect End Of Data
-                            if byte_string == [0xFF, 0xFF]:
-                                self.high_speed_data_is_avtive = False
-                                self.idx_high_speed_data =+ 1
-                                print('TLM DCD: End of high-speed data detected!')
-                                break
+                        decoded_value =  b_coeff \
+                                       + a_coeff * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
+                                                    * 2**(-fractional_bit_length)
+                        #####
+                        
+                        hs_data.append([format(gse_time,'.3f'), decoded_value])
+
+                        # detect End Of Data
+                        if byte_string == b'\xff\xff':
+                            self.high_speed_data_is_avtive = False
+                            self.idx_high_speed_data += 1
+                            print('TLM DCD: End of high-speed data detected!')
+                            break
 
                     continue
 
                 # - payload (latter half)
                 elif self.TlmItemAttr[strItem]['type'] == 'data pl2':
-                    byte_length = 2
-                    signed = self.TlmItemAttr[strItem]['signed']
-                    integer_bit_length = int(self.TlmItemAttr[strItem]['integer bit len'])    # includes a sign bit if any
-                    a_coeff = self.TlmItemAttr[strItem]['a coeff']
-                    b_coeff = self.TlmItemAttr[strItem]['b coeff']
-
-                    total_bit_length = 8 * byte_length
-                    fractional_bit_length = total_bit_length - integer_bit_length
-                    
                     # - W036
-                    byte_idx_shift = 0
-                    #####
-                    # byte_string = []
-                    # for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
-                    byte_string = [data[byte_idx+byte_idx_shift:byte_idx+byte_idx_shift+byte_length]]
+                    byte_length = 2
+                    byte_idx_offset = 0
+                    byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]
+                    
+                    decoded_value = byte_string
+                    dict_data_row.update({strItem:decoded_value})
 
-                    # physical_value =  b_coeff \
-                    #                 + a_coeff \
-                    #                     * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
-                    #                     / 2**(fractional_bit_length)
-                    #####
-                    w036 = byte_string
-                    # df_mf.iat[iFrame,iItem] = w036
-                    dict_data_row.update({strItem:w036})
+                    # skip below when high speed data is NOT active
+                    if self.high_speed_data_is_avtive == False:     continue
+                    
+                    # output history to an external file
+                    for j in range(int(self.TlmItemAttr[strItem]['word len'])):                        
+                        byte_length = 2
+                        byte_idx_offset = self.W2B * j
+                        byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]
 
-                    # write history to an external file
-                    if self.high_speed_data_is_avtive == True:
-                        for j in range(int(self.TlmItemAttr[strItem]['word len'])):
-                            byte_idx_shift = self.W2B * j
-                            
-                            #####
-                            # byte_string = []
-                            # for i in range(byte_length): byte_string.append(data[byte_idx+i+byte_idx_shift])
-                            byte_string = [data[byte_idx+byte_idx_shift:byte_idx+byte_idx_shift+byte_length]]
+                        #####
+                        signed = self.TlmItemAttr[strItem]['signed']
+                        integer_bit_length = int(self.TlmItemAttr[strItem]['integer bit len'])    # includes a sign bit if any
+                        a_coeff = self.TlmItemAttr[strItem]['a coeff']
+                        b_coeff = self.TlmItemAttr[strItem]['b coeff']
 
-                            physical_value =  b_coeff \
-                                            + a_coeff \
-                                                * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
-                                                * 2**(-fractional_bit_length)
-                            #####
-                            
-                            hs_data.append([format(gse_time,'.3f'), physical_value])
+                        total_bit_length = 8 * byte_length
+                        fractional_bit_length = total_bit_length - integer_bit_length
 
-                            # detect End Of Data
-                            if byte_string == [0xFF, 0xFF]:
-                                self.high_speed_data_is_avtive = False
-                                self.idx_high_speed_data =+ 1
-                                print('TLM DCD: End of high-speed data detected!')
-                                break
+                        decoded_value =  b_coeff \
+                                       + a_coeff * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
+                                                    * 2**(-fractional_bit_length)
+                        #####
+                        
+                        hs_data.append([format(gse_time,'.3f'), decoded_value])
+
+                        # detect End Of Data
+                        if byte_string == b'\xff\xff':
+                            self.high_speed_data_is_avtive = False
+                            self.idx_high_speed_data += 1
+                            print('TLM DCD: End of high-speed data detected!')
+                            break
 
                     continue
 
@@ -471,17 +470,19 @@ class TelemeterHandler :
 
                 # - ordinary items
                 if self.TlmItemAttr[strItem]['ordinary item'] == True :
-                    # df_mf.iat[iFrame,iItem] = decoded_value
-                    dict_data_row.update({strItem:decoded_value})
-
-                # - analog pressure in [MPa]
-                elif self.TlmItemAttr[strItem]['type'] == 'p ana':
                     # handle sub-commutation
                     if iFrame % self.TlmItemAttr[strItem]['sub com mod'] != self.TlmItemAttr[strItem]['sub com res']: 
                         continue
-                    
-                    # df_mf.iat[iFrame,iItem] = decoded_value
+
                     dict_data_row.update({strItem:decoded_value})
+
+                # - analog pressure in [MPa]
+                # elif self.TlmItemAttr[strItem]['type'] == 'p ana':
+                #     # handle sub-commutation
+                #     if iFrame % self.TlmItemAttr[strItem]['sub com mod'] != self.TlmItemAttr[strItem]['sub com res']: 
+                #         continue
+                    
+                #     dict_data_row.update({strItem:decoded_value})
 
                 # - Temperature in [K] <S,16,-2>
                 elif self.TlmItemAttr[strItem]['type'] == 'T':
@@ -491,9 +492,8 @@ class TelemeterHandler :
                     # get temperature by converting thermoelectric voltage
                     Ttc = self.uv2k(Vtc + Vcjc - Vaz, 'K')
 
-                    # df_mf.iat[iFrame,iItem] = Ttc - 273.15         # in deg-C
-                    # df_mf.iat[iFrame,iItem] = Ttc                 # in Kelvin
-                    dict_data_row.update({strItem:(Ttc - 273.15)})
+                    dict_data_row.update({strItem:(Ttc - 273.15)})  # in deg-C
+                    # dict_data_row.update({strItem:Ttc})             # in Kelvin
 
                 # - Cold-junction compensation coefficient in [uV]
                 elif self.TlmItemAttr[strItem]['type'] == 'cjc':
@@ -503,14 +503,12 @@ class TelemeterHandler :
                     Tcjc = self.ohm2k(Rcjc)
                     Vcjc = self.k2uv(Tcjc, 'K')
 
-                    # df_mf.iat[iFrame,iItem] = Vcjc
                     dict_data_row.update({strItem:Vcjc})
 
                 # - Auto-zero coefficient in [uV]
                 elif self.TlmItemAttr[strItem]['type'] == 'az':
                     Vaz = decoded_value
                     
-                    # df_mf.iat[iFrame,iItem] = decoded_value
                     dict_data_row.update({strItem:decoded_value})
 
                 # - error code
@@ -519,16 +517,13 @@ class TelemeterHandler :
                     # memory when error occcures
                     if ecode != 0:  err_history.append([format(gse_time,'.3f'), int(ecode)])
                     
-                    # df_mf.iat[iFrame,iItem] = decoded_value
                     dict_data_row.update({strItem:decoded_value})
 
                 # - others
                 else:
-                    # df_mf.iat[iFrame,iItem] = np.nan
                     print(f'TLM RCV: ITEM={iItem} has no decoding rule!')
 
             dict_data_matrix[iFrame] = dict_data_row
-            df_mf = pd.DataFrame.from_dict(dict_data_matrix, orient='index')
 
             self.iLine += 1
 
@@ -539,6 +534,8 @@ class TelemeterHandler :
         # write error history to an external file when error occurs
         if err_history != []:
             self.q_write_data.put_nowait( (self.FPATH_ERR, err_history) )
+
+        df_mf = pd.DataFrame.from_dict(dict_data_matrix, orient='index')
 
         #if iLine % 1 == 0:
         if self.iLine % 500 == 0:
@@ -554,7 +551,15 @@ class TelemeterHandler :
         return df_mf
 
 
-    ''' Decoding-Rule Implimentations '''
+    ''' Implimentations of decoding rules '''
+    def dr_ordinary_item(self):
+        pass
+
+    def dr_gse_time(self):
+        pass
+
+    def dr_gse_time(self):
+        pass
 
 
     ''' Utilities ''' 
@@ -579,6 +584,9 @@ class TelemeterHandler :
     # Get a physical value from raw telemeter words
     def get_physical_value(self, itemAttr, data, idx_byte):
         byte_length = self.W2B * int(itemAttr['word len'])
+        
+        byte_string = data[idx_byte:idx_byte+byte_length]
+        
         signed = itemAttr['signed']
         integer_bit_length = int(itemAttr['integer bit len'])    # include sign bit if any
         a_coeff = itemAttr['a coeff']
@@ -586,26 +594,11 @@ class TelemeterHandler :
 
         total_bit_length = 8 * byte_length
         fractional_bit_length = total_bit_length - integer_bit_length
-        
-        # byte_string = []
-        # for i in range(byte_length): byte_string.append(data[idx_byte+i])
+        decoded_value =  b_coeff \
+                       + a_coeff * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
+                                    * 2**(-fractional_bit_length)
 
-        # print(f'byte string = {byte_string}')
-        # print(f'slice = {data[idx_byte:idx_byte+byte_length]}')
-
-        # physical_value =  b_coeff \
-        #                 + a_coeff \
-        #                     * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
-        #                     * 2**(-fractional_bit_length)
-        # print(f'value from byte string = {physical_value}')
-
-        physical_value =  b_coeff \
-                        + a_coeff \
-                            * (int.from_bytes(data[idx_byte:idx_byte+byte_length], byteorder='big', signed=signed)) \
-                            * 2**(-fractional_bit_length)
-        # print(f'value from slice = {physical_value}')
-
-        return physical_value
+        return decoded_value
 
 
     # Convert thermoelectric voltage (in uV) to temperature (in K)
