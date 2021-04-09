@@ -38,9 +38,9 @@ class TelemeterHandler :
     # FPATH_CONFIG = './config_tlm_2.xlsx'
 
     # output file pathes
-    __FPATH_LS_DATA = './data_***.csv'                # low-speed data    
-    __FPATH_HS_DATA = './high_speed_data_***.csv'     # high-speed data
-    FPATH_ERR = './error_history.csv'               # error history
+    __FPATH_LS_DATA = './data_***.csv'                  # low-speed data    
+    __FPATH_HS_DATA = './high_speed_data_****.csv'      # high-speed data
+    FPATH_ERR = './error_history.csv'                   # error history
 
 
     def __init__(self, tlm_type, q_message, q_latest_values) -> None:
@@ -81,22 +81,18 @@ class TelemeterHandler :
         # print(f'Item Attributions = {self.TlmItemAttr}')
         # pp.pprint(self.TlmItemAttr)
 
-        # initialize a DataFrame to store data of one major frame
-        self.df_mf = pd.DataFrame(index=[], columns=self.TlmItemList)
-
         # initialize data index
         self.iLine = 0
 
         # initialize high-speed data functionality
-        # self.w009_old = 0x00
-        # self.w018_old = 0x00
         self.high_speed_data_is_avtive = False
         self.idx_high_speed_data = 0
 
         #
         ### Initialize file writer
         self.fpath_ls_data = self.__FPATH_LS_DATA.replace('***', self.tlm_type)
-        self.df_mf.to_csv(self.fpath_ls_data, mode='w')        
+        df_mf = pd.DataFrame(index=[], columns=self.TlmItemList)
+        df_mf.to_csv(self.fpath_ls_data, mode='w')
 
 
     # Telemetry data hundler
@@ -184,10 +180,20 @@ class TelemeterHandler :
 
             # enqueue decoded data to save in a file
             if self.iLine % 1 == 0:
-            # if self.iLine % 2 == 0:
             # if self.iLine % 10 == 0:
                 write_data = df_mf.values.tolist()
                 self.q_write_data.put_nowait( (self.fpath_ls_data, write_data) )
+
+            # output CUI
+            if self.iLine % 5000 == 0:
+            # if iLine % 1 == 0:
+                print('')
+                print(f'iLine: {self.iLine}')
+                # print(f'From : {addr}')
+                # print(f'To   : {socket.gethostbyname(self.HOST)}')
+                print(df_mf)
+                # print(pd.DataFrame.from_dict(dict_data_matrix, orient='index'))
+                print('')
 
             # notify GUI of latest values
             self.notify(df_mf)
@@ -200,6 +206,7 @@ class TelemeterHandler :
     # Notify GUI of latest values
     def notify(self, df_mf) -> None:
         pass
+
         # if self.tlm_type == 'smt':
         #     tlm_latest_data.df_smt = df_mf.fillna(method='bfill').head(1)
         #     # tlm_latest_data.df_smt = df_mf.fillna(method='ffill').tail(1)
@@ -328,42 +335,104 @@ class TelemeterHandler :
                     decoded_value = byte_string
                     dict_data_row.update({strItem:decoded_value})
 
-                    # skip below when high speed data is active
-                    if self.high_speed_data_is_avtive == True:     continue   
-
-                    # - W013 : senser number
+                    # - W013 : sensor number
                     byte_length = 2
                     byte_idx_offset = 8 
                     byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]
 
                     w013 = byte_string
 
-                    # detect head of high-speed data
-                    if      (w009 == b'\xff\x53\x4f\x44') \
-                        and (w013 == b'\x00\x01' or w013 == b'\x00\x02' or w013 == b'\x00\x03'):
+                    # switch high_speed_data_is_active
+                    if self.high_speed_data_is_avtive == False:
+                        
+                        # detect start of high-speed data when NOT ACTIVE
+                        if      (w009 == b'\xff\x53\x4f\x44') \
+                            and (w013 == b'\x00\x01' or w013 == b'\x00\x02' or w013 == b'\x00\x03'):
 
-                        self.high_speed_data_is_avtive = True
-                        self.fpath_hs_data = self.__FPATH_HS_DATA.replace('***', '{:0=4}'.format(self.idx_high_speed_data))
-                        print('TLM DCD: Start of high-speed data is detected!')
+                            self.high_speed_data_is_avtive = True
+                            self.fpath_hs_data = self.__FPATH_HS_DATA.replace('****', '{:0=4}'.format(self.idx_high_speed_data))
+                            print('TLM DCD: Start of high-speed data is detected!')
 
-                        # file header
-                        #####
-                        signed = self.TlmItemAttr[strItem]['signed']
-                        integer_bit_length = int(self.TlmItemAttr[strItem]['integer bit len'])    # includes a sign bit if any
-                        a_coeff = self.TlmItemAttr[strItem]['a coeff']
-                        b_coeff = self.TlmItemAttr[strItem]['b coeff']
+                            ### file header
+                            # - W011 : data length
+                            byte_length = 4
+                            byte_idx_offset = 4
+                            byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]
 
-                        total_bit_length = 8 * byte_length
-                        fractional_bit_length = total_bit_length - integer_bit_length
-    
-                        decoded_value =  b_coeff \
-                                       + a_coeff * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
-                                                    * 2**(-fractional_bit_length)
-                        #####
-                        sensor_number = decoded_value
+                            signed = False
+                            integer_bit_length = 32     # includes a sign bit if any
+                            a_coeff = 1.0
+                            b_coeff = 0.0
 
-                        hs_data.append(['sensor_number=', sensor_number])
-                        hs_data.append([])      # blank line
+                            total_bit_length = 8 * byte_length
+                            fractional_bit_length = total_bit_length - integer_bit_length
+        
+                            decoded_value =  b_coeff \
+                                           + a_coeff * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
+                                                        * 2**(-fractional_bit_length)
+
+                            data_length = int(decoded_value)
+
+                            # - W013 : sensor number
+                            byte_length = 2             # <- change here
+                            byte_idx_offset = 8         # <- change here
+                            byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]
+
+                            signed = False
+                            integer_bit_length = 16     # includes a sign bit if any
+                            a_coeff = 1.0
+                            b_coeff = 0.0
+
+                            total_bit_length = 8 * byte_length
+                            fractional_bit_length = total_bit_length - integer_bit_length
+        
+                            decoded_value =  b_coeff \
+                                           + a_coeff * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
+                                                        * 2**(-fractional_bit_length)
+
+                            sensor_number = int(decoded_value)
+
+                            # - W017 : sampling rate
+                            byte_length = 2             # <- change here
+                            byte_idx_offset = 16        # <- change here
+                            byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]
+
+                            signed = False
+                            integer_bit_length = 16     # includes a sign bit if any
+                            a_coeff = 1.0
+                            b_coeff = 0.0
+
+                            total_bit_length = 8 * byte_length
+                            fractional_bit_length = total_bit_length - integer_bit_length
+        
+                            decoded_value =  b_coeff \
+                                           + a_coeff * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
+                                                        * 2**(-fractional_bit_length)
+
+                            sampling_rate = int(decoded_value)
+
+
+                            hs_data.append(['data length=', data_length])
+                            hs_data.append(['sensor number=', sensor_number])
+                            hs_data.append(['sampling rate=', sampling_rate])
+                            hs_data.append([])      # blank line
+
+                    else:
+                        # - W018 : 
+                        byte_length = 2
+                        byte_idx_offset = 18
+                        byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]
+
+                        w018 = byte_string
+
+                        # detect end of high-speed data when ACTIVE
+                        if      (w009 == b'\xff\x53\x4f\x44') \
+                            and (w013 == b'\x00\x00') \
+                            and (w018 == b'\xff\xff'):
+
+                            self.high_speed_data_is_avtive = False
+                            self.idx_high_speed_data += 1
+                            print('TLM DCD: End of high-speed data detected!')
 
                     continue
 
@@ -382,6 +451,7 @@ class TelemeterHandler :
 
                     # output history to an external file
                     for j in range(int(self.TlmItemAttr[strItem]['word len'])):
+                        # decode 1 word
                         byte_length = 2
                         byte_idx_offset = self.W2B * j
                         byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]                            
@@ -403,11 +473,11 @@ class TelemeterHandler :
                         hs_data.append([format(gse_time,'.3f'), decoded_value])
 
                         # detect End Of Data
-                        if byte_string == b'\xff\xff':
-                            self.high_speed_data_is_avtive = False
-                            self.idx_high_speed_data += 1
-                            print('TLM DCD: End of high-speed data detected!')
-                            break
+                        # if byte_string == b'\xff\xff':
+                        #     self.high_speed_data_is_avtive = False
+                        #     self.idx_high_speed_data += 1
+                        #     print('TLM DCD: End of high-speed data detected!')
+                        #     break
 
                     continue
 
@@ -447,11 +517,11 @@ class TelemeterHandler :
                         hs_data.append([format(gse_time,'.3f'), decoded_value])
 
                         # detect End Of Data
-                        if byte_string == b'\xff\xff':
-                            self.high_speed_data_is_avtive = False
-                            self.idx_high_speed_data += 1
-                            print('TLM DCD: End of high-speed data detected!')
-                            break
+                        # if byte_string == b'\xff\xff':
+                        #     self.high_speed_data_is_avtive = False
+                        #     self.idx_high_speed_data += 1
+                        #     print('TLM DCD: End of high-speed data detected!')
+                        #     break
 
                     continue
 
@@ -517,26 +587,15 @@ class TelemeterHandler :
 
             self.iLine += 1
 
-        # write high-speed data to an external file when detected
+        # enqueue high-speed data to save in an external file when detected
         if hs_data != []:
             self.q_write_data.put_nowait( (self.fpath_hs_data, hs_data) )
 
-        # write error history to an external file when error occurs
+        # enqueue write error history to save in an external file when error occurs
         if err_history != []:
             self.q_write_data.put_nowait( (self.FPATH_ERR, err_history) )
 
         df_mf = pd.DataFrame.from_dict(dict_data_matrix, orient='index')
-
-        #if iLine % 1 == 0:
-        # if self.iLine % 500 == 0:
-        if self.iLine % 2000 == 0:            
-            print('')
-            print(f'iLine: {self.iLine}')
-            # print(f'From : {addr}')
-            # print(f'To   : {socket.gethostbyname(self.HOST)}')
-            print(df_mf)
-            # print(pd.DataFrame.from_dict(dict_data_matrix, orient='index'))
-            print('')
 
         # return self.df_mf
         return df_mf
