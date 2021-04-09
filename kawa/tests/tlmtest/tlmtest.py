@@ -113,11 +113,11 @@ class TelemeterHandler :
         # - datagram listner
         loop = asyncio.get_running_loop()
         transport, _ = await loop.create_datagram_endpoint(
-                                        protocol_factory=(lambda: DatagramServerProtocol(tlm_type, self.q_dgram)),
-                                        local_addr=(self.HOST,self.PORT))
+                                    protocol_factory=(lambda: DatagramServerProtocol(tlm_type, self.q_dgram)),
+                                    local_addr=(self.HOST,self.PORT))
         # transport, protocol = await loop.create_datagram_endpoint(
-        #                                 protocol_factory=(lambda: DatagramServerProtocol(tlm_type, self.q_dgram)),
-        #                                 local_addr=(self.HOST,self.PORT))
+                                    # protocol_factory=(lambda: DatagramServerProtocol(tlm_type, self.q_dgram)),
+                                    # local_addr=(self.HOST,self.PORT))
 
         # wait until GUI task done
         # while True:
