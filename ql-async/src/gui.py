@@ -1,7 +1,8 @@
 ### Standard libraries
-# import time
 # import concurrent.futures
+import queue
 import sys
+# import time
 
 ### Third-party libraries
 import numpy as np
@@ -44,11 +45,14 @@ plt.rcParams["figure.subplot.hspace"] = 0.05    # Height Margin between subplots
 Top Level Window
 """
 class frmMain(wx.Frame):
-    def __init__(self, internal_flags, tlm_latest_data):
+    # def __init__(self, internal_flags, tlm_latest_data):
+    def __init__(self, q_msg_smt, q_msg_pcm, q_data_smt, q_data_pcm):
         super().__init__(None, wx.ID_ANY, 'Telemetry Data Quick Look for Detonation Engine System')
         # receive instance of shared variables
-        self.internal_flags = internal_flags
-        #self.latest_values = latest_values
+        # self.internal_flags = internal_flags
+        # self.latest_values = latest_values
+        self.q_msg_smt = q_msg_smt      # sending ONLY
+        self.q_msg_pcm = q_msg_pcm      # sending ONLY
 
         # maxmize GUI window size
         self.Maximize(True)
@@ -60,7 +64,7 @@ class frmMain(wx.Frame):
         root_panel = wx.Panel(self, wx.ID_ANY)
 
         # ??? System panel : Show the feeding system status
-        self.chart_panel = ChartPanel(root_panel, tlm_latest_data)
+        self.chart_panel = ChartPanel(root_panel, q_data_smt, q_data_pcm)
 
         # lay out panels by sizer
         root_layout = wx.GridBagSizer()
@@ -84,9 +88,13 @@ class frmMain(wx.Frame):
         # dig.Destroy()
         # if result == wx.ID_OK:  self.Destroy()
         
+        # quit tlm handlers
+        self.q_msg_smt.put_nowait('stop') 
+        self.q_msg_pcm.put_nowait('stop') 
+        # self.internal_flags.GUI_TASK_IS_DONE = True
+
         self.Destroy()
         
-        self.internal_flags.GUI_TASK_IS_DONE = True
 
 """
 Time History Plots & Current Value Indicators
@@ -98,11 +106,14 @@ class ChartPanel(wx.Panel):
 
     __PLOT_SKIP = 39    ### T.B.REFAC. ###
 
-    def __init__(self, parent, tlm_latest_data):
+    def __init__(self, parent, q_data_smt, q_data_pcm):
         super().__init__(parent, wx.ID_ANY)
 
+        self.q_data_smt = q_data_smt        # receiving ONLY
+        self.q_data_pcm = q_data_pcm        # receiving ONLY
+        # self.tlm_latest_data = tlm_latest_data      # receive instance of shared variables
+
         ### initialize
-        self.tlm_latest_data = tlm_latest_data      # receive instance of shared variables
         self.__F_TLM_IS_ACTIVE = False
         self.dfTlm = pd.DataFrame()
         self.__PLOT_COUNT = self.__PLOT_SKIP   ### T.B.REFAC. ###
@@ -110,8 +121,10 @@ class ChartPanel(wx.Panel):
         ### load configurations from external files
         # - smt
         try: 
-            df_cfg_smt = pd.read_excel('./config_tlm_2.xlsx', 
+            df_cfg_smt = pd.read_excel('./config_tlm_3.xlsx', 
                                         sheet_name='smt', header=0, index_col=None).dropna(how='all')
+            # df_cfg_smt = pd.read_excel('./config_tlm_2.xlsx', 
+            #                             sheet_name='smt', header=0, index_col=None).dropna(how='all')
         except:
             print('Error TLM: "config_tlm.xlsx"!')
             print(self.TLM_TYPE)
@@ -123,8 +136,10 @@ class ChartPanel(wx.Panel):
 
         # - pcm
         try: 
-            df_cfg_pcm = pd.read_excel('./config_tlm_2.xlsx', 
+            df_cfg_pcm = pd.read_excel('./config_tlm_3.xlsx', 
                                         sheet_name='pcm', header=0, index_col=None).dropna(how='all')
+            # df_cfg_pcm = pd.read_excel('./config_tlm_2.xlsx', 
+            #                             sheet_name='pcm', header=0, index_col=None).dropna(how='all')
         except:
             print('Error TLM: "config_tlm.xlsx"!')
             print(self.TLM_TYPE)
@@ -170,8 +185,30 @@ class ChartPanel(wx.Panel):
     def OnFetchLatestValues(self, event):
         # print('GUI FTC: fetched tlm data')
         
+        self.dfTlm_smt = pd.DataFrame()
+        self.dfTlm_pcm = pd.DataFrame()
+
+        ### fetch current values
+        # - smt
+        while True:
+            try:
+                self.dfTlm_smt = self.q_data_smt.get_nowait()
+            except queue.Empty:
+                break
+            else:
+                if self.q_data_smt.empty() == True:     break
+        # - pcm
+        while True:
+            try:
+                self.dfTlm_pcm = self.q_data_pcm.get_nowait()
+            except queue.Empty:
+                break
+            else:
+                if self.q_data_pcm.empty() == True:     break
+
         # break off when tlm data not exist
-        if len(self.tlm_latest_data.df_smt.index) == 0 or len(self.tlm_latest_data.df_pcm.index) == 0:
+        # if len(self.tlm_latest_data.df_smt.index) == 0 or len(self.tlm_latest_data.df_pcm.index) == 0:
+        if len(self.dfTlm_smt.index) == 0 or len(self.dfTlm_pcm.index) == 0:
             print('GUI FTC: awaiting SMT and/or PCM data')
             self.__F_TLM_IS_ACTIVE = False
             return None
@@ -188,8 +225,8 @@ class ChartPanel(wx.Panel):
         
         ### T.B.REFAC.: should be thread safe ###
         # fetch current values & store
-        self.dfTlm_smt = self.tlm_latest_data.df_smt
-        self.dfTlm_pcm = self.tlm_latest_data.df_pcm        
+        # self.dfTlm_smt = self.tlm_latest_data.df_smt
+        # self.dfTlm_pcm = self.tlm_latest_data.df_pcm        
 
     # Event handler: EVT_TIMER
     def OnRefreshDigitalIndicator(self, event):
