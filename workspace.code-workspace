@@ -3,5 +3,8 @@
 		{
 			"path": "."
 		}
-	]
+	],
+	"settings": {
+		"python.pythonPath": "~/.pyenv/versions/3.8.7/bin/python"
+	}
 }
