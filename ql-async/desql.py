@@ -23,7 +23,8 @@ def tlm_handler_wrapper(tlm_type, q_msg, q_data):
 
     tlm = asynctlm2.TelemeterHandler(tlm_type, q_msg, q_data)
 
-    asyncio.run( tlm.handler() )
+    asyncio.run( tlm.tlm_handler(), debug=True )
+    # asyncio.run( tlm.tlm_handler() )
     
     print('Closing TLM...')
 
