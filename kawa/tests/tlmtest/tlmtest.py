@@ -556,7 +556,9 @@ class TelemeterHandler :
 
             self.iLine += 1
 
-        return pd.DataFrame.from_dict(dict_data_matrix, orient='index'), hs_data, err_history
+        df_mf = pd.DataFrame.from_dict(dict_data_matrix, orient='index')
+
+        return df_mf, hs_data, err_history
 
 
     ''' Implimentations of decoding rules '''
