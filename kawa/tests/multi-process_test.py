@@ -5,7 +5,7 @@ import pandas as pd
 import queue
 import time
 
-def task1(seed, q_msg, q_data):
+def my_task(seed, q_msg, q_data):
     # print('task1 called', flush=True)
     print(f'task {seed} called')
     
@@ -18,7 +18,7 @@ def task1(seed, q_msg, q_data):
         data = pd.DataFrame.from_dict(dict(zip(keys, values)), orient='index')
         q_data.put_nowait(data)
 
-        time.sleep(0.3)
+        time.sleep(0.1)
 
         try:
             msg = q_msg.get_nowait()
@@ -54,13 +54,13 @@ if __name__ == '__main__':
 
     # executor = concurrent.futures.ProcessPoolExecutor()
     # future1 = executor.submit(task1, q_msg_1, q_data_1)
-    p1 = multiprocessing.Process(target=task1, args=(3.7, q_msg_1, q_data_1, ))
-    p2 = multiprocessing.Process(target=task1, args=(8.6, q_msg_2, q_data_2, ))
+    p1 = multiprocessing.Process(target=my_task, args=(3.7, q_msg_1, q_data_1))
+    p2 = multiprocessing.Process(target=my_task, args=(8.6, q_msg_2, q_data_2))
     p1.start()
     p2.start()
 
     for i in range(10):
-        time.sleep(0.2)
+        time.sleep(0.3)
 
         try:
             data1 = q_data_1.get_nowait()
@@ -89,8 +89,8 @@ if __name__ == '__main__':
     q_msg_1.join()
     q_msg_2.join()
 
-    q_data_1.join()
-    q_data_2.join()
+    # q_data_1.join()
+    # q_data_2.join()
 
     # executor.shutdown
     p1.join()
