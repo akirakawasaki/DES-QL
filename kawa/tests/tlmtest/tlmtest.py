@@ -176,15 +176,26 @@ class TelemeterHandler :
             except asyncio.CancelledError:
                 break
 
-            df_mf = self.decode(data)
+            ### decode datagram
+            df_mf, hs_data, err_history = self.decode(data)
 
-            # enqueue decoded data to save in a file
+            ### enqueue decoded data chunk to save in a external file
+            # - low-speed data 
             if self.iLine % 1 == 0:
             # if self.iLine % 10 == 0:
                 write_data = df_mf.values.tolist()
                 self.q_write_data.put_nowait( (self.fpath_ls_data, write_data) )
 
-            # output CUI
+            # - high-speed data
+            if hs_data != []:
+                self.q_write_data.put_nowait( (self.fpath_hs_data, hs_data) )
+
+            # - error history
+            if err_history != []:
+                self.q_write_data.put_nowait( (self.FPATH_ERR, err_history) )
+
+            ### output decoded data to user interface
+            # - CUI
             if self.iLine % 5000 == 0:
             # if iLine % 1 == 0:
                 print('')
@@ -195,7 +206,7 @@ class TelemeterHandler :
                 # print(pd.DataFrame.from_dict(dict_data_matrix, orient='index'))
                 print('')
 
-            # notify GUI of latest values
+            # - GUI (notify of latest values)
             self.notify(df_mf)
 
             self.q_dgram.task_done()
@@ -222,8 +233,6 @@ class TelemeterHandler :
         Vcjc = 0.0
         Vaz = 0.0
 
-        # sensor_number = 0
-        # fpath_hs_data = self.__FPATH_HS_DATA.replace('***', '{:0=4}'.format(sensor_number))
         hs_data = []
         err_history = []
         
@@ -253,41 +262,27 @@ class TelemeterHandler :
                 byte_idx =  byte_idx_head + self.W2B * int(self.TlmItemAttr[strItem]['w idx'])
 
 
-                ''' Decoding rules '''
+                ''' Decoding rules '''      ### To Be Refactored ###
 
-                ### Peculiar items ()
+                ### Peculiar items
                 # - Number of days from January 1st on GSE
                 if self.TlmItemAttr[strItem]['type'] == 'gse day':
-                    # decoded_value =  (data[byte_idx]   >> 4  ) * 100 \
-                    #                + (data[byte_idx]   & 0x0F) * 10  \
-                    #                + (data[byte_idx+1] >> 4  ) * 1
-
                     byte_length = self.W2B * int(self.TlmItemAttr[strItem]['word len'])
                     byte_string = data[byte_idx:byte_idx+byte_length]
-
+                    ###
                     decoded_value =  (byte_string[0]   >> 4  ) * 100 \
                                    + (byte_string[0]   & 0x0F) * 10  \
                                    + (byte_string[1] >> 4  ) * 1
-
+                    ###
                     dict_data_row.update({strItem:decoded_value})
 
                     continue
 
                 # - GSE timestamp in [sec]
                 elif self.TlmItemAttr[strItem]['type'] == 'gse time':
-                    # decoded_value =  (data[byte_idx+1] & 0x0F) * 10  * 3600  \
-                    #                + (data[byte_idx+2] >> 4  ) * 1   * 3600  \
-                    #                + (data[byte_idx+2] & 0x0F) * 10  * 60    \
-                    #                + (data[byte_idx+3] >> 4  ) * 1   * 60    \
-                    #                + (data[byte_idx+3] & 0x0F) * 10          \
-                    #                + (data[byte_idx+4] >> 4  ) * 1           \
-                    #                + (data[byte_idx+4] & 0x0F) * 100 * 0.001 \
-                    #                + (data[byte_idx+5] >> 4  ) * 10  * 0.001 \
-                    #                + (data[byte_idx+5] & 0x0F) * 1   * 0.001
-                    
                     byte_length = self.W2B * int(self.TlmItemAttr[strItem]['word len'])
                     byte_string = data[byte_idx:byte_idx+byte_length]
-                    
+                    ###
                     decoded_value =  (byte_string[1] & 0x0F) * 10  * 3600  \
                                    + (byte_string[2] >> 4  ) * 1   * 3600  \
                                    + (byte_string[2] & 0x0F) * 10  * 60    \
@@ -299,25 +294,21 @@ class TelemeterHandler :
                                    + (byte_string[5] & 0x0F) * 1   * 0.001
 
                     gse_time = decoded_value
-                    
+                    ###
                     dict_data_row.update({strItem:decoded_value})
                     
                     continue
 
                 # - Relay status (boolean)
                 elif self.TlmItemAttr[strItem]['type'] == 'bool':
-                    # decoded_value = (  data[byte_idx + int(self.TlmItemAttr[strItem]['b coeff'])] 
-                    #                                  & int(self.TlmItemAttr[strItem]['a coeff']) ) \
-                    #                                  / int(self.TlmItemAttr[strItem]['a coeff'])
-
                     byte_length = self.W2B * int(self.TlmItemAttr[strItem]['word len'])
                     byte_string = data[byte_idx:byte_idx+byte_length]
-
+                    ###
                     byte_idx_offset = int(self.TlmItemAttr[strItem]['b coeff'])
                     bit_filter = int(self.TlmItemAttr[strItem]['a coeff'])
                     decoded_value = 1.0 if ((byte_string[byte_idx_offset] & bit_filter) > 0) \
                                     else 0.0
-
+                    ###
                     dict_data_row.update({strItem:decoded_value})
 
                     continue
@@ -326,18 +317,18 @@ class TelemeterHandler :
                 # - header
                 if self.TlmItemAttr[strItem]['type'] == 'data hd':
                     # - W009 + W010: start of data (SOD)
-                    byte_length = 4
                     byte_idx_offset = 0
+                    byte_length = 4
                     byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]
-
+                    ###
                     w009 = byte_string
-
                     decoded_value = byte_string
+                    ###
                     dict_data_row.update({strItem:decoded_value})
 
                     # - W013 : sensor number
-                    byte_length = 2
                     byte_idx_offset = 8 
+                    byte_length = 2
                     byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]
 
                     w013 = byte_string
@@ -354,9 +345,9 @@ class TelemeterHandler :
                             print('TLM DCD: Start of high-speed data is detected!')
 
                             ### file header
-                            # - W011 : data length
-                            byte_length = 4
+                            # - W011: data length
                             byte_idx_offset = 4
+                            byte_length = 4
                             byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]
 
                             signed = False
@@ -373,9 +364,9 @@ class TelemeterHandler :
 
                             data_length = int(decoded_value)
 
-                            # - W013 : sensor number
-                            byte_length = 2             # <- change here
-                            byte_idx_offset = 8         # <- change here
+                            # - W013: sensor number
+                            byte_idx_offset = 8
+                            byte_length = 2
                             byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]
 
                             signed = False
@@ -392,9 +383,9 @@ class TelemeterHandler :
 
                             sensor_number = int(decoded_value)
 
-                            # - W017 : sampling rate
-                            byte_length = 2             # <- change here
-                            byte_idx_offset = 16        # <- change here
+                            # - W017: sampling rate
+                            byte_idx_offset = 16
+                            byte_length = 2
                             byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]
 
                             signed = False
@@ -418,9 +409,9 @@ class TelemeterHandler :
                             hs_data.append([])      # blank line
 
                     else:
-                        # - W018 : 
-                        byte_length = 2
+                        # - W018: 
                         byte_idx_offset = 18
+                        byte_length = 2
                         byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]
 
                         w018 = byte_string
@@ -439,8 +430,8 @@ class TelemeterHandler :
                 # - payload (first half)
                 elif self.TlmItemAttr[strItem]['type'] == 'data pl1':
                     # - W018
-                    byte_length = 2
                     byte_idx_offset = 18
+                    byte_length = 2
                     byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]
                     
                     decoded_value = byte_string
@@ -452,8 +443,8 @@ class TelemeterHandler :
                     # output history to an external file
                     for j in range(int(self.TlmItemAttr[strItem]['word len'])):
                         # decode 1 word
-                        byte_length = 2
                         byte_idx_offset = self.W2B * j
+                        byte_length = 2
                         byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]                            
                         
                         #####
@@ -472,20 +463,13 @@ class TelemeterHandler :
                         
                         hs_data.append([format(gse_time,'.3f'), decoded_value])
 
-                        # detect End Of Data
-                        # if byte_string == b'\xff\xff':
-                        #     self.high_speed_data_is_avtive = False
-                        #     self.idx_high_speed_data += 1
-                        #     print('TLM DCD: End of high-speed data detected!')
-                        #     break
-
                     continue
 
                 # - payload (latter half)
                 elif self.TlmItemAttr[strItem]['type'] == 'data pl2':
                     # - W036
-                    byte_length = 2
                     byte_idx_offset = 0
+                    byte_length = 2
                     byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]
                     
                     decoded_value = byte_string
@@ -496,8 +480,8 @@ class TelemeterHandler :
                     
                     # output history to an external file
                     for j in range(int(self.TlmItemAttr[strItem]['word len'])):                        
-                        byte_length = 2
                         byte_idx_offset = self.W2B * j
+                        byte_length = 2
                         byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]
 
                         #####
@@ -516,13 +500,6 @@ class TelemeterHandler :
                         
                         hs_data.append([format(gse_time,'.3f'), decoded_value])
 
-                        # detect End Of Data
-                        # if byte_string == b'\xff\xff':
-                        #     self.high_speed_data_is_avtive = False
-                        #     self.idx_high_speed_data += 1
-                        #     print('TLM DCD: End of high-speed data detected!')
-                        #     break
-
                     continue
 
                 ### Ordinary items
@@ -535,14 +512,6 @@ class TelemeterHandler :
                         continue
 
                     dict_data_row.update({strItem:decoded_value})
-
-                # - analog pressure in [MPa]
-                # elif self.TlmItemAttr[strItem]['type'] == 'p ana':
-                #     # handle sub-commutation
-                #     if iFrame % self.TlmItemAttr[strItem]['sub com mod'] != self.TlmItemAttr[strItem]['sub com res']: 
-                #         continue
-                    
-                #     dict_data_row.update({strItem:decoded_value})
 
                 # - Temperature in [K] <S,16,-2>
                 elif self.TlmItemAttr[strItem]['type'] == 'T':
@@ -587,18 +556,7 @@ class TelemeterHandler :
 
             self.iLine += 1
 
-        # enqueue high-speed data to save in an external file when detected
-        if hs_data != []:
-            self.q_write_data.put_nowait( (self.fpath_hs_data, hs_data) )
-
-        # enqueue write error history to save in an external file when error occurs
-        if err_history != []:
-            self.q_write_data.put_nowait( (self.FPATH_ERR, err_history) )
-
-        df_mf = pd.DataFrame.from_dict(dict_data_matrix, orient='index')
-
-        # return self.df_mf
-        return df_mf
+        return pd.DataFrame.from_dict(dict_data_matrix, orient='index'), hs_data, err_history
 
 
     ''' Implimentations of decoding rules '''
@@ -774,9 +732,7 @@ class TelemeterHandler :
             print('')   # linefeed
         
         # empty line
-        print('')  
-
-
+        print('')
 
 
 #
