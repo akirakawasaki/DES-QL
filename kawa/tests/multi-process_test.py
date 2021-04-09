@@ -1,6 +1,7 @@
 # import asyncio
 # import concurrent.futures
 import multiprocessing
+import pandas as pd
 import queue
 import time
 
@@ -13,7 +14,8 @@ def task1(seed, q_msg, q_data):
         # data = [i*j for j in range(5)]
         keys = ['abc','def5','ghi12','jkl0987','mno']
         values = [seed*i/(j+1) for j in range(5)]
-        data = dict(zip(keys, values))
+        # data = dict(zip(keys, values))
+        data = pd.DataFrame.from_dict(dict(zip(keys, values)), orient='index')
         q_data.put_nowait(data)
 
         time.sleep(0.3)
@@ -66,7 +68,8 @@ if __name__ == '__main__':
         except queue.Empty:
             pass
         else:
-            print(f'list1={data1}')
+            print(f'data1={data1}')
+            print(type(data1))
             q_data_1.task_done()
 
         try:
@@ -75,7 +78,7 @@ if __name__ == '__main__':
         except queue.Empty:
             pass
         else:
-            print(f'list2={data2}')
+            print(f'data2={data2}')
             q_data_2.task_done()
 
         # print(f'i = {i}')
