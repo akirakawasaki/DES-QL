@@ -83,7 +83,9 @@ class frmMain(wx.Frame):
         # result = dig.ShowModal()
         # dig.Destroy()
         # if result == wx.ID_OK:  self.Destroy()
+        
         self.Destroy()
+        
         self.internal_flags.GUI_TASK_IS_DONE = True
 
 """
@@ -302,14 +304,14 @@ class ChartPanel(wx.Panel):
             self.canvas.restore_region(self.backgrounds[i])
 
             # clear axes
-            self.axes[i].cla()
+            # self.axes[i].cla()
 
             # update axex attributions
             self.axes[i].set_xlim([self.t_min, self.t_max])
-            self.axes[i].set_ylim([self.PlotterAttr[i]['y_min'], self.PlotterAttr[i]['y_max']])
-            self.axes[i].set_ylabel(self.PlotterAttr[i]['y_label'])
-            self.axes[i].axhline(y=self.PlotterAttr[i]['alart_lim_l'], xmin=0, xmax=1, color='FIREBRICK')
-            self.axes[i].axhline(y=self.PlotterAttr[i]['alart_lim_u'], xmin=0, xmax=1, color='FIREBRICK')
+            # self.axes[i].set_ylim([self.PlotterAttr[i]['y_min'], self.PlotterAttr[i]['y_max']])
+            # self.axes[i].set_ylabel(self.PlotterAttr[i]['y_label'])
+            # self.axes[i].axhline(y=self.PlotterAttr[i]['alart_lim_l'], xmin=0, xmax=1, color='FIREBRICK')
+            # self.axes[i].axhline(y=self.PlotterAttr[i]['alart_lim_u'], xmin=0, xmax=1, color='FIREBRICK')
             # self.axes[i].axhline(y=self.PlotterAttr[i]['alart_lim_l'], xmin=0, xmax=1, color='RED')
             # self.axes[i].axhline(y=self.PlotterAttr[i]['alart_lim_u'], xmin=0, xmax=1, color='RED')
         
@@ -320,13 +322,13 @@ class ChartPanel(wx.Panel):
             # reflect updates in lines
             self.axes[i].draw_artist(self.lines[i])
 
-            # # redraw and show updated canvas
-        # for i in range(self.__N_PLOTTER):
-            # self.fig.canvas.blit(self.axes[i].bbox)
+        # redraw and show updated canvas
+        for i in range(self.__N_PLOTTER):
+            self.fig.canvas.blit(self.axes[i].bbox)
 
         # redraw and show updated canvas
-        self.fig.canvas.draw()
-        # self.fig.canvas.flush_events()
+        # self.fig.canvas.draw()
+        self.fig.canvas.flush_events()
         
         # print("GUI PLT: redraw plots...")   
 

@@ -1,6 +1,7 @@
 ### Standard libraries
 import asyncio
 import concurrent.futures
+import sys
 import time
 
 ### Third-party libraries
@@ -47,12 +48,18 @@ def gui_handler(internal_flags, tlm_latest_data):
 #   Main
 #
 if __name__ == "__main__":
+    # print(f"GIL switching interval: {sys.getswitchinterval()}")
+    # set GIL switching time to a vlaue other than the default [s]
+    # sys.setswitchinterval(0.001)
+    # print(f"GIL switching interval: {sys.getswitchinterval()}")
+    
     # initialize variables shared among threads
     internal_flags = common.InternalFlags()
     tlm_latest_data = common.TlmLatestData()
     
     # launch UDP communication handler concurrently in sub-threads
     executor = concurrent.futures.ThreadPoolExecutor()
+    # executor = concurrent.futures.ProcessPoolExecutor()
     executor.submit(tlm_handler_wrapper, internal_flags, tlm_latest_data)
 
     # launch GUI handler in Main thread

@@ -22,7 +22,7 @@ Constant Definition
 #   Telemetry Data Hundler
 #
 async def tlm_hundler(tlm_type, internal_flags, tlm_latest_data):
-    print('Starting socket communication for {}...'.format(tlm_type))
+    print(f'Starting socket communication for {tlm_type}...')
     
     # initialize
     # HOST = ''
