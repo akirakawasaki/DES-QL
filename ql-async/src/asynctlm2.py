@@ -106,18 +106,18 @@ class TelemeterHandler :
 
         # invoke async tasks in the running event loop (ORDER OF INVOCATION IS IMPORTAN)
         # - file writer
-        task_file_writer = asyncio.create_task( tlm.file_writer() ) 
+        task_file_writer = asyncio.create_task( self.file_writer() ) 
         
         # - data decoder
-        task_decoder = asyncio.create_task( tlm.decoder() )
+        task_decoder = asyncio.create_task( self.decoder() )
 
         # - datagram listner
         loop = asyncio.get_running_loop()
         transport, _ = await loop.create_datagram_endpoint(
-                                    protocol_factory=(lambda: DatagramServerProtocol(tlm_type, self.q_dgram)),
+                                    protocol_factory=(lambda: DatagramServerProtocol(self.tlm_type, self.q_dgram)),
                                     local_addr=(self.HOST,self.PORT))
         # transport, protocol = await loop.create_datagram_endpoint(
-                                    # protocol_factory=(lambda: DatagramServerProtocol(tlm_type, self.q_dgram)),
+                                    # protocol_factory=(lambda: DatagramServerProtocol(self.tlm_type, self.q_dgram)),
                                     # local_addr=(self.HOST,self.PORT))
 
         # block until GUI task done
