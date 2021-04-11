@@ -23,10 +23,10 @@ from matplotlib.figure import Figure
 """
 wxPython configurations
 """
-FETCH_RATE_LATEST_VALUES       = 20     # ms/cycle
+FETCH_RATE_LATEST_VALUES       = 50     # ms/cycle
 # FETCH_RATE_LATEST_VALUES       = 200     # ms/cycle
 REFLESH_RATE_DIGITAL_INDICATOR = 800    # ms/cycle
-REFLESH_RATE_PLOTTER           = 20     # ms/cycle
+REFLESH_RATE_PLOTTER           = 100    # ms/cycle
 
 """
 Matplotlib configuration
@@ -41,10 +41,15 @@ plt.rcParams["figure.subplot.right"]  = 0.97    # Right
 plt.rcParams["figure.subplot.hspace"] = 0.05    # Height Margin between subplots
 
 
-"""
-Top Level Window
-"""
+#
+#   Top-level window
+#
 class frmMain(wx.Frame):
+    # input file pathes
+    FPATH_CONFIG = './config_tlm_3.xlsx'
+    # FPATH_CONFIG = './config_tlm_2.xlsx'
+
+    
     # def __init__(self, internal_flags, tlm_latest_data):
     def __init__(self, q_msg_smt, q_msg_pcm, q_data_smt, q_data_pcm):
         super().__init__(None, wx.ID_ANY, 'Telemetry Data Quick Look for Detonation Engine System')
@@ -53,30 +58,46 @@ class frmMain(wx.Frame):
         # self.latest_values = latest_values
         self.q_msg_smt = q_msg_smt      # sending ONLY
         self.q_msg_pcm = q_msg_pcm      # sending ONLY
+        self.q_data_smt = q_data_smt    # receiving ONLY
+        self.q_data_pcm = q_data_pcm    # receiving ONLY
 
-        # maxmize GUI window size
+        self.dfTlm_smt = pd.DataFrame()
+        self.dfTlm_pcm = pd.DataFrame()
+
+        self.F_TLM_IS_ACTIVE = False
+
+        ### initialize attributions
+        self.SetBackgroundColour('Black')
+        # self.SetBackgroundColour('Dark Grey')
         self.Maximize(True)
 
-        # self.SetBackgroundColour('Dark Grey')
-        self.SetBackgroundColour('Black')
-
         # generate Main Graphic
-        root_panel = wx.Panel(self, wx.ID_ANY)
+        # pnlRoot = wx.Panel(self, wx.ID_ANY)
 
-        # ??? System panel : Show the feeding system status
-        self.chart_panel = ChartPanel(root_panel, q_data_smt, q_data_pcm)
+        ### 
+        # - Time History Plots & Current Value Indicators
+        self.chart_panel = ChartPanel(parent=self)
+        # self.chart_panel = ChartPanel(parent=self, q_data_smt, q_data_pcm)
 
         # lay out panels by sizer
-        root_layout = wx.GridBagSizer()
-        root_layout.Add(self.chart_panel, pos=wx.GBPosition(0,0), flag=wx.EXPAND | wx.ALL, border=10)
-        root_panel.SetSizer(root_layout)
-        root_layout.Fit(root_panel)
+        layout = wx.GridBagSizer()
+        layout.Add(self.chart_panel, pos=wx.GBPosition(0,0), flag=wx.EXPAND | wx.ALL, border=10)
+        self.SetSizer(layout)
+        # layout.Fit(self)
+        # pnlRoot.SetSizer(layout)
+        # layout.Fit(pnlRoot)
 
-        # bind events
+        ### bind events
+        # - close
         self.Bind(wx.EVT_CLOSE, self.OnClose)
+                
+        # - timer to fetch latest telemeter data
+        self.tmrFetchTelemeterData = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self.OnFetchLatestValues, self.tmrFetchTelemeterData)
+        self.tmrFetchTelemeterData.Start(FETCH_RATE_LATEST_VALUES)
 
         # show
-        self.Show()
+        # self.Show()
 
     # Event handler: EVT_CLOSE
     def OnClose(self, event):
@@ -94,11 +115,55 @@ class frmMain(wx.Frame):
         # self.internal_flags.GUI_TASK_IS_DONE = True
 
         self.Destroy()
-        
 
-"""
-Time History Plots & Current Value Indicators
-"""
+    # Event handler: EVT_TIMER
+    def OnFetchLatestValues(self, event):
+        # print('GUI FTC: fetched tlm data')
+        
+        self.dfTlm_smt = pd.DataFrame()
+        self.dfTlm_pcm = pd.DataFrame()
+
+        ### fetch current values
+        # - smt
+        while True:
+            try:
+                self.dfTlm_smt = self.q_data_smt.get_nowait()
+            except queue.Empty:
+                break
+            # else:
+            #     if self.q_data_smt.empty() == True:     break
+        # - pcm
+        while True:
+            try:
+                self.dfTlm_pcm = self.q_data_pcm.get_nowait()
+            except queue.Empty:
+                break
+            # else:
+            #     if self.q_data_pcm.empty() == True:     break
+
+        # break off when tlm data not exist
+        if len(self.dfTlm_smt.index) == 0 or len(self.dfTlm_pcm.index) == 0:
+            print('GUI FTC: awaiting SMT and/or PCM data')
+            self.F_TLM_IS_ACTIVE = False
+            return None
+        
+        # for debug
+        # print('GUI FTC: df.index length = {}'.format(len(self.tlm_latest_data.df_smt.index)))
+        # print(self.tlm_latest_data.df_smt) 
+
+        self.F_TLM_IS_ACTIVE = True
+
+
+# 
+#   Root panel
+#
+# class pnlRoot(wx.Panel):
+#     pass
+
+
+# 
+#   Panel for Time History Plots & Current Value Indicators
+# 
 class ChartPanel(wx.Panel):
     __N_PLOTTER = 5
     __T_RANGE = 30    # [s]
@@ -106,18 +171,21 @@ class ChartPanel(wx.Panel):
 
     __PLOT_SKIP = 39    ### T.B.REFAC. ###
 
-    def __init__(self, parent, q_data_smt, q_data_pcm):
+    # def __init__(self, parent, q_data_smt, q_data_pcm):
+    def __init__(self, parent):
         super().__init__(parent, wx.ID_ANY)
 
-        self.q_data_smt = q_data_smt        # receiving ONLY
-        self.q_data_pcm = q_data_pcm        # receiving ONLY
+        self.parent = parent
+
+        # self.q_data_smt = self.parent.q_data_smt    # receiving ONLY
+        # self.q_data_pcm = self.parent.q_data_pcm    # receiving ONLY
         # self.tlm_latest_data = tlm_latest_data      # receive instance of shared variables
 
         ### initialize
-        self.__F_TLM_IS_ACTIVE = False
-        self.dfTlm = pd.DataFrame()
+        # self.__F_TLM_IS_ACTIVE = False
         self.__PLOT_COUNT = self.__PLOT_SKIP   ### T.B.REFAC. ###
-        
+        # self.dfTlm = pd.DataFrame()
+
         ### load configurations from external files
         # - smt
         try: 
@@ -167,9 +235,9 @@ class ChartPanel(wx.Panel):
 
         ### bind events
         # - set timer to fetch latest telemeter data
-        self.tmrFetchTelemeterData = wx.Timer(self)
-        self.Bind(wx.EVT_TIMER, self.OnFetchLatestValues, self.tmrFetchTelemeterData)
-        self.tmrFetchTelemeterData.Start(FETCH_RATE_LATEST_VALUES)
+        # self.tmrFetchTelemeterData = wx.Timer(self)
+        # self.Bind(wx.EVT_TIMER, self.OnFetchLatestValues, self.tmrFetchTelemeterData)
+        # self.tmrFetchTelemeterData.Start(FETCH_RATE_LATEST_VALUES)
 
         # - set timer to refresh current-value pane
         self.tmrRefreshDigitalIndicator = wx.Timer(self)
@@ -182,59 +250,60 @@ class ChartPanel(wx.Panel):
         self.tmrRefreshPlotter.Start(REFLESH_RATE_PLOTTER)
 
     # Event handler: EVT_TIMER
-    def OnFetchLatestValues(self, event):
-        # print('GUI FTC: fetched tlm data')
+    # def OnFetchLatestValues(self, event):
+    #     # print('GUI FTC: fetched tlm data')
         
-        self.dfTlm_smt = pd.DataFrame()
-        self.dfTlm_pcm = pd.DataFrame()
+    #     self.dfTlm_smt = pd.DataFrame()
+    #     self.dfTlm_pcm = pd.DataFrame()
 
-        ### fetch current values
-        # - smt
-        while True:
-            try:
-                self.dfTlm_smt = self.q_data_smt.get_nowait()
-            except queue.Empty:
-                break
-            else:
-                if self.q_data_smt.empty() == True:     break
-        # - pcm
-        while True:
-            try:
-                self.dfTlm_pcm = self.q_data_pcm.get_nowait()
-            except queue.Empty:
-                break
-            else:
-                if self.q_data_pcm.empty() == True:     break
+    #     ### fetch current values
+    #     # - smt
+    #     while True:
+    #         try:
+    #             self.dfTlm_smt = self.q_data_smt.get_nowait()
+    #         except queue.Empty:
+    #             break
+    #         # else:
+    #         #     if self.q_data_smt.empty() == True:     break
+    #     # - pcm
+    #     while True:
+    #         try:
+    #             self.dfTlm_pcm = self.q_data_pcm.get_nowait()
+    #         except queue.Empty:
+    #             break
+    #         # else:
+    #         #     if self.q_data_pcm.empty() == True:     break
 
-        # break off when tlm data not exist
-        # if len(self.tlm_latest_data.df_smt.index) == 0 or len(self.tlm_latest_data.df_pcm.index) == 0:
-        if len(self.dfTlm_smt.index) == 0 or len(self.dfTlm_pcm.index) == 0:
-            print('GUI FTC: awaiting SMT and/or PCM data')
-            self.__F_TLM_IS_ACTIVE = False
-            return None
+    #     # break off when tlm data not exist
+    #     # if len(self.tlm_latest_data.df_smt.index) == 0 or len(self.tlm_latest_data.df_pcm.index) == 0:
+    #     if len(self.dfTlm_smt.index) == 0 or len(self.dfTlm_pcm.index) == 0:
+    #         print('GUI FTC: awaiting SMT and/or PCM data')
+    #         self.__F_TLM_IS_ACTIVE = False
+    #         return None
         
-        # for debug
-        # print('GUI FTC: df.index length = {}'.format(len(self.tlm_latest_data.df_smt.index)))
-        # print(self.tlm_latest_data.df_smt) 
+    #     # for debug
+    #     # print('GUI FTC: df.index length = {}'.format(len(self.tlm_latest_data.df_smt.index)))
+    #     # print(self.tlm_latest_data.df_smt) 
 
-        self.__F_TLM_IS_ACTIVE = True
+    #     self.__F_TLM_IS_ACTIVE = True
 
-        # if self.dfTlm == self.tlm_latest_data.df_smt:
-        #     print('GUI FTC: TLM data has NOT been updated!')
-        #     return None
+    #     # if self.dfTlm == self.tlm_latest_data.df_smt:
+    #     #     print('GUI FTC: TLM data has NOT been updated!')
+    #     #     return None
         
-        ### T.B.REFAC.: should be thread safe ###
-        # fetch current values & store
-        # self.dfTlm_smt = self.tlm_latest_data.df_smt
-        # self.dfTlm_pcm = self.tlm_latest_data.df_pcm        
+    #     ### T.B.REFAC.: should be thread safe ###
+    #     # fetch current values & store
+    #     # self.dfTlm_smt = self.tlm_latest_data.df_smt
+    #     # self.dfTlm_pcm = self.tlm_latest_data.df_pcm
 
     # Event handler: EVT_TIMER
     def OnRefreshDigitalIndicator(self, event):
-        if self.__F_TLM_IS_ACTIVE == False: return None     # skip refresh
+        if self.parent.F_TLM_IS_ACTIVE == False: return None     # skip refresh
+        # if self.__F_TLM_IS_ACTIVE == False: return None     # skip refresh
         
         # obtain time slice of dfTlm by DEEP COPY to avoid unexpected rewrite during refresh
-        df_smt_tmp = self.dfTlm_smt.copy()
-        df_pcm_tmp = self.dfTlm_pcm.copy()
+        # df_smt_tmp = self.dfTlm_smt.copy()
+        # df_pcm_tmp = self.dfTlm_pcm.copy()
         
         # for debug
         # print(f'GUI IND: df_pcm_tmp = {df_pcm_tmp}')
@@ -250,12 +319,14 @@ class ChartPanel(wx.Panel):
                         continue
 
                     # refresh indicator
-                    self.stxtIndicator[iii].SetLabel(str(np.round(df_smt_tmp.iloc[-1, iii], 2)))
+                    self.stxtIndicator[iii].SetLabel(str(np.round(self.parent.dfTlm_smt.iloc[-1, iii], 2)))
+                    # self.stxtIndicator[iii].SetLabel(str(np.round(df_smt_tmp.iloc[-1, iii], 2)))
 
                     # accentuate indicator by colors
                     if self.TlmItemAttr_smt[iii]['type'] == 'bool':
                         # OFF
-                        if int(df_smt_tmp.iloc[-1, iii]) == 0:
+                        # if int(df_smt_tmp.iloc[-1, iii]) == 0:
+                        if int(self.parent.dfTlm_smt.iloc[-1, iii]) == 0:
                             self.tbtnLabel[iii].SetForegroundColour('NullColour')
                             self.stxtIndicator[iii].SetBackgroundColour('NullColour')
                             # self.stxtIndicator[iii].SetBackgroundColour('NAVY')
@@ -279,23 +350,25 @@ class ChartPanel(wx.Panel):
                             continue
 
                         # refresh indicator
-                        self.stxtIndicator[iii+self.N_ITEM_SMT].SetLabel(str(np.round(df_pcm_tmp.iloc[-1, iii], 2)))
+                        self.stxtIndicator[iii+self.N_ITEM_SMT].SetLabel(str(np.round(self.parent.dfTlm_pcm.iloc[-1, iii], 2)))
                         break
                     
 
     # Event handler: EVT_TIMER
     def OnRefreshPlotter(self, event):
-        if self.__F_TLM_IS_ACTIVE == False: return None     # skip refresh
+        if self.parent.F_TLM_IS_ACTIVE == False: return None     # skip refresh
+        # if self.__F_TLM_IS_ACTIVE == False: return None     # skip refresh
         # for debug
         # print("GUI PLT: F_TLM_IS_ACTIVE = {}".format(self.__F_TLM_IS_ACTIVE))
 
         ###
         ### update data set for plot
         # - obtain time slice of dfTlm by DEEP COPY to avoid unexpected rewrite during refresh
-        df_smt_tmp = self.dfTlm_smt.copy()
-        df_pcm_tmp = self.dfTlm_pcm.copy()
-        df_tmp = pd.concat([df_smt_tmp, df_pcm_tmp], axis=1)
-
+        # df_smt_tmp = self.dfTlm_smt.copy()
+        # df_pcm_tmp = self.dfTlm_pcm.copy()
+        # df_tmp = pd.concat([df_smt_tmp, df_pcm_tmp], axis=1)
+        df_tmp = pd.concat([self.parent.dfTlm_smt, self.parent.dfTlm_pcm], axis=1)      ### T.B.REFAC. ###
+        
         # for debug
         # df_tmp.to_csv('./debug.csv')
 

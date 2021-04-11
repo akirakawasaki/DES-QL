@@ -48,12 +48,14 @@ def tlm_handler_wrapper(tlm_type, q_msg, q_data):
 def gui_handler(q_msg_smt, q_msg_pcm, q_data_smt, q_data_pcm):
     print('MAIN: Invoking GUI...')
     
+    # create the wx app
     app = wx.App()
 
-    # generate instance of the main window
-    gui.frmMain(q_msg_smt, q_msg_pcm, q_data_smt, q_data_pcm)
-    
-    # launch event loop for GUI
+    # create the main window & show
+    frame = gui.frmMain(q_msg_smt, q_msg_pcm, q_data_smt, q_data_pcm)
+    frame.Show()
+
+    # launch event loop for GUI <BLOCKING>
     app.MainLoop()
 
     print('Closing GUI...')
@@ -76,29 +78,31 @@ def gui_handler(q_msg_smt, q_msg_pcm, q_data_smt, q_data_pcm):
 #   Main
 #
 if __name__ == "__main__":
-    # queues for smt
+    ### generate FIFO queues for inter-process communication
+    # - smt
     q_msg_smt = multiprocessing.JoinableQueue()
     q_data_smt = multiprocessing.JoinableQueue()
-
-    # queues for pcm
+    # - pcm
     q_msg_pcm = multiprocessing.JoinableQueue()
     q_data_pcm = multiprocessing.JoinableQueue()
 
-    # launch UDP communication handler in another process for SMT
+    ### launch UDP communication handler in other processes <NON-BLOCKING>
+    # - smt
     p_smt = multiprocessing.Process(target=tlm_handler_wrapper, args=('smt', q_msg_smt, q_data_smt))
     p_smt.start()
-    
-    # launch UDP communication handler in another process for PCM
+    # - pcm
     p_pcm = multiprocessing.Process(target=tlm_handler_wrapper, args=('pcm', q_msg_pcm, q_data_pcm))
     p_pcm.start()
 
-    # launch GUI handler in Main thread
+    ### launch GUI handler in the main process/thread <BLOCKING>
     gui_handler(q_msg_smt, q_msg_pcm, q_data_smt, q_data_pcm)
     
+    ### end processing
+    # - smt
     q_msg_smt.join()
     # q_data_smt.join()
     p_smt.join()
-
+    # - pcm
     q_msg_pcm.join()
     # q_data_smt.join()
     p_pcm.join()
