@@ -45,24 +45,69 @@ plt.rcParams["figure.subplot.hspace"] = 0.05    # Height Margin between subplots
 #   Top-level window
 #
 class frmMain(wx.Frame):
+    #
+    WINDOW_CAPTION = 'Telemetry Data Quick Look for Detonation Engine System'
+    
     # input file pathes
     FPATH_CONFIG = './config_tlm_3.xlsx'
     # FPATH_CONFIG = './config_tlm_2.xlsx'
-
     
-    # def __init__(self, internal_flags, tlm_latest_data):
     def __init__(self, q_msg_smt, q_msg_pcm, q_data_smt, q_data_pcm):
-        super().__init__(None, wx.ID_ANY, 'Telemetry Data Quick Look for Detonation Engine System')
+        super().__init__(None, wx.ID_ANY, self.WINDOW_CAPTION)
+        
         # receive instance of shared variables
-        # self.internal_flags = internal_flags
-        # self.latest_values = latest_values
-        self.q_msg_smt = q_msg_smt      # sending ONLY
-        self.q_msg_pcm = q_msg_pcm      # sending ONLY
-        self.q_data_smt = q_data_smt    # receiving ONLY
-        self.q_data_pcm = q_data_pcm    # receiving ONLY
+        self.q_msg_smt = q_msg_smt      # sending ONLY (to TLM)
+        self.q_msg_pcm = q_msg_pcm      # sending ONLY (to TLM)
+        self.q_data_smt = q_data_smt    # receiving ONLY (from TLM)
+        self.q_data_pcm = q_data_pcm    # receiving ONLY (from TLM)
 
-        self.dfTlm_smt = pd.DataFrame()
-        self.dfTlm_pcm = pd.DataFrame()
+
+        ### load configurations from an external file
+        # - smt
+        try: 
+            # df_cfg_smt = pd.read_excel(self.FPATH_CONFIG, 
+            #                             sheet_name='smt', header=0, index_col=0).dropna(how='all')
+            df_cfg_smt = pd.read_excel(self.FPATH_CONFIG, 
+                                        sheet_name='smt', header=0, index_col=None).dropna(how='all')
+        except:
+            print(f'Error GUI: Config file "{self.FPATH_CONFIG}" NOT exists! smt')
+            sys.exit()
+
+        self.TlmItemList_smt = df_cfg_smt['item'].values.tolist()
+        self.TlmItemAttr_smt = df_cfg_smt.to_dict(orient='index')
+        self.N_ITEM_SMT = len(self.TlmItemList_smt)
+
+        # - pcm
+        try: 
+            # df_cfg_pcm = pd.read_excel(self.FPATH_CONFIG, 
+            #                             sheet_name='pcm', header=0, index_col=0).dropna(how='all')
+            df_cfg_pcm = pd.read_excel(self.FPATH_CONFIG, 
+                                        sheet_name='pcm', header=0, index_col=None).dropna(how='all')
+        except:
+            print(f'Error GUI: Config file "{self.FPATH_CONFIG}" NOT exists! pcm')
+            sys.exit()
+
+        self.TlmItemList_pcm = df_cfg_pcm['item'].values.tolist()
+        self.TlmItemAttr_pcm = df_cfg_pcm.to_dict(orient='index')
+        self.N_ITEM_PCM = len(self.TlmItemList_pcm)
+
+
+        self.dictTlm_smt = dict.fromkeys(['Line#'] + self.TlmItemList_smt, np.nan)
+        self.dfTlm_smt = pd.DataFrame.from_dict(self.dictTlm_smt, orient='index').T
+        # self.dfTlm_smt = pd.DataFrame.from_dict(self.dictTlm_smt, orient='columns')
+        # self.dfTlm_smt = pd.DataFrame()
+
+        self.dictTlm_pcm = dict.fromkeys(['Line#'] + self.TlmItemList_pcm, np.nan)
+        self.dfTlm_pcm = pd.DataFrame.from_dict(self.dictTlm_pcm, orient='index').T
+        # self.dfTlm_pcm = pd.DataFrame.from_dict(self.dictTlm_pcm, orient='columns')
+        # self.dfTlm_pcm = pd.DataFrame()
+
+        # for debug
+        print(f'dfTlm_smt = ')
+        print(self.dfTlm_smt)
+        print(f'dfTlm_pcm = ')
+        print(self.dfTlm_pcm)
+
 
         self.F_TLM_IS_ACTIVE = False
 
@@ -70,9 +115,6 @@ class frmMain(wx.Frame):
         self.SetBackgroundColour('Black')
         # self.SetBackgroundColour('Dark Grey')
         self.Maximize(True)
-
-        # generate Main Graphic
-        # pnlRoot = wx.Panel(self, wx.ID_ANY)
 
         ### 
         # - Time History Plots & Current Value Indicators
@@ -96,9 +138,6 @@ class frmMain(wx.Frame):
         self.Bind(wx.EVT_TIMER, self.OnFetchLatestValues, self.tmrFetchTelemeterData)
         self.tmrFetchTelemeterData.Start(FETCH_RATE_LATEST_VALUES)
 
-        # show
-        # self.Show()
-
     # Event handler: EVT_CLOSE
     def OnClose(self, event):
         # dig = wx.MessageDialog(self,
@@ -120,14 +159,14 @@ class frmMain(wx.Frame):
     def OnFetchLatestValues(self, event):
         # print('GUI FTC: fetched tlm data')
         
-        self.dfTlm_smt = pd.DataFrame()
-        self.dfTlm_pcm = pd.DataFrame()
+        # self.dfTlm_smt = pd.DataFrame()
+        # self.dfTlm_pcm = pd.DataFrame()
 
         ### fetch current values
         # - smt
         while True:
             try:
-                self.dfTlm_smt = self.q_data_smt.get_nowait()
+                self.dfTlm_smt.update( self.q_data_smt.get_nowait() )
             except queue.Empty:
                 break
             # else:
@@ -135,7 +174,7 @@ class frmMain(wx.Frame):
         # - pcm
         while True:
             try:
-                self.dfTlm_pcm = self.q_data_pcm.get_nowait()
+                self.dfTlm_pcm.update( self.q_data_pcm.get_nowait() )
             except queue.Empty:
                 break
             # else:
@@ -153,69 +192,56 @@ class frmMain(wx.Frame):
 
         self.F_TLM_IS_ACTIVE = True
 
-
-# 
-#   Root panel
-#
-# class pnlRoot(wx.Panel):
-#     pass
-
-
 # 
 #   Panel for Time History Plots & Current Value Indicators
 # 
 class ChartPanel(wx.Panel):
     __N_PLOTTER = 5
     __T_RANGE = 30    # [s]
-    __IDX_TIME = 1
 
-    __PLOT_SKIP = 39    ### T.B.REFAC. ###
+    # __IDX_TIME = 1
+    __IDX_TIME = 2      # tentative
+
+    __PLOT_SKIP = 9    ### T.B.REFAC. ###
+    # __PLOT_SKIP = 39    ### T.B.REFAC. ###
 
     # def __init__(self, parent, q_data_smt, q_data_pcm):
     def __init__(self, parent):
         super().__init__(parent, wx.ID_ANY)
 
+        ### initialize
         self.parent = parent
 
-        # self.q_data_smt = self.parent.q_data_smt    # receiving ONLY
-        # self.q_data_pcm = self.parent.q_data_pcm    # receiving ONLY
-        # self.tlm_latest_data = tlm_latest_data      # receive instance of shared variables
-
-        ### initialize
-        # self.__F_TLM_IS_ACTIVE = False
         self.__PLOT_COUNT = self.__PLOT_SKIP   ### T.B.REFAC. ###
-        # self.dfTlm = pd.DataFrame()
 
-        ### load configurations from external files
-        # - smt
-        try: 
-            df_cfg_smt = pd.read_excel('./config_tlm_3.xlsx', 
-                                        sheet_name='smt', header=0, index_col=None).dropna(how='all')
-            # df_cfg_smt = pd.read_excel('./config_tlm_2.xlsx', 
-            #                             sheet_name='smt', header=0, index_col=None).dropna(how='all')
-        except:
-            print('Error TLM: "config_tlm.xlsx"!')
-            print(self.TLM_TYPE)
-            sys.exit()
+        ### load configurations from an external file
+        # # - smt
+        # try: 
+        #     # df_cfg_smt = pd.read_excel(self.parent.FPATH_CONFIG, 
+        #     #                             sheet_name='smt', header=0, index_col=0).dropna(how='all')
+        #     df_cfg_smt = pd.read_excel(self.parent.FPATH_CONFIG, 
+        #                                 sheet_name='smt', header=0, index_col=None).dropna(how='all')
+        # except:
+        #     print('Error TLM: "config_tlm.xlsx"!')
+        #     sys.exit()
 
-        self.TlmItemList_smt = df_cfg_smt['item'].values.tolist()
-        self.TlmItemAttr_smt = df_cfg_smt.to_dict(orient='index')
-        self.N_ITEM_SMT = len(self.TlmItemList_smt)
+        # self.TlmItemList_smt = df_cfg_smt['item'].values.tolist()
+        # self.TlmItemAttr_smt = df_cfg_smt.to_dict(orient='index')
+        # self.N_ITEM_SMT = len(self.TlmItemList_smt)
 
-        # - pcm
-        try: 
-            df_cfg_pcm = pd.read_excel('./config_tlm_3.xlsx', 
-                                        sheet_name='pcm', header=0, index_col=None).dropna(how='all')
-            # df_cfg_pcm = pd.read_excel('./config_tlm_2.xlsx', 
-            #                             sheet_name='pcm', header=0, index_col=None).dropna(how='all')
-        except:
-            print('Error TLM: "config_tlm.xlsx"!')
-            print(self.TLM_TYPE)
-            sys.exit()
+        # # - pcm
+        # try: 
+        #     # df_cfg_pcm = pd.read_excel(self.parent.FPATH_CONFIG, 
+        #     #                             sheet_name='pcm', header=0, index_col=0).dropna(how='all')
+        #     df_cfg_pcm = pd.read_excel(self.parent.FPATH_CONFIG, 
+        #                                 sheet_name='pcm', header=0, index_col=None).dropna(how='all')
+        # except:
+        #     print('Error TLM: "config_tlm.xlsx"!')
+        #     sys.exit()
 
-        self.TlmItemList_pcm = df_cfg_pcm['item'].values.tolist()
-        self.TlmItemAttr_pcm = df_cfg_pcm.to_dict(orient='index')
-        self.N_ITEM_PCM = len(self.TlmItemList_pcm)
+        # self.TlmItemList_pcm = df_cfg_pcm['item'].values.tolist()
+        # self.TlmItemAttr_pcm = df_cfg_pcm.to_dict(orient='index')
+        # self.N_ITEM_PCM = len(self.TlmItemList_pcm)
 
         # - digital indicator config
         self.load_config_digital_indicator()
@@ -228,10 +254,10 @@ class ChartPanel(wx.Panel):
         self.configure_plotter()
 
         ### lay out panes
-        self.layout = wx.FlexGridSizer(rows=1, cols=2, gap=(20, 0))
-        self.layout.Add(self.canvas, flag=wx.EXPAND)                            # plotter pane
-        self.layout.Add(self.IndicatorPane, flag=wx.ALIGN_CENTER_HORIZONTAL)    # digital indicator pane
-        self.SetSizer(self.layout)
+        layout = wx.FlexGridSizer(rows=1, cols=2, gap=(20, 0))
+        layout.Add(self.canvas, flag=wx.EXPAND)                            # plotter pane
+        layout.Add(self.IndicatorPane, flag=wx.ALIGN_CENTER_HORIZONTAL)    # digital indicator pane
+        self.SetSizer(layout)
 
         ### bind events
         # - set timer to fetch latest telemeter data
@@ -298,24 +324,19 @@ class ChartPanel(wx.Panel):
 
     # Event handler: EVT_TIMER
     def OnRefreshDigitalIndicator(self, event):
-        if self.parent.F_TLM_IS_ACTIVE == False: return None     # skip refresh
-        # if self.__F_TLM_IS_ACTIVE == False: return None     # skip refresh
+        # skip refresh when TLM NOT active
+        if self.parent.F_TLM_IS_ACTIVE == False:    return None
         
-        # obtain time slice of dfTlm by DEEP COPY to avoid unexpected rewrite during refresh
-        # df_smt_tmp = self.dfTlm_smt.copy()
-        # df_pcm_tmp = self.dfTlm_pcm.copy()
-        
-        # for debug
-        # print(f'GUI IND: df_pcm_tmp = {df_pcm_tmp}')
-
-        # refresh indicators
+        ### refresh indicators
+        # - sweep groups
         for i in self.GroupAttr.keys():
-            ### T.B.REFAC. ###
+            # - seep items belong each group    ### T.B.REFAC. ###
             for ii in range(self.GroupAttr[i]['rows'] * self.GroupAttr[i]['cols']):
                 # search throughout smt items
-                for iii in range(self.N_ITEM_SMT):
-                    if ( self.TlmItemAttr_smt[iii]['group']      != self.GroupAttr[i]['label'] or
-                         self.TlmItemAttr_smt[iii]['item order'] != ii ):
+                for iii in range(self.parent.N_ITEM_SMT):
+                    # skip
+                    if (   self.parent.TlmItemAttr_smt[iii]['group']      != self.GroupAttr[i]['label']
+                        or self.parent.TlmItemAttr_smt[iii]['item order'] != ii ):
                         continue
 
                     # refresh indicator
@@ -323,69 +344,62 @@ class ChartPanel(wx.Panel):
                     # self.stxtIndicator[iii].SetLabel(str(np.round(df_smt_tmp.iloc[-1, iii], 2)))
 
                     # accentuate indicator by colors
-                    if self.TlmItemAttr_smt[iii]['type'] == 'bool':
-                        # OFF
+                    if self.parent.TlmItemAttr_smt[iii]['type'] == 'bool':
+                        # - OFF
                         # if int(df_smt_tmp.iloc[-1, iii]) == 0:
                         if int(self.parent.dfTlm_smt.iloc[-1, iii]) == 0:
                             self.tbtnLabel[iii].SetForegroundColour('NullColour')
                             self.stxtIndicator[iii].SetBackgroundColour('NullColour')
                             # self.stxtIndicator[iii].SetBackgroundColour('NAVY')
-                        # ON
+                        # - ON
                         else:
                             self.tbtnLabel[iii].SetForegroundColour('RED')
                             # self.tbtnLabel[iii].SetForegroundColour('BLUE')
                             # self.stxtIndicator[iii].SetBackgroundColour('GREY')
                             self.stxtIndicator[iii].SetBackgroundColour('MAROON')
                             # self.stxtIndicator[iii].SetBackgroundColour('NAVY')
-                        # self.stxtIndicator[iii].Refresh()
+                        
                         self.stxtIndicator[iii].Refresh()
 
                     break
                 
                 else:
                     # search throughout pcm items
-                    for iii in range(self.N_ITEM_PCM):
-                        if ( self.TlmItemAttr_pcm[iii]['group']      != self.GroupAttr[i]['label'] or
-                             self.TlmItemAttr_pcm[iii]['item order'] != ii ) :
+                    for iii in range(self.parent.N_ITEM_PCM):
+                        # skip
+                        if ( self.parent.TlmItemAttr_pcm[iii]['group']      != self.GroupAttr[i]['label'] or
+                             self.parent.TlmItemAttr_pcm[iii]['item order'] != ii ) :
                             continue
 
                         # refresh indicator
-                        self.stxtIndicator[iii+self.N_ITEM_SMT].SetLabel(str(np.round(self.parent.dfTlm_pcm.iloc[-1, iii], 2)))
-                        break
-                    
+                        self.stxtIndicator[iii+self.parent.N_ITEM_SMT].SetLabel(str(np.round(self.parent.dfTlm_pcm.iloc[-1, iii], 2)))
+                        
+                        break      
 
     # Event handler: EVT_TIMER
     def OnRefreshPlotter(self, event):
-        if self.parent.F_TLM_IS_ACTIVE == False: return None     # skip refresh
-        # if self.__F_TLM_IS_ACTIVE == False: return None     # skip refresh
-        # for debug
-        # print("GUI PLT: F_TLM_IS_ACTIVE = {}".format(self.__F_TLM_IS_ACTIVE))
+        # skip refresh when TLM NOT active
+        if self.parent.F_TLM_IS_ACTIVE == False:    return None
+        # print(f'GUI PLT: F_TLM_IS_ACTIVE = {self.parent.F_TLM_IS_ACTIVE}')      # for debug
 
-        ###
         ### update data set for plot
-        # - obtain time slice of dfTlm by DEEP COPY to avoid unexpected rewrite during refresh
-        # df_smt_tmp = self.dfTlm_smt.copy()
-        # df_pcm_tmp = self.dfTlm_pcm.copy()
-        # df_tmp = pd.concat([df_smt_tmp, df_pcm_tmp], axis=1)
         df_tmp = pd.concat([self.parent.dfTlm_smt, self.parent.dfTlm_pcm], axis=1)      ### T.B.REFAC. ###
         
-        # for debug
-        # df_tmp.to_csv('./debug.csv')
-
         # - update plot points by appending latest values
         self.x_series = np.append(self.x_series, df_tmp.iloc[-1,self.__IDX_TIME])
         for i in range(self.__N_PLOTTER):
-            # self.y_series = np.append(self.y_series, df_tmp.iloc[-1,self.index_plot[i]])
             self.y_series = np.append(self.y_series, df_tmp.iloc[-1,self.PlotterAttr[i]['idx_item']])
+            # self.y_series = np.append(self.y_series, df_tmp.iloc[-1,self.PlotterAttr[i]['idx_item']+1])     # tentative
 
-        # print("GUI PLT: append latest values {}".format(df_tmp.iloc[-1,self.index_x]))
-        # print("GUI PLT: x_series = {}".format(self.x_series))
-        # print("GUI PLT: y_series = {}".format(self.y_series))
+        # for debug
+        # print(f'GUI PLT: append latest values {df_tmp.iloc[-1,self.index_x]}')
+        # print(f'GUI PLT: x_series = {self.x_series}')
+        # print(f'GUI PLT: y_series = {self.y_series}')
 
         # - determine time max & min
         self.t_max = self.x_series[-1]
         self.t_min = self.t_max - self.__T_RANGE
-        # print("GUI PLT: t_max = {}, t_min = {}".format(self.t_max, self.t_min))
+        # print(f'GUI PLT: t_max = {self.t_max}, t_min = {self.t_min}')
 
         # - delete plot points out of the designated time range
         while self.x_series[0] < self.t_min:
@@ -400,13 +414,6 @@ class ChartPanel(wx.Panel):
             return None
         self.__PLOT_COUNT = 0
 
-        # # run tlm_handler concurrently in other threads
-        # executor = concurrent.futures.ThreadPoolExecutor()
-        # # executor = concurrent.futures.ProcessPoolExecutor()
-        # executor.submit(self.__redraw_plotter_pane)
-
-    # def __redraw_plotter_pane(self):
-        ###
         ### refresh plotter
         self.lines = []
         for i in range(self.__N_PLOTTER):
@@ -455,10 +462,6 @@ class ChartPanel(wx.Panel):
         }
         
     # Configure appearance for digital indicators to display current values
-    # <hierarchy>
-    #   IndicatorPane - lytSBoxGroup
-    #                 - sboxGroup    - 
-    #
     def configure_digital_indicator(self):
         self.IndicatorPane = wx.BoxSizer(wx.VERTICAL)
 
@@ -481,11 +484,11 @@ class ChartPanel(wx.Panel):
         self.lytPair = []           # pair of Indicator & Label
         
         # smt items
-        for i in range(self.N_ITEM_SMT):
+        for i in range(self.parent.N_ITEM_SMT):
             # generate instance 
             # - item label (ToggleButton)
             self.tbtnLabel.append(
-                wx.ToggleButton(self, wx.ID_ANY, self.TlmItemAttr_smt[i]['item'], size=(140,22)))
+                wx.ToggleButton(self, wx.ID_ANY, self.parent.TlmItemAttr_smt[i]['item'], size=(140,22)))
             
             # - digital indicator (StaticText)
             self.stxtIndicator.append(
@@ -499,15 +502,15 @@ class ChartPanel(wx.Panel):
             self.lytPair[-1].Add(self.stxtIndicator[-1], flag=wx.EXPAND)
 
         # pcm items
-        for i in range(self.N_ITEM_PCM):
+        for i in range(self.parent.N_ITEM_PCM):
             # generate instance 
             # - item label (ToggleButton)
             self.tbtnLabel.append(
-                wx.ToggleButton(self, wx.ID_ANY, self.TlmItemAttr_pcm[i]['item'], size=(120,22)))
+                wx.ToggleButton(self, wx.ID_ANY, self.parent.TlmItemAttr_pcm[i]['item'], size=(120,22)))
             
             # - digital indicator (StaticText)
             self.stxtIndicator.append(
-                wx.StaticText(self, wx.ID_ANY, str(i + self.N_ITEM_SMT), style=wx.ALIGN_CENTRE | wx.ST_NO_AUTORESIZE))
+                wx.StaticText(self, wx.ID_ANY, str(i + self.parent.N_ITEM_SMT), style=wx.ALIGN_CENTRE | wx.ST_NO_AUTORESIZE))
             self.stxtIndicator[-1].SetBackgroundColour('BLACK')
             self.stxtIndicator[-1].SetForegroundColour('GREEN')
 
@@ -529,17 +532,17 @@ class ChartPanel(wx.Panel):
                 j = -1
 
                 # search throughout smt items
-                for iii in range(self.N_ITEM_SMT):
-                    if ( self.TlmItemAttr_smt[iii]['group'] == self.GroupAttr[i]['label'] and
-                         self.TlmItemAttr_smt[iii]['item order'] == ii ) :
+                for iii in range(self.parent.N_ITEM_SMT):
+                    if ( self.parent.TlmItemAttr_smt[iii]['group'] == self.GroupAttr[i]['label'] and
+                         self.parent.TlmItemAttr_smt[iii]['item order'] == ii ) :
                         j = iii
                         break    
                 else:
                     # search throughout pcm items
-                    for iii in range(self.N_ITEM_PCM):
-                        if ( self.TlmItemAttr_pcm[iii]['group'] == self.GroupAttr[i]['label'] and
-                            self.TlmItemAttr_pcm[iii]['item order'] == ii ) :
-                            j = iii + self.N_ITEM_SMT
+                    for iii in range(self.parent.N_ITEM_PCM):
+                        if ( self.parent.TlmItemAttr_pcm[iii]['group'] == self.GroupAttr[i]['label'] and
+                             self.parent.TlmItemAttr_pcm[iii]['item order'] == ii ) :
+                            j = iii + self.parent.N_ITEM_SMT
                             break    
                 
                 # assign items in grids
@@ -572,31 +575,31 @@ class ChartPanel(wx.Panel):
             dict_tmp = {}
 
             # search throughout smt items
-            for iii in range(self.N_ITEM_SMT):
-                if self.TlmItemAttr_smt[iii]['plot #'] != i: continue       # skip
+            for iii in range(self.parent.N_ITEM_SMT):
+                if self.parent.TlmItemAttr_smt[iii]['plot #'] != i: continue       # skip
       
                 dict_tmp['idx_item']    = iii
-                dict_tmp['y_label']     = str(self.TlmItemAttr_smt[iii]['item'])
-                dict_tmp['y_unit']      = str(self.TlmItemAttr_smt[iii]['unit'])
-                dict_tmp['y_min']       = float(self.TlmItemAttr_smt[iii]['y_min'])
-                dict_tmp['y_max']       = float(self.TlmItemAttr_smt[iii]['y_max'])
-                dict_tmp['alart_lim_l'] = float(self.TlmItemAttr_smt[iii]['alert_lim_l'])
-                dict_tmp['alart_lim_u'] = float(self.TlmItemAttr_smt[iii]['alert_lim_u'])
+                dict_tmp['y_label']     = str(self.parent.TlmItemAttr_smt[iii]['item'])
+                dict_tmp['y_unit']      = str(self.parent.TlmItemAttr_smt[iii]['unit'])
+                dict_tmp['y_min']       = float(self.parent.TlmItemAttr_smt[iii]['y_min'])
+                dict_tmp['y_max']       = float(self.parent.TlmItemAttr_smt[iii]['y_max'])
+                dict_tmp['alart_lim_l'] = float(self.parent.TlmItemAttr_smt[iii]['alert_lim_l'])
+                dict_tmp['alart_lim_u'] = float(self.parent.TlmItemAttr_smt[iii]['alert_lim_u'])
 
                 break
             
             else:
                 # search throughout pcm items
-                for iii in range(self.N_ITEM_PCM):
-                    if self.TlmItemAttr_pcm[iii]['plot #'] != i: continue   # skip
+                for iii in range(self.parent.N_ITEM_PCM):
+                    if self.parent.TlmItemAttr_pcm[iii]['plot #'] != i: continue   # skip
 
-                    dict_tmp['idx_item']    = iii + self.N_ITEM_SMT
-                    dict_tmp['y_label']     = str(self.TlmItemAttr_pcm[iii]['item'])
-                    dict_tmp['y_unit']      = str(self.TlmItemAttr_pcm[iii]['unit'])
-                    dict_tmp['y_min']       = float(self.TlmItemAttr_pcm[iii]['y_min'])
-                    dict_tmp['y_max']       = float(self.TlmItemAttr_pcm[iii]['y_max'])
-                    dict_tmp['alart_lim_l'] = float(self.TlmItemAttr_pcm[iii]['alert_lim_l'])
-                    dict_tmp['alart_lim_u'] = float(self.TlmItemAttr_pcm[iii]['alert_lim_u'])
+                    dict_tmp['idx_item']    = iii + self.parent.N_ITEM_SMT
+                    dict_tmp['y_label']     = str(self.parent.TlmItemAttr_pcm[iii]['item'])
+                    dict_tmp['y_unit']      = str(self.parent.TlmItemAttr_pcm[iii]['unit'])
+                    dict_tmp['y_min']       = float(self.parent.TlmItemAttr_pcm[iii]['y_min'])
+                    dict_tmp['y_max']       = float(self.parent.TlmItemAttr_pcm[iii]['y_max'])
+                    dict_tmp['alart_lim_l'] = float(self.parent.TlmItemAttr_pcm[iii]['alert_lim_l'])
+                    dict_tmp['alart_lim_u'] = float(self.parent.TlmItemAttr_pcm[iii]['alert_lim_u'])
 
                     break
 
