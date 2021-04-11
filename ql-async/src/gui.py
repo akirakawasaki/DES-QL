@@ -23,8 +23,7 @@ from matplotlib.figure import Figure
 """
 wxPython configurations
 """
-FETCH_RATE_LATEST_VALUES       = 50     # ms/cycle
-# FETCH_RATE_LATEST_VALUES       = 200     # ms/cycle
+FETCH_RATE_LATEST_VALUES       = 25     # ms/cycle
 REFLESH_RATE_DIGITAL_INDICATOR = 800    # ms/cycle
 REFLESH_RATE_PLOTTER           = 100    # ms/cycle
 
@@ -73,8 +72,8 @@ class frmMain(wx.Frame):
             print(f'Error GUI: Config file "{self.FPATH_CONFIG}" NOT exists! smt')
             sys.exit()
 
-        self.TlmItemList_smt = df_cfg_smt['item'].values.tolist()
         self.TlmItemAttr_smt = df_cfg_smt.to_dict(orient='index')
+        self.TlmItemList_smt = df_cfg_smt['item'].values.tolist()
         self.N_ITEM_SMT = len(self.TlmItemList_smt)
 
         # - pcm
@@ -87,8 +86,8 @@ class frmMain(wx.Frame):
             print(f'Error GUI: Config file "{self.FPATH_CONFIG}" NOT exists! pcm')
             sys.exit()
 
-        self.TlmItemList_pcm = df_cfg_pcm['item'].values.tolist()
         self.TlmItemAttr_pcm = df_cfg_pcm.to_dict(orient='index')
+        self.TlmItemList_pcm = df_cfg_pcm['item'].values.tolist()
         self.N_ITEM_PCM = len(self.TlmItemList_pcm)
 
 
@@ -216,35 +215,6 @@ class ChartPanel(wx.Panel):
 
         self.__PLOT_COUNT = self.__PLOT_SKIP   ### T.B.REFAC. ###
 
-        ### load configurations from an external file
-        # # - smt
-        # try: 
-        #     # df_cfg_smt = pd.read_excel(self.parent.FPATH_CONFIG, 
-        #     #                             sheet_name='smt', header=0, index_col=0).dropna(how='all')
-        #     df_cfg_smt = pd.read_excel(self.parent.FPATH_CONFIG, 
-        #                                 sheet_name='smt', header=0, index_col=None).dropna(how='all')
-        # except:
-        #     print('Error TLM: "config_tlm.xlsx"!')
-        #     sys.exit()
-
-        # self.TlmItemList_smt = df_cfg_smt['item'].values.tolist()
-        # self.TlmItemAttr_smt = df_cfg_smt.to_dict(orient='index')
-        # self.N_ITEM_SMT = len(self.TlmItemList_smt)
-
-        # # - pcm
-        # try: 
-        #     # df_cfg_pcm = pd.read_excel(self.parent.FPATH_CONFIG, 
-        #     #                             sheet_name='pcm', header=0, index_col=0).dropna(how='all')
-        #     df_cfg_pcm = pd.read_excel(self.parent.FPATH_CONFIG, 
-        #                                 sheet_name='pcm', header=0, index_col=None).dropna(how='all')
-        # except:
-        #     print('Error TLM: "config_tlm.xlsx"!')
-        #     sys.exit()
-
-        # self.TlmItemList_pcm = df_cfg_pcm['item'].values.tolist()
-        # self.TlmItemAttr_pcm = df_cfg_pcm.to_dict(orient='index')
-        # self.N_ITEM_PCM = len(self.TlmItemList_pcm)
-
         # - digital indicator config
         self.load_config_digital_indicator()
 
@@ -262,11 +232,6 @@ class ChartPanel(wx.Panel):
         self.SetSizer(layout)
 
         ### bind events
-        # - set timer to fetch latest telemeter data
-        # self.tmrFetchTelemeterData = wx.Timer(self)
-        # self.Bind(wx.EVT_TIMER, self.OnFetchLatestValues, self.tmrFetchTelemeterData)
-        # self.tmrFetchTelemeterData.Start(FETCH_RATE_LATEST_VALUES)
-
         # - set timer to refresh current-value pane
         self.tmrRefreshDigitalIndicator = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.OnRefreshDigitalIndicator, self.tmrRefreshDigitalIndicator)
@@ -276,53 +241,6 @@ class ChartPanel(wx.Panel):
         self.tmrRefreshPlotter = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.OnRefreshPlotter, self.tmrRefreshPlotter)
         self.tmrRefreshPlotter.Start(REFLESH_RATE_PLOTTER)
-
-    # Event handler: EVT_TIMER
-    # def OnFetchLatestValues(self, event):
-    #     # print('GUI FTC: fetched tlm data')
-        
-    #     self.dfTlm_smt = pd.DataFrame()
-    #     self.dfTlm_pcm = pd.DataFrame()
-
-    #     ### fetch current values
-    #     # - smt
-    #     while True:
-    #         try:
-    #             self.dfTlm_smt = self.q_data_smt.get_nowait()
-    #         except queue.Empty:
-    #             break
-    #         # else:
-    #         #     if self.q_data_smt.empty() == True:     break
-    #     # - pcm
-    #     while True:
-    #         try:
-    #             self.dfTlm_pcm = self.q_data_pcm.get_nowait()
-    #         except queue.Empty:
-    #             break
-    #         # else:
-    #         #     if self.q_data_pcm.empty() == True:     break
-
-    #     # break off when tlm data not exist
-    #     # if len(self.tlm_latest_data.df_smt.index) == 0 or len(self.tlm_latest_data.df_pcm.index) == 0:
-    #     if len(self.dfTlm_smt.index) == 0 or len(self.dfTlm_pcm.index) == 0:
-    #         print('GUI FTC: awaiting SMT and/or PCM data')
-    #         self.__F_TLM_IS_ACTIVE = False
-    #         return None
-        
-    #     # for debug
-    #     # print('GUI FTC: df.index length = {}'.format(len(self.tlm_latest_data.df_smt.index)))
-    #     # print(self.tlm_latest_data.df_smt) 
-
-    #     self.__F_TLM_IS_ACTIVE = True
-
-    #     # if self.dfTlm == self.tlm_latest_data.df_smt:
-    #     #     print('GUI FTC: TLM data has NOT been updated!')
-    #     #     return None
-        
-    #     ### T.B.REFAC.: should be thread safe ###
-    #     # fetch current values & store
-    #     # self.dfTlm_smt = self.tlm_latest_data.df_smt
-    #     # self.dfTlm_pcm = self.tlm_latest_data.df_pcm
 
     # Event handler: EVT_TIMER
     def OnRefreshDigitalIndicator(self, event):
