@@ -93,14 +93,14 @@ class frmMain(wx.Frame):
 
 
         self.dictTlm_smt = dict.fromkeys(['Line#'] + self.TlmItemList_smt, np.nan)
-        self.dfTlm_smt = pd.DataFrame.from_dict(self.dictTlm_smt, orient='index').T
+        # self.dfTlm_smt = pd.DataFrame.from_dict(self.dictTlm_smt, orient='index').T
         # self.dfTlm_smt = pd.DataFrame.from_dict(self.dictTlm_smt, orient='columns')
-        # self.dfTlm_smt = pd.DataFrame()
+        self.dfTlm_smt = pd.DataFrame()
 
         self.dictTlm_pcm = dict.fromkeys(['Line#'] + self.TlmItemList_pcm, np.nan)
-        self.dfTlm_pcm = pd.DataFrame.from_dict(self.dictTlm_pcm, orient='index').T
+        # self.dfTlm_pcm = pd.DataFrame.from_dict(self.dictTlm_pcm, orient='index').T
         # self.dfTlm_pcm = pd.DataFrame.from_dict(self.dictTlm_pcm, orient='columns')
-        # self.dfTlm_pcm = pd.DataFrame()
+        self.dfTlm_pcm = pd.DataFrame()
 
         # for debug
         print(f'dfTlm_smt = ')
@@ -166,7 +166,8 @@ class frmMain(wx.Frame):
         # - smt
         while True:
             try:
-                self.dfTlm_smt.update( self.q_data_smt.get_nowait() )
+                self.dfTlm_smt = self.q_data_smt.get_nowait()
+                # self.dfTlm_smt.update( self.q_data_smt.get_nowait() )
             except queue.Empty:
                 break
             # else:
@@ -174,7 +175,8 @@ class frmMain(wx.Frame):
         # - pcm
         while True:
             try:
-                self.dfTlm_pcm.update( self.q_data_pcm.get_nowait() )
+                self.dfTlm_pcm = self.q_data_pcm.get_nowait()
+                # self.dfTlm_pcm.update( self.q_data_pcm.get_nowait() )
             except queue.Empty:
                 break
             # else:
