@@ -34,7 +34,8 @@ class TelemeterHandler :
     BUFSIZE = W2B * (LEN_HEADER + LEN_PAYLOAD) * NUM_OF_FRAMES       # 1088 bytes
 
     # input file pathes
-    FPATH_CONFIG = './config_tlm_3.xlsx'
+    FPATH_CONFIG = './config_tlm_4.xlsx'
+    # FPATH_CONFIG = './config_tlm_3.xlsx'
     # FPATH_CONFIG = './config_tlm_2.xlsx'
 
     # output file pathes
