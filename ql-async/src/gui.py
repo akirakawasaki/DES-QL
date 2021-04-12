@@ -249,13 +249,13 @@ class ChartPanel(wx.Panel):
         
         ### refresh indicators
         # - sweep groups
-        for i in self.GroupAttr.keys():
+        for strGroupName in self.GroupAttr.keys():
             # - seep items belong each group    ### T.B.REFAC. ###
-            for ii in range(self.GroupAttr[i]['rows'] * self.GroupAttr[i]['cols']):
+            for ii in range(self.GroupAttr[strGroupName]['rows'] * self.GroupAttr[strGroupName]['cols']):
                 # search throughout smt items
                 for iii in range(self.parent.N_ITEM_SMT):
                     # skip
-                    if (   self.parent.TlmItemAttr_smt[iii]['group']      != self.GroupAttr[i]['label']
+                    if (   self.parent.TlmItemAttr_smt[iii]['group']      != strGroupName
                         or self.parent.TlmItemAttr_smt[iii]['item order'] != ii ):
                         continue
 
@@ -287,14 +287,62 @@ class ChartPanel(wx.Panel):
                     # search throughout pcm items
                     for iii in range(self.parent.N_ITEM_PCM):
                         # skip
-                        if ( self.parent.TlmItemAttr_pcm[iii]['group']      != self.GroupAttr[i]['label'] or
-                             self.parent.TlmItemAttr_pcm[iii]['item order'] != ii ) :
+                        if (   self.parent.TlmItemAttr_pcm[iii]['group']      != strGroupName 
+                            or self.parent.TlmItemAttr_pcm[iii]['item order'] != ii ) :
                             continue
 
                         # refresh indicator
                         self.stxtIndicator[iii+self.parent.N_ITEM_SMT].SetLabel(str(np.round(self.parent.dfTlm_pcm.iloc[-1, iii], 2)))
                         
-                        break      
+                        break
+
+        # - sweep groups
+        # for i in self.GroupAttr.keys():
+        #     # - seep items belong each group    ### T.B.REFAC. ###
+        #     for ii in range(self.GroupAttr[i]['rows'] * self.GroupAttr[i]['cols']):
+        #         # search throughout smt items
+        #         for iii in range(self.parent.N_ITEM_SMT):
+        #             # skip
+        #             if (   self.parent.TlmItemAttr_smt[iii]['group']      != self.GroupAttr[i]['label']
+        #                 or self.parent.TlmItemAttr_smt[iii]['item order'] != ii ):
+        #                 continue
+
+        #             # refresh indicator
+        #             self.stxtIndicator[iii].SetLabel(str(np.round(self.parent.dfTlm_smt.iloc[-1, iii], 2)))
+        #             # self.stxtIndicator[iii].SetLabel(str(np.round(df_smt_tmp.iloc[-1, iii], 2)))
+
+        #             # accentuate indicator by colors
+        #             if self.parent.TlmItemAttr_smt[iii]['type'] == 'bool':
+        #                 # - OFF
+        #                 # if int(df_smt_tmp.iloc[-1, iii]) == 0:
+        #                 if int(self.parent.dfTlm_smt.iloc[-1, iii]) == 0:
+        #                     self.tbtnLabel[iii].SetForegroundColour('NullColour')
+        #                     self.stxtIndicator[iii].SetBackgroundColour('NullColour')
+        #                     # self.stxtIndicator[iii].SetBackgroundColour('NAVY')
+        #                 # - ON
+        #                 else:
+        #                     self.tbtnLabel[iii].SetForegroundColour('RED')
+        #                     # self.tbtnLabel[iii].SetForegroundColour('BLUE')
+        #                     # self.stxtIndicator[iii].SetBackgroundColour('GREY')
+        #                     self.stxtIndicator[iii].SetBackgroundColour('MAROON')
+        #                     # self.stxtIndicator[iii].SetBackgroundColour('NAVY')
+                        
+        #                 self.stxtIndicator[iii].Refresh()
+
+        #             break
+                
+        #         else:
+        #             # search throughout pcm items
+        #             for iii in range(self.parent.N_ITEM_PCM):
+        #                 # skip
+        #                 if ( self.parent.TlmItemAttr_pcm[iii]['group']      != self.GroupAttr[i]['label'] or
+        #                      self.parent.TlmItemAttr_pcm[iii]['item order'] != ii ) :
+        #                     continue
+
+        #                 # refresh indicator
+        #                 self.stxtIndicator[iii+self.parent.N_ITEM_SMT].SetLabel(str(np.round(self.parent.dfTlm_pcm.iloc[-1, iii], 2)))
+                        
+        #                 break
 
     # Event handler: EVT_TIMER
     def OnRefreshPlotter(self, event):
@@ -373,13 +421,21 @@ class ChartPanel(wx.Panel):
     def load_config_digital_indicator(self):
         ### T.B.REFAC.: TEMPORALLY DESIGNATED BY LITERALS ###
         self.GroupAttr = {
-            0: {'idx': 0, 'label': 'Time',          'rows': 1, 'cols': 6},
-            1: {'idx': 1, 'label': 'DES State',     'rows': 5, 'cols': 6},
-            2: {'idx': 2, 'label': 'Pressure',      'rows': 2, 'cols': 6},
-            3: {'idx': 3, 'label': 'Temperature',   'rows': 2, 'cols': 6},
-            4: {'idx': 4, 'label': 'IMU',           'rows': 2, 'cols': 6},
-            5: {'idx': 5, 'label': 'House Keeping', 'rows': 3, 'cols': 6}
+            'Time':          {'gidx': 0, 'rows': 1, 'cols': 6},
+            'DES State':     {'gidx': 1, 'rows': 5, 'cols': 6},
+            'Pressure':      {'gidx': 2, 'rows': 2, 'cols': 6},
+            'Temperature':   {'gidx': 3, 'rows': 2, 'cols': 6},
+            'IMU':           {'gidx': 4, 'rows': 2, 'cols': 6},
+            'House Keeping': {'gidx': 5, 'rows': 3, 'cols': 6}
         }
+        # self.GroupAttr = {
+        #     0: {'idx': 0, 'label': 'Time',          'rows': 1, 'cols': 6},
+        #     1: {'idx': 1, 'label': 'DES State',     'rows': 5, 'cols': 6},
+        #     2: {'idx': 2, 'label': 'Pressure',      'rows': 2, 'cols': 6},
+        #     3: {'idx': 3, 'label': 'Temperature',   'rows': 2, 'cols': 6},
+        #     4: {'idx': 4, 'label': 'IMU',           'rows': 2, 'cols': 6},
+        #     5: {'idx': 5, 'label': 'House Keeping', 'rows': 3, 'cols': 6}
+        # }
         
     # Configure appearance for digital indicators to display current values
     def configure_digital_indicator(self):
@@ -388,15 +444,25 @@ class ChartPanel(wx.Panel):
         ### generate containers to groupe indicators (StaticBox)
         self.SBoxGroup = []
         self.lytSBoxGroup = []
-        for i in self.GroupAttr.keys():
+        for strGroupName in self.GroupAttr.keys():
             # - generate an instance
-            self.SBoxGroup.append(wx.StaticBox(self, wx.ID_ANY, self.GroupAttr[i]['label']))
+            self.SBoxGroup.append(wx.StaticBox(self, wx.ID_ANY, strGroupName))
             self.SBoxGroup[-1].SetForegroundColour('WHITE')
             self.SBoxGroup[-1].SetFont(wx.Font(15, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
             
             # - lay out the instance
             self.lytSBoxGroup.append(wx.StaticBoxSizer(self.SBoxGroup[-1], wx.VERTICAL))
             self.IndicatorPane.Add(self.lytSBoxGroup[-1])
+
+        # for i in self.GroupAttr.keys():
+        #     # - generate an instance
+        #     self.SBoxGroup.append(wx.StaticBox(self, wx.ID_ANY, self.GroupAttr[i]['label']))
+        #     self.SBoxGroup[-1].SetForegroundColour('WHITE')
+        #     self.SBoxGroup[-1].SetFont(wx.Font(15, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+            
+        #     # - lay out the instance
+        #     self.lytSBoxGroup.append(wx.StaticBoxSizer(self.SBoxGroup[-1], wx.VERTICAL))
+        #     self.IndicatorPane.Add(self.lytSBoxGroup[-1])
 
         ### generate indicators & their labels
         self.tbtnLabel = []
@@ -440,31 +506,58 @@ class ChartPanel(wx.Panel):
             self.lytPair[-1].Add(self.stxtIndicator[-1], flag=wx.EXPAND)
 
         ### lay out pairs of indicators & labels in the grouping SBoxes
+        # self.lytIndicator = []
+        # for i in self.GroupAttr.keys():
+        #     # generate grid in the grouping SBox
+        #     self.lytIndicator.append(
+        #         wx.GridSizer(rows=self.GroupAttr[i]['rows'], cols=self.GroupAttr[i]['cols'], gap=(10,5)))
+            
+        #     # place items in the grid
+        #     for ii in range(self.GroupAttr[i]['rows'] * self.GroupAttr[i]['cols']):
+        #         # initialize
+        #         j = -1
+
+        #         # search throughout smt items
+        #         for iii in range(self.parent.N_ITEM_SMT):
+        #             if ( self.parent.TlmItemAttr_smt[iii]['group'] == self.GroupAttr[i]['label'] and
+        #                  self.parent.TlmItemAttr_smt[iii]['item order'] == ii ) :
+        #                 j = iii
+        #                 break    
+        #         else:
+        #             # search throughout pcm items
+        #             for iii in range(self.parent.N_ITEM_PCM):
+        #                 if ( self.parent.TlmItemAttr_pcm[iii]['group'] == self.GroupAttr[i]['label'] and
+        #                      self.parent.TlmItemAttr_pcm[iii]['item order'] == ii ) :
+        #                     j = iii + self.parent.N_ITEM_SMT
+        #                     break
+
         self.lytIndicator = []
-        for i in self.GroupAttr.keys():
+        for strGroupName in self.GroupAttr.keys():
+            i = self.GroupAttr[strGroupName]['gidx']
+            
             # generate grid in the grouping SBox
             self.lytIndicator.append(
-                wx.GridSizer(rows=self.GroupAttr[i]['rows'], cols=self.GroupAttr[i]['cols'], gap=(10,5)))
+                wx.GridSizer(rows=self.GroupAttr[strGroupName]['rows'], cols=self.GroupAttr[strGroupName]['cols'], gap=(10,5)))
             
             # place items in the grid
-            for ii in range(self.GroupAttr[i]['rows'] * self.GroupAttr[i]['cols']):
+            for ii in range(self.GroupAttr[strGroupName]['rows'] * self.GroupAttr[strGroupName]['cols']):
                 # initialize
                 j = -1
 
                 # search throughout smt items
                 for iii in range(self.parent.N_ITEM_SMT):
-                    if ( self.parent.TlmItemAttr_smt[iii]['group'] == self.GroupAttr[i]['label'] and
-                         self.parent.TlmItemAttr_smt[iii]['item order'] == ii ) :
+                    if (    self.parent.TlmItemAttr_smt[iii]['group'] == strGroupName 
+                        and self.parent.TlmItemAttr_smt[iii]['item order'] == ii ) :
                         j = iii
                         break    
                 else:
                     # search throughout pcm items
                     for iii in range(self.parent.N_ITEM_PCM):
-                        if ( self.parent.TlmItemAttr_pcm[iii]['group'] == self.GroupAttr[i]['label'] and
-                             self.parent.TlmItemAttr_pcm[iii]['item order'] == ii ) :
+                        if (    self.parent.TlmItemAttr_pcm[iii]['group'] == strGroupName 
+                            and self.parent.TlmItemAttr_pcm[iii]['item order'] == ii ) :
                             j = iii + self.parent.N_ITEM_SMT
-                            break    
-                
+                            break
+
                 # assign items in grids
                 if j == -1:
                     self.lytIndicator[i].Add((0,0))                         # empty cell
