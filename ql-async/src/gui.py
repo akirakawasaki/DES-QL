@@ -420,13 +420,15 @@ class ChartPanel(wx.Panel):
     # Load configurations from external files
     def load_config_digital_indicator(self):
         ### T.B.REFAC.: TEMPORALLY DESIGNATED BY LITERALS ###
+        N_ITEM_PER_ROW = 6
+
         self.GroupAttr = {
-            'Time':          {'gidx': 0, 'rows': 1, 'cols': 6},
-            'DES State':     {'gidx': 1, 'rows': 5, 'cols': 6},
-            'Pressure':      {'gidx': 2, 'rows': 2, 'cols': 6},
-            'Temperature':   {'gidx': 3, 'rows': 2, 'cols': 6},
-            'IMU':           {'gidx': 4, 'rows': 2, 'cols': 6},
-            'House Keeping': {'gidx': 5, 'rows': 3, 'cols': 6}
+            'Time':          {'gidx': 0, 'rows': 1, 'cols': N_ITEM_PER_ROW},
+            'DES State':     {'gidx': 1, 'rows': 5, 'cols': N_ITEM_PER_ROW},
+            'Pressure':      {'gidx': 2, 'rows': 2, 'cols': N_ITEM_PER_ROW},
+            'Temperature':   {'gidx': 3, 'rows': 2, 'cols': N_ITEM_PER_ROW},
+            'IMU':           {'gidx': 4, 'rows': 2, 'cols': N_ITEM_PER_ROW},
+            'House Keeping': {'gidx': 5, 'rows': 3, 'cols': N_ITEM_PER_ROW}
         }
         # self.GroupAttr = {
         #     0: {'idx': 0, 'label': 'Time',          'rows': 1, 'cols': 6},
