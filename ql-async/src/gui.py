@@ -91,22 +91,45 @@ class frmMain(wx.Frame):
         self.TlmItemList_pcm = df_cfg_pcm['item'].values.tolist()
         self.N_ITEM_PCM = len(self.TlmItemList_pcm)
 
+        ### T.B.REFAC. ###
+        group_order = {'Time':0, 'DES State':1, 'Pressure':2, 'Temperature':3, 'IMU':4, 'House Keeping':5}
 
-        self.dictTlm_smt = dict.fromkeys(['Line#'] + self.TlmItemList_smt, np.nan)
+        # df_cfg = pd.concat([df_cfg_smt, df_cfg_pcm], axis=0)
+
+        # df_cfg['group order'] = df_cfg['group'].apply(lambda x: group_order.index(x) if x in group_order else -1)
+        # df_cfg_s = df_cfg.sort_values(['group','item order'])
+        # print(df_cfg_s)
+
+        # self.TlmItemAttr = df_cfg_s.to_dict(orient='index')
+
+
+        ### initialize a dictionary to store latest values
+        self.dictTlmLatestValues = {}
+
+        self.dictTlmLatestValues_smt = dict.fromkeys(['Line# (smt)'] + self.TlmItemList_smt, np.nan)
+        self.dictTlmLatestValues.update(self.dictTlmLatestValues_smt)
         # self.dfTlm_smt = pd.DataFrame.from_dict(self.dictTlm_smt, orient='index').T
         # self.dfTlm_smt = pd.DataFrame.from_dict(self.dictTlm_smt, orient='columns')
         self.dfTlm_smt = pd.DataFrame()
 
-        self.dictTlm_pcm = dict.fromkeys(['Line#'] + self.TlmItemList_pcm, np.nan)
+        self.dictTlmLatestValues_pcm = dict.fromkeys(['Line# (pcm)'] + self.TlmItemList_pcm, np.nan)
+        self.dictTlmLatestValues.update(self.dictTlmLatestValues_pcm)
         # self.dfTlm_pcm = pd.DataFrame.from_dict(self.dictTlm_pcm, orient='index').T
         # self.dfTlm_pcm = pd.DataFrame.from_dict(self.dictTlm_pcm, orient='columns')
         self.dfTlm_pcm = pd.DataFrame()
 
         # for debug
-        print(f'dfTlm_smt = ')
-        print(self.dfTlm_smt)
-        print(f'dfTlm_pcm = ')
-        print(self.dfTlm_pcm)
+        print(f'dictTlmLatestValues_smt = {self.dictTlmLatestValues_smt}')
+        print(f'dictTlmLatestValues_pcm = {self.dictTlmLatestValues_pcm}')
+        # print(f'dfTlm_smt = ')
+        # print(self.dfTlm_smt)
+        # print(f'dfTlm_pcm = ')
+        # print(self.dfTlm_pcm)
+
+        # check key duplication
+        if (self.dictTlmLatestValues_smt.keys() & self.dictTlmLatestValues_pcm.keys()) != set():
+            print(f'Error GUI: Keys are duplicated between SMT & PCM! Check CONFIG file.')
+            sys.exit()
 
 
         self.F_TLM_IS_ACTIVE = False
@@ -197,56 +220,33 @@ class frmMain(wx.Frame):
         
         # for debug
         # print('GUI FTC: df.index length = {}'.format(len(self.tlm_latest_data.df_smt.index)))
-        # print(self.tlm_latest_data.df_smt) 
+        # print('self.dfTlm_smt = ')
+        # print(self.dfTlm_smt)
+        # print('self.dfTlm_pcm = ') 
+        # print(self.dfTlm_pcm)
+        # print(self.dfTlm_smt.columns)
+        # print(self.dfTlm_smt.iloc[-1].to_list)
+
+        # tmp = self.dfTlm_smt.to_dict(orient='index')
+        # print(tmp[0])
+        # print(tmp)
+
+        self.dictTlmLatestValues.update( self.dfTlm_smt.to_dict(orient='index')[0] )
+        self.dictTlmLatestValues.update( self.dfTlm_pcm.to_dict(orient='index')[0] )
+
+        # self.dictTlmLatestValues.update( dict(zip(self.dfTlm_pcm.columns, self.dfTlm_pcm[-1])) )
+        # dictTlm_pcm = self.dfTlm_pcm.to_dict
+        # dictTlm_pcm = self.dfTlm_pcm.T.to_dict
+        # self.dictTlmLatestValues.update(dictTlm_pcm)
 
         self.F_TLM_IS_ACTIVE = True
 
-    # Configure appearance for plotters to display time histories
-    def configure_plotter(self):
-        # initialize data set for plot
-        self.x_series = np.empty(0)
-        self.y_series = np.empty(0)
-        
-        # generate empty matplotlib Fugure
-        self.fig = Figure(figsize=(6, 8))
-        
-        # register Figure with matplotlib Canvas
-        self.canvas = FigureCanvasWxAgg(self, wx.ID_ANY, self.fig)
-
-        # return None     # for debug
-
-        ### prepare axes
-        # - generate subplots containing axes in Figure
-        # NOTE: axes become iterrable hereafter
-        self.axes = []
-        for i in range(self.__N_PLOTTER):
-            self.axes.append(self.fig.add_subplot(self.__N_PLOTTER, 1, i+1))
-
-            # - set limit for x axis
-            t_min = 0
-            self.axes[i].set_xlim([t_min, t_min + self.__T_RANGE])
-
-            # - set limit for y axis
-            self.axes[i].set_ylim([self.PlotterAttr[i]['y_min'], self.PlotterAttr[i]['y_max']])
-
-            # - set label for y axis
-            self.axes[i].set_ylabel(self.PlotterAttr[i]['y_label'])
-            # self.axes[i].set_ylabel(self.PlotterAttr[i]['y_label'] + f' [{self.PlotterAttr[i]['y_unit']}]')
-
-        # tentatively draw canvas without plot points to save as background
-        self.canvas.draw()                                            
-
-        # save the empty canvas as background
-        # NOTE: backgrounds become iterrable hereafter
-        self.backgrounds = []
-        for i in range(self.__N_PLOTTER):
-            self.backgrounds.append(self.canvas.copy_from_bbox(self.axes[i].bbox))
 
 # 
-#   Panel: Plotter Pane ()
+#   Panel: Plotter Pane (Time-history plot)
 # 
 class pnlPlotter(wx.Panel):
-    __N_PLOTTER = 5
+    N_PLOTTER = 5
     __T_RANGE = 30    # [s]
 
     # __IDX_TIME = 1
@@ -284,12 +284,14 @@ class pnlPlotter(wx.Panel):
         # print(f'GUI PLT: F_TLM_IS_ACTIVE = {self.parent.F_TLM_IS_ACTIVE}')      # for debug
 
         ### update data set for plot
-        df_tmp = pd.concat([self.parent.dfTlm_smt, self.parent.dfTlm_pcm], axis=1)      ### T.B.REFAC. ###
+        # df_tmp = pd.concat([self.parent.dfTlm_smt, self.parent.dfTlm_pcm], axis=1)      ### T.B.REFAC. ###
         
         # - update plot points by appending latest values
-        self.x_series = np.append(self.x_series, df_tmp.iloc[-1,self.__IDX_TIME])
-        for i in range(self.__N_PLOTTER):
-            self.y_series = np.append(self.y_series, df_tmp.iloc[-1,self.PlotterAttr[i]['idx_item']])
+        self.x_series = np.append(self.x_series, self.parent.dictTlmLatestValues['GSE time'])
+        # self.x_series = np.append(self.x_series, df_tmp.iloc[-1,self.__IDX_TIME])
+        for i in range(self.N_PLOTTER):
+            self.y_series = np.append(self.y_series, self.parent.dictTlmLatestValues[self.PlotterAttr[i]['item']])
+            # self.y_series = np.append(self.y_series, df_tmp.iloc[-1,self.PlotterAttr[i]['idx_item']])
             # self.y_series = np.append(self.y_series, df_tmp.iloc[-1,self.PlotterAttr[i]['idx_item']+1])     # tentative
 
         # for debug
@@ -305,7 +307,7 @@ class pnlPlotter(wx.Panel):
         # - delete plot points out of the designated time range
         while self.x_series[0] < self.t_min:
             self.x_series = np.delete(self.x_series, 0)
-            self.y_series = np.delete(self.y_series, np.s_[0:self.__N_PLOTTER])
+            self.y_series = np.delete(self.y_series, np.s_[0:self.N_PLOTTER])
             # print('GUI PLT: a member of 'x_series' is out of the range')
 
         ### T.B.REFAC. ###
@@ -317,7 +319,7 @@ class pnlPlotter(wx.Panel):
 
         ### refresh plotter
         self.lines = []
-        for i in range(self.__N_PLOTTER):
+        for i in range(self.N_PLOTTER):
             # delete x axis and lines by restroring canvas
             self.canvas.restore_region(self.backgrounds[i])
 
@@ -335,13 +337,13 @@ class pnlPlotter(wx.Panel):
         
             # update plot
             # NOTE: lines become iterrable hereafter
-            self.lines.append(self.axes[i].plot(self.x_series, self.y_series[i::self.__N_PLOTTER], color='LIME')[0])
+            self.lines.append(self.axes[i].plot(self.x_series, self.y_series[i::self.N_PLOTTER], color='LIME')[0])
      
             # reflect updates in lines
             self.axes[i].draw_artist(self.lines[i])
 
         # redraw and show updated canvas
-        for i in range(self.__N_PLOTTER):
+        for i in range(self.N_PLOTTER):
             self.fig.canvas.blit(self.axes[i].bbox)
 
         # redraw and show updated canvas
@@ -353,11 +355,11 @@ class pnlPlotter(wx.Panel):
     # Load configurations from external files
     def load_config_plotter(self):
         # handle exception
-        # if self.__N_PLOTTER > 5: self.__N_PLOTTER = 5
-        self.__N_PLOTTER = max(1, min(5, self.__N_PLOTTER))
+        # if self.N_PLOTTER > 5: self.N_PLOTTER = 5
+        self.N_PLOTTER = max(1, min(5, self.N_PLOTTER))
 
         self.PlotterAttr = {}
-        for i in range(self.__N_PLOTTER):  
+        for i in range(self.N_PLOTTER):  
             dict_tmp = {}
 
             # search throughout smt items
@@ -365,6 +367,7 @@ class pnlPlotter(wx.Panel):
                 if self.parent.TlmItemAttr_smt[iii]['plot #'] != i: continue       # skip
       
                 dict_tmp['idx_item']    = iii
+                dict_tmp['item']        = str(self.parent.TlmItemAttr_smt[iii]['item'])
                 dict_tmp['y_label']     = str(self.parent.TlmItemAttr_smt[iii]['item'])
                 dict_tmp['y_unit']      = str(self.parent.TlmItemAttr_smt[iii]['unit'])
                 dict_tmp['y_min']       = float(self.parent.TlmItemAttr_smt[iii]['y_min'])
@@ -380,6 +383,7 @@ class pnlPlotter(wx.Panel):
                     if self.parent.TlmItemAttr_pcm[iii]['plot #'] != i: continue   # skip
 
                     dict_tmp['idx_item']    = iii + self.parent.N_ITEM_SMT
+                    dict_tmp['item']        = str(self.parent.TlmItemAttr_pcm[iii]['item'])
                     dict_tmp['y_label']     = str(self.parent.TlmItemAttr_pcm[iii]['item'])
                     dict_tmp['y_unit']      = str(self.parent.TlmItemAttr_pcm[iii]['unit'])
                     dict_tmp['y_min']       = float(self.parent.TlmItemAttr_pcm[iii]['y_min'])
@@ -410,8 +414,8 @@ class pnlPlotter(wx.Panel):
         # - generate subplots containing axes in Figure
         # NOTE: axes become iterrable hereafter
         self.axes = []
-        for i in range(self.__N_PLOTTER):
-            self.axes.append(self.fig.add_subplot(self.__N_PLOTTER, 1, i+1))
+        for i in range(self.N_PLOTTER):
+            self.axes.append(self.fig.add_subplot(self.N_PLOTTER, 1, i+1))
 
             # - set limit for x axis
             t_min = 0
@@ -430,8 +434,9 @@ class pnlPlotter(wx.Panel):
         # save the empty canvas as background
         # NOTE: backgrounds become iterrable hereafter
         self.backgrounds = []
-        for i in range(self.__N_PLOTTER):
+        for i in range(self.N_PLOTTER):
             self.backgrounds.append(self.canvas.copy_from_bbox(self.axes[i].bbox))
+
 
 # 
 #   Panel: Digital Indicator Pane
@@ -571,7 +576,7 @@ class pnlDigitalIndicator(wx.Panel):
             # generate instance 
             # - item label (ToggleButton)
             self.tbtnLabel.append(
-                wx.ToggleButton(self, wx.ID_ANY, self.parent.TlmItemAttr_pcm[i]['item'], size=(120,22)))
+                wx.ToggleButton(self, wx.ID_ANY, self.parent.TlmItemAttr_pcm[i]['item'], size=(140,22)))
             
             # - digital indicator (StaticText)
             self.stxtIndicator.append(
@@ -623,12 +628,11 @@ class pnlDigitalIndicator(wx.Panel):
             self.lytSBoxGroup[i].Add(self.lytIndicator[i])
 
         # set states for ToggleButton
-        # for i in range(self.__N_PLOTTER):
+        # for i in range(pnlPlotter.N_PLOTTER):
         #     self.tbtnLabel[self.PlotterAttr[i]['idx_item']].SetValue(True)
 
         # for button in self.tbtnLabel:
         #     button.Bind(wx.EVT_TOGGLEBUTTON, self.graphTest)
-
 
 
 # 
