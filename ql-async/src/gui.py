@@ -503,8 +503,11 @@ class pnlDigitalIndicator(wx.Panel):
                 
                 strItemName = self.dictIndID2Item[strGroupName][i]
 
-                stxtInidicator = iterIndicator.next()
-                tbtnLabel = iterLabel.next()
+                # 
+                if strItemName == '':   continue
+
+                stxtInidicator = next(iterIndicator)
+                tbtnLabel = next(iterLabel)
 
                 # refresh indicator
                 stxtInidicator.SetLabel( 
