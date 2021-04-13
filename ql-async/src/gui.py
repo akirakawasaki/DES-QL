@@ -23,9 +23,9 @@ from matplotlib.figure import Figure
 """
 wxPython configurations
 """
-FETCH_RATE_LATEST_VALUES       = 25     # ms/cycle
-REFLESH_RATE_DIGITAL_INDICATOR = 800    # ms/cycle
-REFLESH_RATE_PLOTTER           = 100    # ms/cycle
+RATE_FETCH_LATEST_VALUES       = 25     # ms/cycle
+RATE_REFLESH_DIGITAL_INDICATOR = 800    # ms/cycle
+RATE_REFLESH_PLOTTER           = 100    # ms/cycle
 
 """
 Matplotlib configuration
@@ -65,42 +65,38 @@ class frmMain(wx.Frame):
         ### load configurations from an external file
         # - smt
         try: 
-            # df_cfg_smt = pd.read_excel(self.FPATH_CONFIG, 
-            #                             sheet_name='smt', header=0, index_col=0).dropna(how='all')
             df_cfg_smt = pd.read_excel(self.FPATH_CONFIG, 
-                                        sheet_name='smt', header=0, index_col=None).dropna(how='all')
+                                        sheet_name='smt', header=0, index_col=0).dropna(how='all')
+            # df_cfg_smt = pd.read_excel(self.FPATH_CONFIG, 
+            #                             sheet_name='smt', header=0, index_col=None).dropna(how='all')
         except:
             print(f'Error GUI: Config file "{self.FPATH_CONFIG}" NOT exists! smt')
             sys.exit()
 
         self.TlmItemAttr_smt = df_cfg_smt.to_dict(orient='index')
-        self.TlmItemList_smt = df_cfg_smt['item'].values.tolist()
+        self.TlmItemList_smt = df_cfg_smt.index.values.tolist()
+        # self.TlmItemList_smt = df_cfg_smt['item'].values.tolist()
         self.N_ITEM_SMT = len(self.TlmItemList_smt)
 
         # - pcm
         try: 
-            # df_cfg_pcm = pd.read_excel(self.FPATH_CONFIG, 
-            #                             sheet_name='pcm', header=0, index_col=0).dropna(how='all')
             df_cfg_pcm = pd.read_excel(self.FPATH_CONFIG, 
-                                        sheet_name='pcm', header=0, index_col=None).dropna(how='all')
+                                        sheet_name='pcm', header=0, index_col=0).dropna(how='all')
+            # df_cfg_pcm = pd.read_excel(self.FPATH_CONFIG, 
+            #                             sheet_name='pcm', header=0, index_col=None).dropna(how='all')
         except:
             print(f'Error GUI: Config file "{self.FPATH_CONFIG}" NOT exists! pcm')
             sys.exit()
 
         self.TlmItemAttr_pcm = df_cfg_pcm.to_dict(orient='index')
-        self.TlmItemList_pcm = df_cfg_pcm['item'].values.tolist()
+        self.TlmItemList_pcm = df_cfg_pcm.index.values.tolist()
+        # self.TlmItemList_pcm = df_cfg_pcm['item'].values.tolist()
         self.N_ITEM_PCM = len(self.TlmItemList_pcm)
 
-        ### T.B.REFAC. ###
-        group_order = {'Time':0, 'DES State':1, 'Pressure':2, 'Temperature':3, 'IMU':4, 'House Keeping':5}
-
-        # df_cfg = pd.concat([df_cfg_smt, df_cfg_pcm], axis=0)
-
-        # df_cfg['group order'] = df_cfg['group'].apply(lambda x: group_order.index(x) if x in group_order else -1)
-        # df_cfg_s = df_cfg.sort_values(['group','item order'])
-        # print(df_cfg_s)
-
-        # self.TlmItemAttr = df_cfg_s.to_dict(orient='index')
+        # prepare hash: Item name -> {Item attributions}
+        self.dictTlmItemAttr = {}
+        self.dictTlmItemAttr.update(self.TlmItemAttr_smt)
+        self.dictTlmItemAttr.update(self.TlmItemAttr_pcm)
 
 
         ### initialize a dictionary to store latest values
@@ -166,7 +162,7 @@ class frmMain(wx.Frame):
         # - timer to fetch latest telemeter data
         self.tmrFetchTelemeterData = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.OnFetchLatestValues, self.tmrFetchTelemeterData)
-        self.tmrFetchTelemeterData.Start(FETCH_RATE_LATEST_VALUES)
+        self.tmrFetchTelemeterData.Start(RATE_FETCH_LATEST_VALUES)
 
     # Event handler: EVT_CLOSE
     def OnClose(self, event):
@@ -241,6 +237,13 @@ class frmMain(wx.Frame):
 
         self.F_TLM_IS_ACTIVE = True
 
+    # Utility
+    def get_key_from_value(d, val):
+        keys = [k for k, v in d.items() if v == val]
+        if keys:
+            return keys[0]
+        return None
+
 
 # 
 #   Panel: Plotter Pane (Time-history plot)
@@ -262,9 +265,9 @@ class pnlPlotter(wx.Panel):
 
         self.__PLOT_COUNT = self.__PLOT_SKIP   ### T.B.REFAC. ###
 
-        self.load_config_plotter()
+        self.loadConfig()
 
-        self.configure_plotter()
+        self.configure()
 
         ### 
         layout = wx.GridBagSizer()
@@ -273,12 +276,12 @@ class pnlPlotter(wx.Panel):
 
         ### bind events
         # - set timer to refresh time-history pane
-        self.tmrRefreshPlotter = wx.Timer(self)
-        self.Bind(wx.EVT_TIMER, self.OnRefreshPlotter, self.tmrRefreshPlotter)
-        self.tmrRefreshPlotter.Start(REFLESH_RATE_PLOTTER)
+        self.tmrRefresh = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self.OnTimerRefresh, self.tmrRefresh)
+        self.tmrRefresh.Start(RATE_REFLESH_PLOTTER)
 
     # Event handler: EVT_TIMER
-    def OnRefreshPlotter(self, event):
+    def OnTimerRefresh(self, event):
         # skip refresh when TLM NOT active
         if self.parent.F_TLM_IS_ACTIVE == False:    return None
         # print(f'GUI PLT: F_TLM_IS_ACTIVE = {self.parent.F_TLM_IS_ACTIVE}')      # for debug
@@ -353,51 +356,67 @@ class pnlPlotter(wx.Panel):
         # print("GUI PLT: redraw plots...")
 
     # Load configurations from external files
-    def load_config_plotter(self):
+    def loadConfig(self):
         # handle exception
         # if self.N_PLOTTER > 5: self.N_PLOTTER = 5
         self.N_PLOTTER = max(1, min(5, self.N_PLOTTER))
 
+        # Prepare hash: Plotter# -> {Plotter Attributions}
         self.PlotterAttr = {}
         for i in range(self.N_PLOTTER):  
             dict_tmp = {}
 
-            # search throughout smt items
-            for iii in range(self.parent.N_ITEM_SMT):
-                if self.parent.TlmItemAttr_smt[iii]['plot #'] != i: continue       # skip
-      
-                dict_tmp['idx_item']    = iii
-                dict_tmp['item']        = str(self.parent.TlmItemAttr_smt[iii]['item'])
-                dict_tmp['y_label']     = str(self.parent.TlmItemAttr_smt[iii]['item'])
-                dict_tmp['y_unit']      = str(self.parent.TlmItemAttr_smt[iii]['unit'])
-                dict_tmp['y_min']       = float(self.parent.TlmItemAttr_smt[iii]['y_min'])
-                dict_tmp['y_max']       = float(self.parent.TlmItemAttr_smt[iii]['y_max'])
-                dict_tmp['alart_lim_l'] = float(self.parent.TlmItemAttr_smt[iii]['alert_lim_l'])
-                dict_tmp['alart_lim_u'] = float(self.parent.TlmItemAttr_smt[iii]['alert_lim_u'])
+            # search throughout items
+            for strItemName in self.parent.dictTlmItemAttr:
+                # skip
+                if self.parent.dictTlmItemAttr[strItemName]['plot #'] != i:     continue
+                
+                dict_tmp['item']        = strItemName
+                dict_tmp['unit']        = str(self.parent.dictTlmItemAttr[strItemName]['unit'])
+                dict_tmp['y_label']     = dict_tmp['item'] + ' [' + dict_tmp['unit'] + ']'
+                dict_tmp['y_min']       = float(self.parent.dictTlmItemAttr[strItemName]['y_min'])
+                dict_tmp['y_max']       = float(self.parent.dictTlmItemAttr[strItemName]['y_max'])
+                dict_tmp['alart_lim_l'] = float(self.parent.dictTlmItemAttr[strItemName]['alert_lim_l'])
+                dict_tmp['alart_lim_u'] = float(self.parent.dictTlmItemAttr[strItemName]['alert_lim_u'])
 
                 break
+
+            # # search throughout smt items
+            # for iii in range(self.parent.N_ITEM_SMT):
+            #     if self.parent.TlmItemAttr_smt[iii]['plot #'] != i: continue       # skip
+      
+            #     dict_tmp['idx_item']    = iii
+            #     dict_tmp['item']        = str(self.parent.TlmItemAttr_smt[iii]['item'])
+            #     dict_tmp['y_label']     = str(self.parent.TlmItemAttr_smt[iii]['item'])
+            #     dict_tmp['y_unit']      = str(self.parent.TlmItemAttr_smt[iii]['unit'])
+            #     dict_tmp['y_min']       = float(self.parent.TlmItemAttr_smt[iii]['y_min'])
+            #     dict_tmp['y_max']       = float(self.parent.TlmItemAttr_smt[iii]['y_max'])
+            #     dict_tmp['alart_lim_l'] = float(self.parent.TlmItemAttr_smt[iii]['alert_lim_l'])
+            #     dict_tmp['alart_lim_u'] = float(self.parent.TlmItemAttr_smt[iii]['alert_lim_u'])
+
+            #     break
             
-            else:
-                # search throughout pcm items
-                for iii in range(self.parent.N_ITEM_PCM):
-                    if self.parent.TlmItemAttr_pcm[iii]['plot #'] != i: continue   # skip
+            # else:
+            #     # search throughout pcm items
+            #     for iii in range(self.parent.N_ITEM_PCM):
+            #         if self.parent.TlmItemAttr_pcm[iii]['plot #'] != i: continue   # skip
 
-                    dict_tmp['idx_item']    = iii + self.parent.N_ITEM_SMT
-                    dict_tmp['item']        = str(self.parent.TlmItemAttr_pcm[iii]['item'])
-                    dict_tmp['y_label']     = str(self.parent.TlmItemAttr_pcm[iii]['item'])
-                    dict_tmp['y_unit']      = str(self.parent.TlmItemAttr_pcm[iii]['unit'])
-                    dict_tmp['y_min']       = float(self.parent.TlmItemAttr_pcm[iii]['y_min'])
-                    dict_tmp['y_max']       = float(self.parent.TlmItemAttr_pcm[iii]['y_max'])
-                    dict_tmp['alart_lim_l'] = float(self.parent.TlmItemAttr_pcm[iii]['alert_lim_l'])
-                    dict_tmp['alart_lim_u'] = float(self.parent.TlmItemAttr_pcm[iii]['alert_lim_u'])
+            #         dict_tmp['idx_item']    = iii + self.parent.N_ITEM_SMT
+            #         dict_tmp['item']        = str(self.parent.TlmItemAttr_pcm[iii]['item'])
+            #         dict_tmp['y_label']     = str(self.parent.TlmItemAttr_pcm[iii]['item'])
+            #         dict_tmp['y_unit']      = str(self.parent.TlmItemAttr_pcm[iii]['unit'])
+            #         dict_tmp['y_min']       = float(self.parent.TlmItemAttr_pcm[iii]['y_min'])
+            #         dict_tmp['y_max']       = float(self.parent.TlmItemAttr_pcm[iii]['y_max'])
+            #         dict_tmp['alart_lim_l'] = float(self.parent.TlmItemAttr_pcm[iii]['alert_lim_l'])
+            #         dict_tmp['alart_lim_u'] = float(self.parent.TlmItemAttr_pcm[iii]['alert_lim_u'])
 
-                    break
+            #         break
 
             # append attibutions for i-th plotter 
             self.PlotterAttr[i] = dict_tmp
 
     # Configure appearance for plotters to display time histories
-    def configure_plotter(self):
+    def configure(self):
         # initialize data set for plot
         self.x_series = np.empty(0)
         self.y_series = np.empty(0)
@@ -448,9 +467,9 @@ class pnlDigitalIndicator(wx.Panel):
         
         self.parent = parent
 
-        self.load_config_digital_indicator()
+        self.loadConfig()
 
-        self.configure_digital_indicator()
+        self.configure()
 
         ### 
         layout = wx.GridBagSizer()
@@ -459,20 +478,65 @@ class pnlDigitalIndicator(wx.Panel):
 
         ### bind events
         # - set timer to refresh current-value pane
-        self.tmrRefreshDigitalIndicator = wx.Timer(self)
-        self.Bind(wx.EVT_TIMER, self.OnRefreshDigitalIndicator, self.tmrRefreshDigitalIndicator)
-        self.tmrRefreshDigitalIndicator.Start(REFLESH_RATE_DIGITAL_INDICATOR)
+        self.tmrRefresh = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self.OnTimerRefresh, self.tmrRefresh)
+        self.tmrRefresh.Start(RATE_REFLESH_DIGITAL_INDICATOR)
+
+        # - toggle button
+        # for button in self.tbtnLabel:
+        #     button.Bind(wx.EVT_TOGGLEBUTTON, self.graphTest)
 
     # Event handler: EVT_TIMER
-    def OnRefreshDigitalIndicator(self, event):
+    def OnTimerRefresh(self, event):
+        # skip refresh when TLM NOT active
+        if self.parent.F_TLM_IS_ACTIVE == False:    return None
+        
+        ### refresh indicators
+        # - prepare iterator
+        iterIndicator = iter( self.stxtIndicator )
+        iterLabel = iter( self.tbtnLabel )
+        
+        # - sweep groups
+        for strGroupName in self.dictGroupAttr.keys():
+            # - seep items belong each group
+            for i in range( self.dictGroupAttr[strGroupName]['rows'] * self.dictGroupAttr[strGroupName]['cols']) :
+                
+                strItemName = self.dictIndID2Item[strGroupName][i]
+
+                stxtInidicator = iterIndicator.next()
+                tbtnLabel = iterLabel.next()
+
+                # refresh indicator
+                stxtInidicator.SetLabel( 
+                    str( np.round(self.parent.dictTlmLatestValues[strItemName], 2)) )
+
+                # accentuate indicator by colors
+                if self.parent.dictTlmItemAttr[strItemName]['type'] == 'bool':
+                    # - OFF
+                    if int(self.parent.dictTlmLatestValues[strItemName]) == 0:
+                        stxtInidicator.SetBackgroundColour('NullColour')
+                        # stxtInidicator.SetBackgroundColour('NAVY')
+                        tbtnLabel.SetForegroundColour('NullColour')
+                    # - ON
+                    else:
+                        stxtInidicator.SetBackgroundColour('MAROON')
+                        # stxtInidicator.SetBackgroundColour('NAVY')
+                        # stxtInidicator.SetBackgroundColour('GREY')
+                        tbtnLabel.SetForegroundColour('RED')
+                        # tbtnLabel.SetForegroundColour('BLUE')
+
+                    stxtInidicator.Refresh()
+
+    # [deprecated] Event handler: EVT_TIMER
+    def OnTimerRefresh_(self, event):
         # skip refresh when TLM NOT active
         if self.parent.F_TLM_IS_ACTIVE == False:    return None
         
         ### refresh indicators
         # - sweep groups
-        for strGroupName in self.GroupAttr.keys():
+        for strGroupName in self.dictGroupAttr.keys():
             # - seep items belong each group    ### T.B.REFAC. ###
-            for ii in range(self.GroupAttr[strGroupName]['rows'] * self.GroupAttr[strGroupName]['cols']):
+            for ii in range( self.dictGroupAttr[strGroupName]['rows'] * self.dictGroupAttr[strGroupName]['cols']) :
                 # search throughout smt items
                 for iii in range(self.parent.N_ITEM_SMT):
                     # skip
@@ -518,11 +582,14 @@ class pnlDigitalIndicator(wx.Panel):
                         break
 
     # Load configurations from external files
-    def load_config_digital_indicator(self):
+    def loadConfig(self):
         ### T.B.REFAC.: TEMPORALLY DESIGNATED BY LITERALS ###
         N_ITEM_PER_ROW = 6
 
-        self.GroupAttr = {
+        ### T.B.REFAC. ###
+        # group_order = {'Time':0, 'DES State':1, 'Pressure':2, 'Temperature':3, 'IMU':4, 'House Keeping':5}
+
+        self.dictGroupAttr = {
             'Time':          {'gidx': 0, 'rows': 1, 'cols': N_ITEM_PER_ROW},
             'DES State':     {'gidx': 1, 'rows': 5, 'cols': N_ITEM_PER_ROW},
             'Pressure':      {'gidx': 2, 'rows': 2, 'cols': N_ITEM_PER_ROW},
@@ -531,14 +598,101 @@ class pnlDigitalIndicator(wx.Panel):
             'House Keeping': {'gidx': 5, 'rows': 3, 'cols': N_ITEM_PER_ROW}
         }
 
+        # Prepare hash: Group name -> {Item order -> Item name}
+        self.dictIndID2Item = {}
+        for strGroupName in self.dictGroupAttr.keys():
+            
+            dict_temp = {}
+            for i in range(self.dictGroupAttr[strGroupName]['rows'] * self.dictGroupAttr[strGroupName]['cols']):
+                
+                item = ''
+                for strItemName, dictItemAttr in self.parent.dictTlmItemAttr.items():
+                    # detect
+                    if dictItemAttr['group'] == strGroupName and dictItemAttr['item order'] == i:
+                        item = strItemName  
+                        break
+
+                dict_temp[i] = item
+
+            self.dictIndID2Item[strGroupName] = dict_temp
+
     # Configure appearance for digital indicators to display current values
-    def configure_digital_indicator(self):
+    def configure(self):
+        self.IndicatorPane = wx.BoxSizer(wx.VERTICAL)
+
+        ### generate containers to groupe indicators (StaticBox)
+        ### generate indicators & their labels
+        ### lay out pairs of indicators & labels in the grouping SBoxes
+        
+        self.SBoxGroup = []
+        self.lytSBoxGroup = []        
+        
+        self.tbtnLabel = []
+        self.stxtIndicator = []
+        self.lytPair = []           # pair of Indicator & Label
+
+        self.lytIndicator = []
+
+
+        for strGroupName in self.dictGroupAttr:
+            i = self.dictGroupAttr[strGroupName]['gidx']
+
+            # - generate an instance
+            self.SBoxGroup.append(wx.StaticBox(self, wx.ID_ANY, strGroupName))
+            self.SBoxGroup[-1].SetForegroundColour('WHITE')
+            self.SBoxGroup[-1].SetFont(wx.Font(15, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+            
+            # - lay out the instance
+            self.lytSBoxGroup.append(wx.StaticBoxSizer(self.SBoxGroup[-1], wx.VERTICAL))
+            self.IndicatorPane.Add(self.lytSBoxGroup[-1])
+
+            # generate grid in the grouping SBox
+            self.lytIndicator.append(
+                wx.GridSizer(   rows=self.dictGroupAttr[strGroupName]['rows'], 
+                                cols=self.dictGroupAttr[strGroupName]['cols'], 
+                                gap=(10,5)) )
+            
+            # place items in the grid
+            for j, strItemName in self.dictIndID2Item[strGroupName].items():
+                # handle empty cell
+                if strItemName == '':
+                    self.lytIndicator[i].Add((0,0))
+                    # self.lytIndicator[i].Add(wx.StaticText(self, -1, ''))
+                    continue
+
+                # generate instance 
+                # - item label (ToggleButton)
+                self.tbtnLabel.append(
+                    wx.ToggleButton(self, wx.ID_ANY, label=strItemName, size=(140,22)))
+                
+                # - digital indicator (StaticText)
+                self.stxtIndicator.append(
+                    wx.StaticText(self, wx.ID_ANY, label=str(i*100 + j), style=wx.ALIGN_CENTRE | wx.ST_NO_AUTORESIZE))
+                self.stxtIndicator[-1].SetBackgroundColour('BLACK')
+                self.stxtIndicator[-1].SetForegroundColour('GREEN')
+
+                # - pair of item label & inidicator
+                self.lytPair.append(wx.GridSizer(rows=2, cols=1, gap=(0,0)))
+                self.lytPair[-1].Add(self.tbtnLabel[-1], flag=wx.EXPAND)
+                self.lytPair[-1].Add(self.stxtIndicator[-1], flag=wx.EXPAND)
+                
+                self.lytIndicator[i].Add(self.lytPair[-1], flag=wx.EXPAND)
+            
+            # snap
+            self.lytSBoxGroup[i].Add(self.lytIndicator[i])
+
+        # set states for ToggleButton
+        # for i in range(pnlPlotter.N_PLOTTER):
+        #     self.tbtnLabel[self.PlotterAttr[i]['idx_item']].SetValue(True)
+    
+    # [deprecated] Configure appearance for digital indicators to display current values
+    def configure_(self):
         self.IndicatorPane = wx.BoxSizer(wx.VERTICAL)
 
         ### generate containers to groupe indicators (StaticBox)
         self.SBoxGroup = []
         self.lytSBoxGroup = []
-        for strGroupName in self.GroupAttr.keys():
+        for strGroupName in self.dictGroupAttr.keys():
             # - generate an instance
             self.SBoxGroup.append(wx.StaticBox(self, wx.ID_ANY, strGroupName))
             self.SBoxGroup[-1].SetForegroundColour('WHITE')
@@ -591,15 +745,17 @@ class pnlDigitalIndicator(wx.Panel):
 
         ### lay out pairs of indicators & labels in the grouping SBoxes
         self.lytIndicator = []
-        for strGroupName in self.GroupAttr.keys():
-            i = self.GroupAttr[strGroupName]['gidx']
+        for strGroupName in self.dictGroupAttr.keys():
+            i = self.dictGroupAttr[strGroupName]['gidx']
             
             # generate grid in the grouping SBox
             self.lytIndicator.append(
-                wx.GridSizer(rows=self.GroupAttr[strGroupName]['rows'], cols=self.GroupAttr[strGroupName]['cols'], gap=(10,5)))
+                wx.GridSizer(   rows=self.dictGroupAttr[strGroupName]['rows'], 
+                                cols=self.dictGroupAttr[strGroupName]['cols'], 
+                                gap=(10,5)) )
             
             # place items in the grid
-            for ii in range(self.GroupAttr[strGroupName]['rows'] * self.GroupAttr[strGroupName]['cols']):
+            for ii in range( self.dictGroupAttr[strGroupName]['rows'] * self.dictGroupAttr[strGroupName]['cols'] ):
                 # initialize
                 j = -1
 
@@ -636,7 +792,7 @@ class pnlDigitalIndicator(wx.Panel):
 
 
 # 
-#   Panel for Time History Plots & Current Value Indicators
+#   [deprecated] Panel for Time History Plots & Current Value Indicators
 # 
 class ChartPanel(wx.Panel):
     __N_PLOTTER = 5
