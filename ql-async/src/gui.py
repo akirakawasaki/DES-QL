@@ -49,8 +49,6 @@ class frmMain(wx.Frame):
     
     # input file pathes
     FPATH_CONFIG = './config_tlm.xlsx'
-    # FPATH_CONFIG = './config_tlm_3.xlsx'
-    # FPATH_CONFIG = './config_tlm_2.xlsx'
     
     def __init__(self, q_msg_smt, q_msg_pcm, q_data_smt, q_data_pcm):
         super().__init__(None, wx.ID_ANY, self.WINDOW_CAPTION)
@@ -71,9 +69,7 @@ class frmMain(wx.Frame):
             print(f'Error GUI: Config file "{self.FPATH_CONFIG}" NOT exists! smt')
             sys.exit()
 
-        self.TlmItemAttr_smt = df_cfg_smt.to_dict(orient='index')
-        # self.TlmItemList_smt = df_cfg_smt.index.values.tolist()
-        # self.N_ITEM_SMT = len(self.TlmItemList_smt)
+        dictTlmItemAttr_smt = df_cfg_smt.to_dict(orient='index')
 
         # pcm
         try: 
@@ -83,39 +79,33 @@ class frmMain(wx.Frame):
             print(f'Error GUI: Config file "{self.FPATH_CONFIG}" NOT exists! pcm')
             sys.exit()
 
-        self.TlmItemAttr_pcm = df_cfg_pcm.to_dict(orient='index')
-        # self.TlmItemList_pcm = df_cfg_pcm.index.values.tolist()
-        # self.N_ITEM_PCM = len(self.TlmItemList_pcm)
+        dictTlmItemAttr_pcm = df_cfg_pcm.to_dict(orient='index')
 
         # check key duplication
-        if (self.TlmItemAttr_smt.keys() & self.TlmItemAttr_pcm.keys()) != set():
+        if (dictTlmItemAttr_smt.keys() & dictTlmItemAttr_pcm.keys()) != set():
             print(f'Error GUI: Keys are duplicated between SMT & PCM! Check CONFIG file.')
             sys.exit()
 
         # prepare hash: Item name -> {Item attributions}
         self.dictTlmItemAttr = {}
-        self.dictTlmItemAttr.update(self.TlmItemAttr_smt)
-        self.dictTlmItemAttr.update(self.TlmItemAttr_pcm)
+        self.dictTlmItemAttr.update(dictTlmItemAttr_smt)
+        self.dictTlmItemAttr.update(dictTlmItemAttr_pcm)
 
         # - initialize a dictionary to store latest values
         self.dictTlmLatestValues = {}
 
-        self.dictTlmLatestValues_smt = dict.fromkeys(['Line# (smt)'] + list(self.TlmItemAttr_smt.keys()), np.nan)
+        self.dictTlmLatestValues_smt = dict.fromkeys(['Line# (smt)'] + list(dictTlmItemAttr_smt.keys()), np.nan)
         self.dictTlmLatestValues.update(self.dictTlmLatestValues_smt)
         self.dfTlm_smt = pd.DataFrame()
 
-        self.dictTlmLatestValues_pcm = dict.fromkeys(['Line# (pcm)'] + list(self.TlmItemAttr_pcm.keys()), np.nan)
+        self.dictTlmLatestValues_pcm = dict.fromkeys(['Line# (pcm)'] + list(dictTlmItemAttr_pcm.keys()), np.nan)
         self.dictTlmLatestValues.update(self.dictTlmLatestValues_pcm)
         self.dfTlm_pcm = pd.DataFrame()
-
-        # for debug
-        # print(f'dictTlmLatestValues_smt = {self.dictTlmLatestValues_smt}')
-        # print(f'dictTlmLatestValues_pcm = {self.dictTlmLatestValues_pcm}')
 
         ###
         self.F_TLM_IS_ACTIVE = False
 
-        ### GUI appearance 
+        ### configure GUI appearance 
         # - initialize attributions
         self.SetBackgroundColour('Black')
         # self.SetBackgroundColour('Dark Grey')
@@ -125,7 +115,7 @@ class frmMain(wx.Frame):
         self.pnlPlotter = pnlPlotter(parent=self)                       # Time History Plots
         self.pnlDigitalIndicator = pnlDigitalIndicator(parent=self)     # Current Value Indicators
 
-        # - lay out panels by sizer
+        # - lay out panels by using sizer
         layout = wx.FlexGridSizer(rows=1, cols=2, gap=(10, 10))
         layout.Add(self.pnlPlotter, flag=wx.EXPAND)                                  # plotter pane
         layout.Add(self.pnlDigitalIndicator, flag=wx.ALIGN_CENTER_HORIZONTAL)        # digital indicator pane
@@ -142,18 +132,9 @@ class frmMain(wx.Frame):
 
     # Event handler: EVT_CLOSE
     def OnClose(self, event):
-        # dig = wx.MessageDialog(self,
-        #                        "Do you really want to close this application?",
-        #                        "Confirm Exit",
-        #                        wx.OK | wx.CANCEL | wx.ICON_QUESTION)
-        # result = dig.ShowModal()
-        # dig.Destroy()
-        # if result == wx.ID_OK:  self.Destroy()
-        
         # quit tlm handlers
         self.q_msg_smt.put_nowait('stop') 
-        self.q_msg_pcm.put_nowait('stop') 
-        # self.internal_flags.GUI_TASK_IS_DONE = True
+        self.q_msg_pcm.put_nowait('stop')
 
         self.Destroy()
 
@@ -169,20 +150,18 @@ class frmMain(wx.Frame):
         while True:
             try:
                 self.dfTlm_smt = self.q_data_smt.get_nowait()
-                # self.dfTlm_smt.update( self.q_data_smt.get_nowait() )
             except queue.Empty:
                 break
-            # else:
-            #     if self.q_data_smt.empty() == True:     break
+            else:
+                self.q_data_smt.task_done()
         # - pcm
         while True:
             try:
                 self.dfTlm_pcm = self.q_data_pcm.get_nowait()
-                # self.dfTlm_pcm.update( self.q_data_pcm.get_nowait() )
             except queue.Empty:
                 break
-            # else:
-            #     if self.q_data_pcm.empty() == True:     break
+            else:
+                self.q_data_pcm.task_done()
 
         # break off when tlm data not exist
         if len(self.dfTlm_smt.index) == 0 or len(self.dfTlm_pcm.index) == 0:
@@ -191,34 +170,15 @@ class frmMain(wx.Frame):
             return None
         
         # for debug
-        # print('GUI FTC: df.index length = {}'.format(len(self.tlm_latest_data.df_smt.index)))
         # print('self.dfTlm_smt = ')
         # print(self.dfTlm_smt)
         # print('self.dfTlm_pcm = ') 
         # print(self.dfTlm_pcm)
-        # print(self.dfTlm_smt.columns)
-        # print(self.dfTlm_smt.iloc[-1].to_list)
-
-        # tmp = self.dfTlm_smt.to_dict(orient='index')
-        # print(tmp[0])
-        # print(tmp)
 
         self.dictTlmLatestValues.update( self.dfTlm_smt.to_dict(orient='index')[0] )
         self.dictTlmLatestValues.update( self.dfTlm_pcm.to_dict(orient='index')[0] )
 
-        # self.dictTlmLatestValues.update( dict(zip(self.dfTlm_pcm.columns, self.dfTlm_pcm[-1])) )
-        # dictTlm_pcm = self.dfTlm_pcm.to_dict
-        # dictTlm_pcm = self.dfTlm_pcm.T.to_dict
-        # self.dictTlmLatestValues.update(dictTlm_pcm)
-
         self.F_TLM_IS_ACTIVE = True
-
-    # Utility
-    def get_key_from_value(d, val):
-        keys = [k for k, v in d.items() if v == val]
-        if keys:
-            return keys[0]
-        return None
 
 
 # 
@@ -228,9 +188,6 @@ class pnlPlotter(wx.Panel):
     ### Class constants
     N_PLOTTER = 5
     __T_RANGE = 30    # [s]
-
-    # __IDX_TIME = 1
-    # __IDX_TIME = 2      # tentative
 
     __PLOT_SKIP = 9    ### T.B.REFAC. ###
     # __PLOT_SKIP = 39    ### T.B.REFAC. ###

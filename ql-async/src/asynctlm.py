@@ -34,8 +34,6 @@ class TelemeterHandler :
 
     # input file pathes
     FPATH_CONFIG = './config_tlm.xlsx'
-    # FPATH_CONFIG = './config_tlm_3.xlsx'
-    # FPATH_CONFIG = './config_tlm_2.xlsx'
 
     # output file pathes
     __FPATH_LS_DATA = './data_***.csv'                  # low-speed data    
@@ -126,9 +124,10 @@ class TelemeterHandler :
             except queue.Empty:            
                 continue
 
-            if msg == 'stop': break
-
-            self.q_message.task_done()
+            if msg == 'stop': 
+                break
+            else:
+                self.q_message.task_done()
     
         print(f'TLM {self.tlm_type}: STOP message received!')
 
@@ -150,16 +149,18 @@ class TelemeterHandler :
         task_file_writer.cancel()
         await task_file_writer              # wait for task to be cancelled
 
+        # 
         self.q_message.task_done()
 
         print(f'TLM {self.tlm_type}: Closing tlm handler...')
 
 
     # General file writer
-    async def file_writer(self) -> None:    
+    async def file_writer(self) -> None:
         print(f'TLM {self.tlm_type}: Starting file writer...')
 
         while True:
+            # (file_path, write_data) = await self.q_write_data.get()
             try:
                 (file_path, write_data) = await self.q_write_data.get()
             except asyncio.CancelledError:
@@ -179,6 +180,7 @@ class TelemeterHandler :
         print(f'TLM {self.tlm_type}: Starting data decoder...')
 
         while True:
+            # data = await self.q_dgram.get()
             try:
                 data = await self.q_dgram.get()
             except asyncio.CancelledError:
