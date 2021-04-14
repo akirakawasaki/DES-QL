@@ -68,15 +68,15 @@ class TelemeterHandler :
         # for debug
         # print(f'df_cfg = {df_cfg}')     
 
-        self.TlmItemList = df_cfg.index.tolist()
-        self.TlmItemAttr = df_cfg.to_dict(orient='index')
+        self.dictTlmItemAttr = df_cfg.to_dict(orient='index')
+        # self.listTlmItem = list(self.dictTlmItemAttr)
         self.NUM_OF_ITEMS = len(df_cfg.index)
         self.MAX_SUP_COM = df_cfg['sup com'].max()
 
         # for debug
-        # print(f'Item List = {self.TlmItemList}')
-        # print(f'Item Attributions = {self.TlmItemAttr}')
-        # pp.pprint(self.TlmItemAttr)
+        print(f'TLM {self.tlm_type}: Item List = {self.dictTlmItemAttr.keys()}')
+        # print(f'Item Attributions = {self.dictTlmItemAttr}')
+        # pp.pprint(self.dictTlmItemAttr)
 
         # initialize data index
         self.iLine = 0
@@ -85,9 +85,13 @@ class TelemeterHandler :
         self.high_speed_data_is_avtive = False
         self.idx_high_speed_data = 0
 
+        # for latching of last MCU error
+        self.last_error = 0
+
         ### Initialize file writer
         self.fpath_ls_data = self.__FPATH_LS_DATA.replace('***', self.tlm_type)
-        df_mf = pd.DataFrame(index=[], columns=self.TlmItemList)
+        # df_mf = pd.DataFrame(index=[], columns=self.TlmItemList)
+        df_mf = pd.DataFrame(index=[], columns=self.dictTlmItemAttr.keys())
         df_mf.to_csv(self.fpath_ls_data, mode='w')
 
 
@@ -189,23 +193,23 @@ class TelemeterHandler :
             ### decode datagram
             df_mf, hs_data, err_history = self.decode(data)
 
-            ### enqueue decoded data chunk to save in a external file
-            # - low-speed data 
+            ### output decoded data
+            # - To Files
+            # low-speed data 
             if self.iLine % 1 == 0:
             # if self.iLine % 10 == 0:
                 write_data = df_mf.values.tolist()
                 self.q_write_data.put_nowait( (self.fpath_ls_data, write_data) )
 
-            # - high-speed data
+            # high-speed data
             if hs_data != []:
                 self.q_write_data.put_nowait( (self.fpath_hs_data, hs_data) )
 
-            # - error history
+            # error history
             if err_history != []:
                 self.q_write_data.put_nowait( (self.FPATH_ERR, err_history) )
 
-            ### output decoded data to user interface
-            # - CUI
+            # - To CUI
             if self.iLine % 5000 == 0:
             # if iLine % 1 == 0:
                 print('')
@@ -215,8 +219,8 @@ class TelemeterHandler :
                 print(df_mf)
                 print('')
 
-            # - GUI (notify of latest values)
-            self.notify(df_mf)
+            # - To GUI
+            self.notify_gui(df_mf)
 
             self.q_dgram.task_done()
 
@@ -224,9 +228,19 @@ class TelemeterHandler :
 
 
     # Notify GUI of latest values
-    def notify(self, df_mf) -> None:
-        self.q_latest_data.put_nowait( df_mf.fillna(method='bfill').head(1) )
-        # self.q_latest_data.put_nowait( df_mf.fillna(method='bfill').tail(1) )
+    def notify_gui(self, df_mf) -> None:
+        df_tmp = df_mf.fillna(method='bfill').head(1)
+        # df_tmp = df_mf.fillna(method='bfill').tail(1)
+
+        if self.tlm_type == 'smt':
+            # detect last MCU error
+            for i in range(self.NUM_OF_FRAMES):
+                ec_temp = df_mf.at[df_mf.index[i], 'Error Code']
+                if ec_temp != 0:   self.last_error = ec_temp
+        
+            df_tmp.at[0, 'Error Code'] = self.last_error
+
+        self.q_latest_data.put_nowait( df_tmp )
 
 
     # Decode raw telemetry data into physical values
@@ -246,7 +260,7 @@ class TelemeterHandler :
             # print(f"iLine: {self.iLine}")
 
             # initialize row by filling with NaN
-            dict_data_row = dict.fromkeys(['Line#'] + self.TlmItemList, math.nan)
+            dict_data_row = dict.fromkeys(['Line#'] + list(self.dictTlmItemAttr.keys()), math.nan)
             # dict_data_row = dict.fromkeys(['Line#'] + self.TlmItemList, np.nan)
             # print(f'dict_data_row = {dict_data_row}')
 
@@ -258,19 +272,20 @@ class TelemeterHandler :
             # print(f"byte_idx_head: {byte_idx_head}") 
 
             # pick up data from the datagram (Get physical values from raw words)
-            for strItem in self.TlmItemAttr:
-                iItem = self.TlmItemList.index(strItem)
+            for strItem in self.dictTlmItemAttr.keys():
+                iItem = list(self.dictTlmItemAttr).index(strItem)
+                # iItem = self.TlmItemList.index(strItem)
 
                 # calc byte index of datum within the datagram
-                byte_idx =  byte_idx_head + self.W2B * int(self.TlmItemAttr[strItem]['w idx'])
+                byte_idx =  byte_idx_head + self.W2B * int(self.dictTlmItemAttr[strItem]['w idx'])
 
 
                 ''' Decoding rules '''      ### To Be Refactored ###
 
                 ### Peculiar items
                 # - Number of days from January 1st on GSE
-                if self.TlmItemAttr[strItem]['type'] == 'gse day':
-                    byte_length = self.W2B * int(self.TlmItemAttr[strItem]['word len'])
+                if self.dictTlmItemAttr[strItem]['type'] == 'gse day':
+                    byte_length = self.W2B * int(self.dictTlmItemAttr[strItem]['word len'])
                     byte_string = data[byte_idx:byte_idx+byte_length]
                     ###
                     decoded_value =  (byte_string[0]   >> 4  ) * 100 \
@@ -282,8 +297,8 @@ class TelemeterHandler :
                     continue
 
                 # - GSE timestamp in [sec]
-                elif self.TlmItemAttr[strItem]['type'] == 'gse time':
-                    byte_length = self.W2B * int(self.TlmItemAttr[strItem]['word len'])
+                elif self.dictTlmItemAttr[strItem]['type'] == 'gse time':
+                    byte_length = self.W2B * int(self.dictTlmItemAttr[strItem]['word len'])
                     byte_string = data[byte_idx:byte_idx+byte_length]
                     ###
                     decoded_value =  (byte_string[1] & 0x0F) * 10  * 3600  \
@@ -303,12 +318,12 @@ class TelemeterHandler :
                     continue
 
                 # - Relay status (boolean)
-                elif self.TlmItemAttr[strItem]['type'] == 'bool':
-                    byte_length = self.W2B * int(self.TlmItemAttr[strItem]['word len'])
+                elif self.dictTlmItemAttr[strItem]['type'] == 'bool':
+                    byte_length = self.W2B * int(self.dictTlmItemAttr[strItem]['word len'])
                     byte_string = data[byte_idx:byte_idx+byte_length]
                     ###
-                    byte_idx_offset = int(self.TlmItemAttr[strItem]['b coeff'])
-                    bit_filter = int(self.TlmItemAttr[strItem]['a coeff'])
+                    byte_idx_offset = int(self.dictTlmItemAttr[strItem]['b coeff'])
+                    bit_filter = int(self.dictTlmItemAttr[strItem]['a coeff'])
                     decoded_value = 1.0 if ((byte_string[byte_idx_offset] & bit_filter) > 0) \
                                     else 0.0
                     ###
@@ -318,7 +333,7 @@ class TelemeterHandler :
 
                 ### High-speed data    ### T.B.REFAC. ###
                 # - header
-                if self.TlmItemAttr[strItem]['type'] == 'data hd':
+                if self.dictTlmItemAttr[strItem]['type'] == 'data hd':
                     # - W009 + W010: start of data (SOD)
                     byte_idx_offset = 0
                     byte_length = 4
@@ -431,7 +446,7 @@ class TelemeterHandler :
                     continue
 
                 # - payload (first half)
-                elif self.TlmItemAttr[strItem]['type'] == 'data pl1':
+                elif self.dictTlmItemAttr[strItem]['type'] == 'data pl1':
                     # - W018
                     byte_idx_offset = 18
                     byte_length = 2
@@ -444,17 +459,17 @@ class TelemeterHandler :
                     if self.high_speed_data_is_avtive == False:     continue
 
                     # output history to an external file
-                    for j in range(int(self.TlmItemAttr[strItem]['word len'])):
+                    for j in range(int(self.dictTlmItemAttr[strItem]['word len'])):
                         # decode 1 word
                         byte_idx_offset = self.W2B * j
                         byte_length = 2
                         byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]                            
                         
                         #####
-                        signed = self.TlmItemAttr[strItem]['signed']
-                        integer_bit_length = int(self.TlmItemAttr[strItem]['integer bit len'])    # includes a sign bit if any
-                        a_coeff = self.TlmItemAttr[strItem]['a coeff']
-                        b_coeff = self.TlmItemAttr[strItem]['b coeff']
+                        signed = self.dictTlmItemAttr[strItem]['signed']
+                        integer_bit_length = int(self.dictTlmItemAttr[strItem]['integer bit len'])    # includes a sign bit if any
+                        a_coeff = self.dictTlmItemAttr[strItem]['a coeff']
+                        b_coeff = self.dictTlmItemAttr[strItem]['b coeff']
 
                         total_bit_length = 8 * byte_length
                         fractional_bit_length = total_bit_length - integer_bit_length
@@ -469,7 +484,7 @@ class TelemeterHandler :
                     continue
 
                 # - payload (latter half)
-                elif self.TlmItemAttr[strItem]['type'] == 'data pl2':
+                elif self.dictTlmItemAttr[strItem]['type'] == 'data pl2':
                     # - W036
                     byte_idx_offset = 0
                     byte_length = 2
@@ -482,16 +497,16 @@ class TelemeterHandler :
                     if self.high_speed_data_is_avtive == False:     continue
                     
                     # output history to an external file
-                    for j in range(int(self.TlmItemAttr[strItem]['word len'])):                        
+                    for j in range(int(self.dictTlmItemAttr[strItem]['word len'])):                        
                         byte_idx_offset = self.W2B * j
                         byte_length = 2
                         byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]
 
                         #####
-                        signed = self.TlmItemAttr[strItem]['signed']
-                        integer_bit_length = int(self.TlmItemAttr[strItem]['integer bit len'])    # includes a sign bit if any
-                        a_coeff = self.TlmItemAttr[strItem]['a coeff']
-                        b_coeff = self.TlmItemAttr[strItem]['b coeff']
+                        signed = self.dictTlmItemAttr[strItem]['signed']
+                        integer_bit_length = int(self.dictTlmItemAttr[strItem]['integer bit len'])    # includes a sign bit if any
+                        a_coeff = self.dictTlmItemAttr[strItem]['a coeff']
+                        b_coeff = self.dictTlmItemAttr[strItem]['b coeff']
 
                         total_bit_length = 8 * byte_length
                         fractional_bit_length = total_bit_length - integer_bit_length
@@ -506,18 +521,18 @@ class TelemeterHandler :
                     continue
 
                 ### Ordinary items
-                decoded_value = self.get_physical_value(self.TlmItemAttr[strItem], data, byte_idx)
+                decoded_value = self.get_physical_value(self.dictTlmItemAttr[strItem], data, byte_idx)
 
                 # - ordinary items
-                if self.TlmItemAttr[strItem]['ordinary item'] == True :
+                if self.dictTlmItemAttr[strItem]['ordinary item'] == True :
                     # handle sub-commutation
-                    if iFrame % self.TlmItemAttr[strItem]['sub com mod'] != self.TlmItemAttr[strItem]['sub com res']: 
+                    if iFrame % self.dictTlmItemAttr[strItem]['sub com mod'] != self.dictTlmItemAttr[strItem]['sub com res']: 
                         continue
 
                     dict_data_row.update({strItem:decoded_value})
 
                 # - Temperature in [K] <S,16,-2>
-                elif self.TlmItemAttr[strItem]['type'] == 'T':
+                elif self.dictTlmItemAttr[strItem]['type'] == 'T':
                     # get TC thermoelectric voltage in [uV]
                     Vtc = decoded_value
 
@@ -528,7 +543,7 @@ class TelemeterHandler :
                     # dict_data_row.update({strItem:Ttc})             # in Kelvin
 
                 # - Cold-junction compensation coefficient in [uV]
-                elif self.TlmItemAttr[strItem]['type'] == 'cjc':
+                elif self.dictTlmItemAttr[strItem]['type'] == 'cjc':
                     cjc = decoded_value
 
                     Rcjc = self.v2ohm(cjc)
@@ -538,13 +553,13 @@ class TelemeterHandler :
                     dict_data_row.update({strItem:Vcjc})
 
                 # - Auto-zero coefficient in [uV]
-                elif self.TlmItemAttr[strItem]['type'] == 'az':
+                elif self.dictTlmItemAttr[strItem]['type'] == 'az':
                     Vaz = decoded_value
                     
                     dict_data_row.update({strItem:decoded_value})
 
                 # - error code
-                elif self.TlmItemAttr[strItem]['type'] == 'ec':
+                elif self.dictTlmItemAttr[strItem]['type'] == 'ec':
                     ecode = decoded_value                
                     # memory when error occcures
                     if ecode != 0:  err_history.append([format(gse_time,'.3f'), int(ecode)])
