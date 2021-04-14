@@ -69,12 +69,13 @@ class TelemeterHandler :
         # print(f'df_cfg = {df_cfg}')     
 
         self.dictTlmItemAttr = df_cfg.to_dict(orient='index')
-        # self.listTlmItem = list(self.dictTlmItemAttr)
+        self.listTlmItem = list(self.dictTlmItemAttr)
         self.NUM_OF_ITEMS = len(df_cfg.index)
         self.MAX_SUP_COM = df_cfg['sup com'].max()
 
-        # for debug
         print(f'TLM {self.tlm_type}: Item List = {self.dictTlmItemAttr.keys()}')
+
+        # for debug
         # print(f'Item Attributions = {self.dictTlmItemAttr}')
         # pp.pprint(self.dictTlmItemAttr)
 
@@ -90,7 +91,6 @@ class TelemeterHandler :
 
         ### Initialize file writer
         self.fpath_ls_data = self.__FPATH_LS_DATA.replace('***', self.tlm_type)
-        # df_mf = pd.DataFrame(index=[], columns=self.TlmItemList)
         df_mf = pd.DataFrame(index=[], columns=self.dictTlmItemAttr.keys())
         df_mf.to_csv(self.fpath_ls_data, mode='w')
 
@@ -232,10 +232,11 @@ class TelemeterHandler :
         df_tmp = df_mf.fillna(method='bfill').head(1)
         # df_tmp = df_mf.fillna(method='bfill').tail(1)
 
+        # latch last error
         if self.tlm_type == 'smt':
             # detect last MCU error
             for i in range(self.NUM_OF_FRAMES):
-                ec_temp = df_mf.at[df_mf.index[i], 'Error Code']
+                ec_temp = df_mf.at[i, 'Error Code']
                 if ec_temp != 0:   self.last_error = ec_temp
         
             df_tmp.at[0, 'Error Code'] = self.last_error
@@ -259,9 +260,10 @@ class TelemeterHandler :
         for iFrame in range(self.NUM_OF_FRAMES):
             # print(f"iLine: {self.iLine}")
 
-            # initialize row by filling with NaN
-            dict_data_row = dict.fromkeys(['Line#'] + list(self.dictTlmItemAttr.keys()), math.nan)
-            # dict_data_row = dict.fromkeys(['Line#'] + self.TlmItemList, np.nan)
+            # initialize row by filling with NaN            
+            # dict_data_row = dict.fromkeys(['Line#'] + list(self.dictTlmItemAttr.keys()), math.nan)
+            dict_data_row = dict.fromkeys(['Line#'] + self.listTlmItem, math.nan)
+            # dict_data_row = dict.fromkeys(['Line#'] + self.listTlmItem, np.nan)
             # print(f'dict_data_row = {dict_data_row}')
 
             dict_data_row.update({'Line#':self.iLine})
@@ -273,12 +275,11 @@ class TelemeterHandler :
 
             # pick up data from the datagram (Get physical values from raw words)
             for strItem in self.dictTlmItemAttr.keys():
-                iItem = list(self.dictTlmItemAttr).index(strItem)
-                # iItem = self.TlmItemList.index(strItem)
+                iItem = self.listTlmItem.index(strItem)
+                # iItem = list(self.dictTlmItemAttr).index(strItem)
 
                 # calc byte index of datum within the datagram
                 byte_idx =  byte_idx_head + self.W2B * int(self.dictTlmItemAttr[strItem]['w idx'])
-
 
                 ''' Decoding rules '''      ### To Be Refactored ###
 

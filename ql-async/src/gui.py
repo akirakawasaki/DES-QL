@@ -351,7 +351,7 @@ class pnlPlotter(wx.Panel):
 
 
 # 
-#   Panel: Digital Indicator Pane
+#   Panel: Digital Indicator Pane (Latest-value indicate)
 # 
 class pnlDigitalIndicator(wx.Panel):
     
