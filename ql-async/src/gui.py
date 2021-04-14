@@ -501,8 +501,10 @@ class pnlDigitalIndicator(wx.Panel):
 
                 # generate instance 
                 # - item label (ToggleButton)
-                self.tbtnLabel.append(
-                    wx.ToggleButton(self, wx.ID_ANY, label=strItemName, size=(140,22)))
+                unit = str( self.parent.dictTlmItemAttr[strItemName]['unit'] )
+                label =     (strItemName + ' [' + unit + ']')   if (unit != 'nan') \
+                       else strItemName
+                self.tbtnLabel.append(wx.ToggleButton(self, wx.ID_ANY, label=label, size=(143,22)))
                 
                 # - digital indicator (StaticText)
                 self.stxtIndicator.append(
