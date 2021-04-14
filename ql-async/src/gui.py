@@ -116,9 +116,10 @@ class frmMain(wx.Frame):
         self.pnlDigitalIndicator = pnlDigitalIndicator(parent=self)     # Current Value Indicators
 
         # - lay out panels by using sizer
-        layout = wx.FlexGridSizer(rows=1, cols=2, gap=(10, 10))
-        layout.Add(self.pnlPlotter, flag=wx.EXPAND)                                  # plotter pane
-        layout.Add(self.pnlDigitalIndicator, flag=wx.ALIGN_CENTER_HORIZONTAL)        # digital indicator pane
+        # layout = wx.FlexGridSizer(rows=1, cols=2, gap=(0,0))
+        layout = wx.BoxSizer(wx.HORIZONTAL)
+        layout.Add(window=self.pnlPlotter, proportion=0, flag=wx.ALL | wx.EXPAND, border=20)            # plotter pane
+        layout.Add(window=self.pnlDigitalIndicator, proportion=0, flag=wx.ALL | wx.EXPAND, border=20)   # digital indicator pane
         self.SetSizer(layout)
 
         ### Bind events
@@ -200,13 +201,16 @@ class pnlPlotter(wx.Panel):
 
         self.__PLOT_COUNT = self.__PLOT_SKIP   ### T.B.REFAC. ###
 
+        # handle exception
+        # self.N_PLOTTER = max(1, min(5, self.N_PLOTTER))
+
         self.loadConfig()
 
         self.configure()
 
         ### 
         layout = wx.GridBagSizer()
-        layout.Add(self.canvas, pos=(0,0))
+        layout.Add(window=self.canvas, pos=(0,0), border=10)
         self.SetSizer(layout)
 
         ### Bind events
@@ -286,8 +290,6 @@ class pnlPlotter(wx.Panel):
 
     # Load configurations from external files
     def loadConfig(self):
-        # handle exception
-        # self.N_PLOTTER = max(1, min(5, self.N_PLOTTER))
 
         # Prepare hash: Plotter# -> {Plotter Attributions}
         self.dictPlotterAttr = {}
@@ -318,7 +320,8 @@ class pnlPlotter(wx.Panel):
         self.y_series = np.empty(0)
         
         # generate empty matplotlib Fugure
-        self.fig = Figure(figsize=(6, 8))
+        # self.fig = Figure()
+        self.fig = Figure(figsize=(6, 9))
         
         # register Figure with matplotlib Canvas
         self.canvas = FigureCanvasWxAgg(self, wx.ID_ANY, self.fig)
