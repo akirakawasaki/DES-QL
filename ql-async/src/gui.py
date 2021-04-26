@@ -31,7 +31,8 @@ Matplotlib configuration
 plt.style.use('dark_background')
 
 # Plotter margins
-plt.rcParams["figure.subplot.bottom"] = 0.03    # Bottom
+# plt.rcParams["figure.subplot.bottom"] = 0.03    # Bottom
+plt.rcParams["figure.subplot.bottom"] = 0.07    # Bottom
 plt.rcParams["figure.subplot.top"]    = 0.99    # Top
 plt.rcParams["figure.subplot.left"]   = 0.15    # Left
 plt.rcParams["figure.subplot.right"]  = 0.97    # Right
@@ -188,7 +189,8 @@ class frmMain(wx.Frame):
 class pnlPlotter(wx.Panel):
     ### Class constants
     N_PLOTTER = 5
-    __T_RANGE = 30    # [s]
+    # __T_RANGE = 30    # [s]
+    __T_RANGE = 31    # [s]
 
     __PLOT_SKIP = 9    ### T.B.REFAC. ###
     # __PLOT_SKIP = 39    ### T.B.REFAC. ###
@@ -334,8 +336,12 @@ class pnlPlotter(wx.Panel):
             self.axes.append(self.fig.add_subplot(self.N_PLOTTER, 1, i+1))
 
             # - set limit for x axis
-            t_min = 0
+            # t_min = -30
+            t_min = -self.__T_RANGE
             self.axes[i].set_xlim([t_min, t_min + self.__T_RANGE])
+
+            # - set label for x axis
+            self.axes[i].set_xlabel('time [s]')
 
             # - set limit for y axis
             self.axes[i].set_ylim([self.dictPlotterAttr[i]['y_min'], self.dictPlotterAttr[i]['y_max']])
