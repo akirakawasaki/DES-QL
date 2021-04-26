@@ -286,11 +286,13 @@ class TelemeterHandler :
                 ### Peculiar items
                 # - Number of days from January 1st on GSE
                 if self.dictTlmItemAttr[strItem]['type'] == 'gse day':
+                    # byte
+
                     byte_length = self.W2B * int(self.dictTlmItemAttr[strItem]['word len'])
                     byte_string = data[byte_idx:byte_idx+byte_length]
                     ###
-                    decoded_value =  (byte_string[0]   >> 4  ) * 100 \
-                                   + (byte_string[0]   & 0x0F) * 10  \
+                    decoded_value =  (byte_string[0] >> 4  ) * 100 \
+                                   + (byte_string[0] & 0x0F) * 10  \
                                    + (byte_string[1] >> 4  ) * 1
                     ###
                     dict_data_row.update({strItem:decoded_value})
