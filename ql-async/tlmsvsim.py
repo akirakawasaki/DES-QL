@@ -74,7 +74,7 @@ if __name__ == "__main__":
     
     if tlm_type == 'smt':
         dist_port = 49157
-        file_path = '../dat/' + 'smt.bin'
+        file_path = './dat/' + 'smt.bin'
         n_lb = 0                # 20210205 full sequence
         # n_lb = 67000            # 20201020 shortened sequence
         # slp_time = 0.005         # 
@@ -82,7 +82,7 @@ if __name__ == "__main__":
         # slp_time = 0.04         # safe mode
     elif tlm_type == 'pcm':
         dist_port = 49158
-        file_path = '../dat/' + 'pcm.bin'
+        file_path = './dat/' + 'pcm.bin'
         n_lb = 0                # 20210205 full sequence
         # n_lb = 135000           # 20201020 shortened sequence
         # slp_time = 0.0025        # 

@@ -2,6 +2,8 @@
 import asyncio
 import multiprocessing as mp
 import queue
+import subprocess
+import sys
 
 ### Third-party libraries
 import wx
@@ -72,6 +74,13 @@ def gui_handler(q_msg_smt, q_msg_pcm, q_data_smt, q_data_pcm):
 #   Main
 #
 if __name__ == "__main__":
+    mode = sys.argv[1]
+
+    if mode == 'debug':
+        print('----- DEBUG MODE -----')
+        sp_smt = subprocess.Popen(['python', './tlmsvsim.py', 'smt'])
+        sp_pcm = subprocess.Popen(['python', './tlmsvsim.py', 'pcm'])
+
     # generate FIFO queues for inter-process communication
     # - SMT/GUI
     q_msg_smt = mp.JoinableQueue()
@@ -94,6 +103,10 @@ if __name__ == "__main__":
     # end processing
     p_smt.join()    
     p_pcm.join()
+
+    if mode == 'debug':
+        sp_smt.terminate()
+        sp_pcm.terminate()
 
     print('DES-QL quitted normally ...')
 

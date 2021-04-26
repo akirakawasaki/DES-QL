@@ -260,8 +260,7 @@ class TelemeterHandler :
         for iFrame in range(self.NUM_OF_FRAMES):
             # print(f"iLine: {self.iLine}")
 
-            # initialize row by filling with NaN            
-            # dict_data_row = dict.fromkeys(['Line#'] + list(self.dictTlmItemAttr.keys()), math.nan)
+            # initialize row by filling with NaN
             dict_data_row = dict.fromkeys(['Line#'] + self.listTlmItem, math.nan)
             # dict_data_row = dict.fromkeys(['Line#'] + self.listTlmItem, np.nan)
             # print(f'dict_data_row = {dict_data_row}')
@@ -276,7 +275,6 @@ class TelemeterHandler :
             # pick up data from the datagram (Get physical values from raw words)
             for strItem in self.dictTlmItemAttr.keys():
                 iItem = self.listTlmItem.index(strItem)
-                # iItem = list(self.dictTlmItemAttr).index(strItem)
 
                 # calc byte index of datum within the datagram
                 byte_idx =  byte_idx_head + self.W2B * int(self.dictTlmItemAttr[strItem]['w idx'])
@@ -290,11 +288,13 @@ class TelemeterHandler :
 
                     byte_length = self.W2B * int(self.dictTlmItemAttr[strItem]['word len'])
                     byte_string = data[byte_idx:byte_idx+byte_length]
+
                     ###
                     decoded_value =  (byte_string[0] >> 4  ) * 100 \
                                    + (byte_string[0] & 0x0F) * 10  \
                                    + (byte_string[1] >> 4  ) * 1
                     ###
+                    
                     dict_data_row.update({strItem:decoded_value})
 
                     continue
@@ -303,6 +303,7 @@ class TelemeterHandler :
                 elif self.dictTlmItemAttr[strItem]['type'] == 'gse time':
                     byte_length = self.W2B * int(self.dictTlmItemAttr[strItem]['word len'])
                     byte_string = data[byte_idx:byte_idx+byte_length]
+
                     ###
                     decoded_value =  (byte_string[1] & 0x0F) * 10  * 3600  \
                                    + (byte_string[2] >> 4  ) * 1   * 3600  \
@@ -316,6 +317,7 @@ class TelemeterHandler :
 
                     gse_time = decoded_value
                     ###
+                    
                     dict_data_row.update({strItem:decoded_value})
                     
                     continue
@@ -324,12 +326,14 @@ class TelemeterHandler :
                 elif self.dictTlmItemAttr[strItem]['type'] == 'bool':
                     byte_length = self.W2B * int(self.dictTlmItemAttr[strItem]['word len'])
                     byte_string = data[byte_idx:byte_idx+byte_length]
+
                     ###
                     byte_idx_offset = int(self.dictTlmItemAttr[strItem]['b coeff'])
                     bit_filter = int(self.dictTlmItemAttr[strItem]['a coeff'])
                     decoded_value = 1.0 if ((byte_string[byte_idx_offset] & bit_filter) > 0) \
                                     else 0.0
                     ###
+
                     dict_data_row.update({strItem:decoded_value})
 
                     continue
@@ -596,8 +600,7 @@ class TelemeterHandler :
     ''' Utilities ''' 
     # Get a physical value from raw telemeter words
     def get_physical_value(self, itemAttr, data, idx_byte):
-        byte_length = self.W2B * int(itemAttr['word len'])
-        
+        byte_length = self.W2B * int(itemAttr['word len']) 
         byte_string = data[idx_byte:idx_byte+byte_length]
         
         signed = itemAttr['signed']
