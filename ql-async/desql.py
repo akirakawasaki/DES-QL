@@ -74,7 +74,10 @@ def gui_handler(q_msg_smt, q_msg_pcm, q_data_smt, q_data_pcm):
 #   Main
 #
 if __name__ == "__main__":
-    mode = sys.argv[1]
+    if len(sys.argv) == 2:
+        mode = sys.argv[1]
+    else:
+        mode = None
 
     if mode == 'debug':
         print('----- DEBUG MODE -----')
