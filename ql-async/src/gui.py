@@ -323,7 +323,7 @@ class pnlPlotter(wx.Panel):
         
         # generate empty matplotlib Fugure
         # self.fig = Figure()
-        self.fig = Figure(figsize=(6, 9))
+        self.fig = Figure(figsize=(6, 9.7))
         
         # register Figure with matplotlib Canvas
         self.canvas = FigureCanvasWxAgg(self, wx.ID_ANY, self.fig)
@@ -448,7 +448,7 @@ class pnlDigitalIndicator(wx.Panel):
             'DES State':     {'gidx': 1, 'rows': 5, 'cols': N_ITEM_PER_ROW},
             'Pressure':      {'gidx': 2, 'rows': 2, 'cols': N_ITEM_PER_ROW},
             'Temperature':   {'gidx': 3, 'rows': 2, 'cols': N_ITEM_PER_ROW},
-            'IMU':           {'gidx': 4, 'rows': 2, 'cols': N_ITEM_PER_ROW},
+            'IMU':           {'gidx': 4, 'rows': 3, 'cols': N_ITEM_PER_ROW},
             'House Keeping': {'gidx': 5, 'rows': 3, 'cols': N_ITEM_PER_ROW}
         }
 
