@@ -410,8 +410,16 @@ class pnlDigitalIndicator(wx.Panel):
                 tbtnLabel = next(iterLabel)
 
                 # refresh indicator
-                stxtInidicator.SetLabel( 
-                    str( np.round(self.parent.dictTlmLatestValues[strItemName], 2)) )
+                if self.parent.dictTlmItemAttr[strItemName]['decimal'] <= 0:
+                    stxtInidicator.SetLabel( 
+                        str( round( self.parent.dictTlmLatestValues[strItemName] ) ) )
+                else :
+                    stxtInidicator.SetLabel( 
+                        str( round( self.parent.dictTlmLatestValues[strItemName], 
+                                    int(self.parent.dictTlmItemAttr[strItemName]['decimal']) ) ) )
+
+                # stxtInidicator.SetLabel( 
+                #     str( np.round(self.parent.dictTlmLatestValues[strItemName], 2)) )
 
                 # accentuate indicator by colors
                 if self.parent.dictTlmItemAttr[strItemName]['type'] == 'bool':

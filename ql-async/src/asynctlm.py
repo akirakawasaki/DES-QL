@@ -279,15 +279,16 @@ class TelemeterHandler :
                 # calc byte index of datum within the datagram
                 byte_idx =  byte_idx_head + self.W2B * int(self.dictTlmItemAttr[strItem]['w idx'])
 
-                ''' Decoding rules '''      ### To Be Refactored ###
+                byte_length = self.W2B * int(self.dictTlmItemAttr[strItem]['word len'])
+                byte_string = data[byte_idx:byte_idx+byte_length]
 
+                ''' Decoding rules '''      ### To Be Refactored ###
+                
                 ### Peculiar items
                 # - Number of days from January 1st on GSE
                 if self.dictTlmItemAttr[strItem]['type'] == 'gse day':
-                    # byte
-
-                    byte_length = self.W2B * int(self.dictTlmItemAttr[strItem]['word len'])
-                    byte_string = data[byte_idx:byte_idx+byte_length]
+                    # byte_length = self.W2B * int(self.dictTlmItemAttr[strItem]['word len'])
+                    # byte_string = data[byte_idx:byte_idx+byte_length]
 
                     ###
                     decoded_value =  (byte_string[0] >> 4  ) * 100 \
@@ -301,8 +302,8 @@ class TelemeterHandler :
 
                 # - GSE timestamp in [sec]
                 elif self.dictTlmItemAttr[strItem]['type'] == 'gse time':
-                    byte_length = self.W2B * int(self.dictTlmItemAttr[strItem]['word len'])
-                    byte_string = data[byte_idx:byte_idx+byte_length]
+                    # byte_length = self.W2B * int(self.dictTlmItemAttr[strItem]['word len'])
+                    # byte_string = data[byte_idx:byte_idx+byte_length]
 
                     ###
                     decoded_value =  (byte_string[1] & 0x0F) * 10  * 3600  \
@@ -324,8 +325,8 @@ class TelemeterHandler :
 
                 # - Relay status (boolean)
                 elif self.dictTlmItemAttr[strItem]['type'] == 'bool':
-                    byte_length = self.W2B * int(self.dictTlmItemAttr[strItem]['word len'])
-                    byte_string = data[byte_idx:byte_idx+byte_length]
+                    # byte_length = self.W2B * int(self.dictTlmItemAttr[strItem]['word len'])
+                    # byte_string = data[byte_idx:byte_idx+byte_length]
 
                     ###
                     byte_idx_offset = int(self.dictTlmItemAttr[strItem]['b coeff'])
@@ -341,15 +342,22 @@ class TelemeterHandler :
                 ### High-speed data    ### T.B.REFAC. ###
                 # - header
                 if self.dictTlmItemAttr[strItem]['type'] == 'data hd':
+                    ###
                     # - W009 + W010: start of data (SOD)
                     byte_idx_offset = 0
                     byte_length = 4
                     byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]
-                    ###
-                    w009 = byte_string
+                    
                     decoded_value = byte_string
-                    ###
                     dict_data_row.update({strItem:decoded_value})
+                    ###
+
+                    # - W009 + W010: start of data (SOD)
+                    byte_idx_offset = 0
+                    byte_length = 4
+                    byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]
+                    
+                    w009 = byte_string
 
                     # - W013 : sensor number
                     byte_idx_offset = 8 
@@ -454,6 +462,7 @@ class TelemeterHandler :
 
                 # - payload (first half)
                 elif self.dictTlmItemAttr[strItem]['type'] == 'data pl1':
+                    ###
                     # - W018
                     byte_idx_offset = 18
                     byte_length = 2
@@ -461,6 +470,7 @@ class TelemeterHandler :
                     
                     decoded_value = byte_string
                     dict_data_row.update({strItem:decoded_value})
+                    ###
 
                     # skip below when high speed data is NOT active
                     if self.high_speed_data_is_avtive == False:     continue
@@ -492,6 +502,7 @@ class TelemeterHandler :
 
                 # - payload (latter half)
                 elif self.dictTlmItemAttr[strItem]['type'] == 'data pl2':
+                    ###
                     # - W036
                     byte_idx_offset = 0
                     byte_length = 2
@@ -499,6 +510,7 @@ class TelemeterHandler :
                     
                     decoded_value = byte_string
                     dict_data_row.update({strItem:decoded_value})
+                    ###
 
                     # skip below when high speed data is NOT active
                     if self.high_speed_data_is_avtive == False:     continue
@@ -528,54 +540,71 @@ class TelemeterHandler :
                     continue
 
                 ### Ordinary items
-                decoded_value = self.get_physical_value(self.dictTlmItemAttr[strItem], data, byte_idx)
+                # decoded_value = self.get_physical_value(self.dictTlmItemAttr[strItem], data, byte_idx)
 
-                # - ordinary items
+                # - Ordinary items
                 if self.dictTlmItemAttr[strItem]['ordinary item'] == True :
                     # handle sub-commutation
                     if iFrame % self.dictTlmItemAttr[strItem]['sub com mod'] != self.dictTlmItemAttr[strItem]['sub com res']: 
                         continue
 
-                    dict_data_row.update({strItem:decoded_value})
+                    decoded_value = self.get_physical_value(self.dictTlmItemAttr[strItem], byte_string)
+                    # dict_data_row.update({strItem:decoded_value})
 
                 # - Temperature in [K] <S,16,-2>
                 elif self.dictTlmItemAttr[strItem]['type'] == 'T':
+                    decoded_value = self.get_physical_value(self.dictTlmItemAttr[strItem], byte_string)
+                    
                     # get TC thermoelectric voltage in [uV]
                     Vtc = decoded_value
 
                     # get temperature by converting thermoelectric voltage
                     Ttc = self.uv2k(Vtc + Vcjc - Vaz, 'K')
 
-                    dict_data_row.update({strItem:(Ttc - 273.15)})  # in deg-C
+                    # decoded_value = Ttc             # in Kelvin
+                    decoded_value = Ttc - 273.15    # in deg-C
+
                     # dict_data_row.update({strItem:Ttc})             # in Kelvin
+                    # dict_data_row.update({strItem:(Ttc - 273.15)})  # in deg-C
 
                 # - Cold-junction compensation coefficient in [uV]
                 elif self.dictTlmItemAttr[strItem]['type'] == 'cjc':
+                    decoded_value = self.get_physical_value(self.dictTlmItemAttr[strItem], byte_string)
+
                     cjc = decoded_value
 
                     Rcjc = self.v2ohm(cjc)
                     Tcjc = self.ohm2k(Rcjc)
                     Vcjc = self.k2uv(Tcjc, 'K')
 
-                    dict_data_row.update({strItem:Vcjc})
+                    decoded_value = Vcjc
+
+                    # dict_data_row.update({strItem:Vcjc})
 
                 # - Auto-zero coefficient in [uV]
                 elif self.dictTlmItemAttr[strItem]['type'] == 'az':
+                    decoded_value = self.get_physical_value(self.dictTlmItemAttr[strItem], byte_string)
+
                     Vaz = decoded_value
                     
-                    dict_data_row.update({strItem:decoded_value})
+                    # dict_data_row.update({strItem:decoded_value})
 
                 # - error code
                 elif self.dictTlmItemAttr[strItem]['type'] == 'ec':
+                    decoded_value = self.get_physical_value(self.dictTlmItemAttr[strItem], byte_string)
+
                     ecode = decoded_value                
                     # memory when error occcures
                     if ecode != 0:  err_history.append([format(gse_time,'.3f'), int(ecode)])
                     
-                    dict_data_row.update({strItem:decoded_value})
+                    # dict_data_row.update({strItem:decoded_value})
 
                 # - others
                 else:
                     print(f'TLM RCV: ITEM={iItem} has no decoding rule!')
+
+                # update dict_data_row
+                dict_data_row.update({strItem:decoded_value})
 
             dict_data_matrix[iFrame] = dict_data_row
 
@@ -599,10 +628,14 @@ class TelemeterHandler :
 
     ''' Utilities ''' 
     # Get a physical value from raw telemeter words
-    def get_physical_value(self, itemAttr, data, idx_byte):
+    # def get_physical_value(self, itemAttr, data, idx_byte):
+        # byte_length = self.W2B * int(itemAttr['word len']) 
+        # byte_string = data[idx_byte:idx_byte+byte_length]
+
+    def get_physical_value(self, itemAttr, byte_string):        
+
+        ###
         byte_length = self.W2B * int(itemAttr['word len']) 
-        byte_string = data[idx_byte:idx_byte+byte_length]
-        
         signed = itemAttr['signed']
         integer_bit_length = int(itemAttr['integer bit len'])    # include sign bit if any
         a_coeff = itemAttr['a coeff']
@@ -613,6 +646,7 @@ class TelemeterHandler :
         decoded_value =  b_coeff \
                        + a_coeff * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
                                     * 2**(-fractional_bit_length)
+        ###
 
         return decoded_value
 
