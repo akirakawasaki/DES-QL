@@ -51,10 +51,14 @@ class TelemeterHandler :
 
         ### Initialize datagram listner
         # self.HOST = ''
-        # self.HOST = '192.168.1.255'                                 # mac
+        # self.HOST = '172.20.140.255'                                # mac
         self.HOST = socket.gethostbyname(socket.gethostname())      # windows / mac(debug)
-        self.PORT =      49157 if (self.tlm_type == 'smt') \
-                    else 49158
+        self.PORT =      60142 if (self.tlm_type == 'smt') \
+                    else 60140
+
+        # self.HOST = '192.168.1.255'                                 # mac (old)
+        # self.PORT =      49157 if (self.tlm_type == 'smt') \
+        #             else 49158
 
         ### Initialize decoder
         # load configuration for word assignment
