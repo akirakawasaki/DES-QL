@@ -22,9 +22,9 @@ def tlm_handler_wrapper(tlm_type, q_msg, q_data):
 
     tlm = asynctlm.TelemeterHandler(tlm_type, q_msg, q_data)
 
-    # asyncio.run( tlm.tlm_handler(), debug=True )
-    asyncio.run( tlm.tlm_handler() )
-    
+    # asyncio.run( tlm.tlm_handler() )
+    asyncio.run( tlm.tlm_handler(), debug=True )      # for debug
+
     q_data.join()
 
     print('Closing TLM...')
@@ -74,6 +74,9 @@ def gui_handler(q_msg_smt, q_msg_pcm, q_data_smt, q_data_pcm):
 #   Main
 #
 if __name__ == "__main__":
+    mp.freeze_support()                     # for generation of executable on Windows
+    mp.set_start_method('spawn', True)      
+    
     if len(sys.argv) == 2:
         mode = sys.argv[1]
     else:
@@ -81,8 +84,8 @@ if __name__ == "__main__":
 
     if mode == 'debug':
         print('----- DEBUG MODE -----')
-        sp_smt = subprocess.Popen(['python', './tlmsvsim.py', 'smt'])
-        sp_pcm = subprocess.Popen(['python', './tlmsvsim.py', 'pcm'])
+        sp_smt = subprocess.Popen(['python', './tlmsvsim.py', 'smt'], stdout=subprocess.DEVNULL)
+        sp_pcm = subprocess.Popen(['python', './tlmsvsim.py', 'pcm'], stdout=subprocess.DEVNULL)
 
     # generate FIFO queues for inter-process communication
     # - SMT/GUI

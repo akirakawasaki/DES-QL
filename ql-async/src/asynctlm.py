@@ -26,11 +26,11 @@ class TelemeterHandler :
     ### Class constants
     
     # telemeter properties
-    W2B = 2
-    NUM_OF_FRAMES = 8
-    LEN_HEADER  = 4
-    LEN_PAYLOAD = 64
-    BUFSIZE = W2B * (LEN_HEADER + LEN_PAYLOAD) * NUM_OF_FRAMES       # 1088 bytes
+    BPW = 2                     # bytes per word
+    NUM_OF_FRAMES = 8           # number of frames in a major frame
+    LEN_HEADER  = 4             # header length in bytes in a frame
+    LEN_PAYLOAD = 64            # payload length in bytes in a frame
+    BUFSIZE = BPW * (LEN_HEADER + LEN_PAYLOAD) * NUM_OF_FRAMES       # 1088 bytes
 
     # input file pathes
     FPATH_CONFIG = './config_tlm.xlsx'
@@ -49,18 +49,15 @@ class TelemeterHandler :
         self.q_message = q_message              # receiving ONLY
         self.q_latest_data = q_latest_data      # sending ONLY
 
-        ### Initialize datagram listner
-        # self.HOST = ''
+        ### Initialize 
+
+        # - datagram listner
         # self.HOST = '172.20.140.255'                                # mac
         self.HOST = socket.gethostbyname(socket.gethostname())      # windows / mac(debug)
         self.PORT =      60142 if (self.tlm_type == 'smt') \
                     else 60140
 
-        # self.HOST = '192.168.1.255'                                 # mac (old)
-        # self.PORT =      49157 if (self.tlm_type == 'smt') \
-        #             else 49158
-
-        ### Initialize decoder
+        # - decoder
         # load configuration for word assignment
         try: 
             df_cfg = pd.read_excel(self.FPATH_CONFIG, 
@@ -69,31 +66,21 @@ class TelemeterHandler :
             print(f'Error TLM {self.tlm_type}: Configuration file NOT exist!')
             sys.exit()
         
-        # for debug
-        # print(f'df_cfg = {df_cfg}')     
-
         self.dictTlmItemAttr = df_cfg.to_dict(orient='index')
         self.listTlmItem = list(self.dictTlmItemAttr)
         self.NUM_OF_ITEMS = len(df_cfg.index)
         self.MAX_SUP_COM = df_cfg['sup com'].max()
 
-        print(f'TLM {self.tlm_type}: Item List = {self.dictTlmItemAttr.keys()}')
-
-        # for debug
-        # print(f'Item Attributions = {self.dictTlmItemAttr}')
-        # pp.pprint(self.dictTlmItemAttr)
-
-        # initialize data index
         self.iLine = 0
 
-        # initialize high-speed data functionality
+        # for high-speed data functionality
         self.high_speed_data_is_avtive = False
         self.idx_high_speed_data = 0
 
-        # for latching of last MCU error
+        # for latching of last MCU error in GUI
         self.last_error = 0
 
-        ### Initialize file writer
+        # - file writer
         self.fpath_ls_data = self.__FPATH_LS_DATA.replace('***', self.tlm_type)
         df_mf = pd.DataFrame(index=[], columns=self.dictTlmItemAttr.keys())
         df_mf.to_csv(self.fpath_ls_data, mode='w')
@@ -119,9 +106,6 @@ class TelemeterHandler :
         transport, _ = await loop.create_datagram_endpoint(
                                     protocol_factory=(lambda: DatagramServerProtocol(self.tlm_type, self.q_dgram)),
                                     local_addr=(self.HOST,self.PORT))
-        # transport, protocol = await loop.create_datagram_endpoint(
-                                    # protocol_factory=(lambda: DatagramServerProtocol(self.tlm_type, self.q_dgram)),
-                                    # local_addr=(self.HOST,self.PORT))
 
         # block until GUI task done
         while True:
@@ -138,9 +122,6 @@ class TelemeterHandler :
                 self.q_message.task_done()
     
         print(f'TLM {self.tlm_type}: STOP message received!')
-
-        # !!! FOR TEST ONLY !!!
-        # await asyncio.sleep(60)
 
         # quit async tasks after GUI task done
         # - detagram listner
@@ -168,7 +149,6 @@ class TelemeterHandler :
         print(f'TLM {self.tlm_type}: Starting file writer...')
 
         while True:
-            # (file_path, write_data) = await self.q_write_data.get()
             try:
                 (file_path, write_data) = await self.q_write_data.get()
             except asyncio.CancelledError:
@@ -188,7 +168,6 @@ class TelemeterHandler :
         print(f'TLM {self.tlm_type}: Starting data decoder...')
 
         while True:
-            # data = await self.q_dgram.get()
             try:
                 data = await self.q_dgram.get()
             except asyncio.CancelledError:
@@ -218,8 +197,6 @@ class TelemeterHandler :
             # if iLine % 1 == 0:
                 print('')
                 print(f'{self.tlm_type} iLine: {self.iLine}')
-                # print(f'From : {addr}')
-                # print(f'To   : {socket.gethostbyname(self.HOST)}')
                 print(df_mf)
                 print('')
 
@@ -262,18 +239,14 @@ class TelemeterHandler :
 
         # sweep frames in a major frame
         for iFrame in range(self.NUM_OF_FRAMES):
-            # print(f"iLine: {self.iLine}")
-
             # initialize row by filling with NaN
             dict_data_row = dict.fromkeys(['Line#'] + self.listTlmItem, math.nan)
-            # dict_data_row = dict.fromkeys(['Line#'] + self.listTlmItem, np.nan)
-            # print(f'dict_data_row = {dict_data_row}')
 
             dict_data_row.update({'Line#':self.iLine})
 
             # byte index of the head of the frame (without header)
-            byte_idx_head =   self.W2B * (self.LEN_HEADER + self.LEN_PAYLOAD) * iFrame \
-                            + self.W2B *  self.LEN_HEADER
+            byte_idx_head =   self.BPW * (self.LEN_HEADER + self.LEN_PAYLOAD) * iFrame \
+                            + self.BPW *  self.LEN_HEADER
             # print(f"byte_idx_head: {byte_idx_head}") 
 
             # pick up data from the datagram (Get physical values from raw words)
@@ -281,9 +254,9 @@ class TelemeterHandler :
                 iItem = self.listTlmItem.index(strItem)
 
                 # calc byte index of datum within the datagram
-                byte_idx =  byte_idx_head + self.W2B * int(self.dictTlmItemAttr[strItem]['w idx'])
+                byte_idx =  byte_idx_head + self.BPW * int(self.dictTlmItemAttr[strItem]['w idx'])
 
-                byte_length = self.W2B * int(self.dictTlmItemAttr[strItem]['word len'])
+                byte_length = self.BPW * int(self.dictTlmItemAttr[strItem]['word len'])
                 byte_string = data[byte_idx:byte_idx+byte_length]
 
                 ''' Decoding rules '''      ### To Be Refactored ###
@@ -291,7 +264,7 @@ class TelemeterHandler :
                 ### Peculiar items
                 # - Number of days from January 1st on GSE
                 if self.dictTlmItemAttr[strItem]['type'] == 'gse day':
-                    # byte_length = self.W2B * int(self.dictTlmItemAttr[strItem]['word len'])
+                    # byte_length = self.BPW * int(self.dictTlmItemAttr[strItem]['word len'])
                     # byte_string = data[byte_idx:byte_idx+byte_length]
 
                     ###
@@ -306,7 +279,7 @@ class TelemeterHandler :
 
                 # - GSE timestamp in [sec]
                 elif self.dictTlmItemAttr[strItem]['type'] == 'gse time':
-                    # byte_length = self.W2B * int(self.dictTlmItemAttr[strItem]['word len'])
+                    # byte_length = self.BPW * int(self.dictTlmItemAttr[strItem]['word len'])
                     # byte_string = data[byte_idx:byte_idx+byte_length]
 
                     ###
@@ -329,7 +302,7 @@ class TelemeterHandler :
 
                 # - Relay status (boolean)
                 elif self.dictTlmItemAttr[strItem]['type'] == 'bool':
-                    # byte_length = self.W2B * int(self.dictTlmItemAttr[strItem]['word len'])
+                    # byte_length = self.BPW * int(self.dictTlmItemAttr[strItem]['word len'])
                     # byte_string = data[byte_idx:byte_idx+byte_length]
 
                     ###
@@ -482,7 +455,7 @@ class TelemeterHandler :
                     # output history to an external file
                     for j in range(int(self.dictTlmItemAttr[strItem]['word len'])):
                         # decode 1 word
-                        byte_idx_offset = self.W2B * j
+                        byte_idx_offset = self.BPW * j
                         byte_length = 2
                         byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]                            
                         
@@ -521,7 +494,7 @@ class TelemeterHandler :
                     
                     # output history to an external file
                     for j in range(int(self.dictTlmItemAttr[strItem]['word len'])):                        
-                        byte_idx_offset = self.W2B * j
+                        byte_idx_offset = self.BPW * j
                         byte_length = 2
                         byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]
 
@@ -633,13 +606,13 @@ class TelemeterHandler :
     ''' Utilities ''' 
     # Get a physical value from raw telemeter words
     # def get_physical_value(self, itemAttr, data, idx_byte):
-        # byte_length = self.W2B * int(itemAttr['word len']) 
+        # byte_length = self.BPW * int(itemAttr['word len']) 
         # byte_string = data[idx_byte:idx_byte+byte_length]
 
     def get_physical_value(self, itemAttr, byte_string):        
 
         ###
-        byte_length = self.W2B * int(itemAttr['word len']) 
+        byte_length = self.BPW * int(itemAttr['word len']) 
         signed = itemAttr['signed']
         integer_bit_length = int(itemAttr['integer bit len'])    # include sign bit if any
         a_coeff = itemAttr['a coeff']
@@ -784,15 +757,15 @@ class TelemeterHandler :
     # Print a major flame
     def print_mf(self, data):
         # header
-        for k in range(self.W2B * self.LEN_HEADER):   
+        for k in range(self.BPW * self.LEN_HEADER):   
             print(hex(data[k]).zfill(4), end=' ')
         print('')   # linefeed
         
         # payload
         for j in range(4):                  
             print(f"message {0}-{j}: ",end='')
-            for k in range(self.W2B * int(self.LEN_PAYLOAD / 4)): 
-                print(hex(data[k + self.W2B * (self.LEN_HEADER + j * int(self.LEN_PAYLOAD / 4))]).zfill(4), end=' ')
+            for k in range(self.BPW * int(self.LEN_PAYLOAD / 4)): 
+                print(hex(data[k + self.BPW * (self.LEN_HEADER + j * int(self.LEN_PAYLOAD / 4))]).zfill(4), end=' ')
             print('')   # linefeed
         
         # empty line
