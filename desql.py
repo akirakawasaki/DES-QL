@@ -9,7 +9,8 @@ import sys
 import wx
 
 ### Local libraries
-from src import asynctlm
+from src import telemeter
+from src import data
 from src import gui
 # from src import common
 
@@ -17,17 +18,31 @@ from src import gui
 #
 #   Socket Communication (UDP/IP) Handler
 #
-def tlm_handler_wrapper(tlm_type, q_msg, q_data):
+def telemeter_handler_wrapper(tlm_type, q_msg, q_datagram):
     print(f'MAIN: Invoking UDP Communication Handler Wrapper for {tlm_type}...')
 
-    tlm = asynctlm.TelemeterHandler(tlm_type, q_msg, q_data)
+    tlm = telemeter.TelemeterHandler(tlm_type, q_msg, q_datagram)
+
+    # asyncio.run( tlm.ttelemeter_handler() )
+    asyncio.run( tlm.telemeter_handler(), debug=True )      # for debug
+
+    print(f'Closing {tlm_type}...')
+
+
+#
+#   Data Handler
+#
+def data_handler(tlm_type, q_datagram):
+    print(f'MAIN: Invoking Data Hundler Wrapper for {tlm_type}...')
+    
+    tlm = data.DataHandler(tlm_type, q_datagram)
 
     # asyncio.run( tlm.tlm_handler() )
     asyncio.run( tlm.tlm_handler(), debug=True )      # for debug
 
-    q_data.join()
+    q_datagram.join()
 
-    print('Closing TLM...')
+    print(f'Closing {tlm_type} Data Handler...')
 
 
 #
@@ -97,10 +112,10 @@ if __name__ == "__main__":
 
     # launch UDP communication handler in other processes <NON-BLOCKING>
     # - smt
-    p_smt = mp.Process(target=tlm_handler_wrapper, args=('smt', q_msg_smt, q_data_smt))
+    p_smt = mp.Process(target=telemeter_handler_wrapper, args=('smt', q_msg_smt, q_data_smt))
     p_smt.start()
     # - pcm
-    p_pcm = mp.Process(target=tlm_handler_wrapper, args=('pcm', q_msg_pcm, q_data_pcm))
+    p_pcm = mp.Process(target=telemeter_handler_wrapper, args=('pcm', q_msg_pcm, q_data_pcm))
     p_pcm.start()
 
     # launch GUI handler in the main process/thread <BLOCKING>

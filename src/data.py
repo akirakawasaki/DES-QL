@@ -20,9 +20,9 @@ import pandas as pd
 
 
 #
-#   Telemeter handler
+#   Data handler
 #
-class TelemeterHandler :
+class DataHandler :
     ### Class constants
     
     # telemeter properties
