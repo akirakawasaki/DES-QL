@@ -11,25 +11,25 @@ import socket
 
 
 #
-#   Telemeter handler
+#   Socket Communication (UDP/IP) handler
 #
 class TelemeterHandler :
-    ### Class constants
+    #
+    # Class constants
+    #
 
     # n/a    
 
-    def __init__(self, tlm_type, q_message, q_dgram) -> None:
+    def __init__(self, tlm_type, HOST, PORT, q_msg, q_dgram) -> None:
         self.tlm_type = tlm_type
 
         # queues for inter-process message passing
-        self.q_message = q_message      # receiving ONLY
-        self.q_dgram = q_dgram          # sending ONLY
+        self.q_msg = q_msg          # receiving ONLY
+        self.q_dgram = q_dgram      # sending ONLY
 
-        # datagram server
-        self.HOST = '172.20.140.255'                                # mac
-        # self.HOST = socket.gethostbyname(socket.gethostname())      # windows / mac(debug)
-        self.PORT =      60142 if (self.tlm_type == 'smt') \
-                    else 60140
+        # datagram server attributions
+        self.HOST = HOST
+        self.PORT = PORT
 
     async def telemeter_handler(self) -> None:
         # invoke async datagram listner
@@ -40,25 +40,29 @@ class TelemeterHandler :
 
         # block until GUI task done
         while True:
-            await asyncio.sleep(1)
-
+            # poll quitting
             try:
-                msg = self.q_message.get_nowait()
+                msg = self.q_msg.get_nowait()
             except queue.Empty:            
+                await asyncio.sleep(1)
                 continue
 
             if msg == 'stop': 
                 break
             else:
-                self.q_message.task_done()
+                self.q_msg.task_done()
     
         print(f'TLM {self.tlm_type}: STOP message received!')
 
         # quit async detagram server
-        transport.close()
+        transport.abort()
+        # transport.close()
 
         # 
-        self.q_message.task_done()
+        self.q_dgram.join()
+
+        # 
+        self.q_msg.task_done()
 
         print(f'TLM {self.tlm_type}: Closing tlm handler...')
 
@@ -75,7 +79,7 @@ class DatagramServerProtocol:
         print(f'TLM {self.tlm_type}: Starting datagram listner...')
 
     # Event handler
-    def connection_made(self,transport):
+    def connection_made(self, transport):
         print(f'Connected to {self.tlm_type}')
         
         self.transport = transport
@@ -91,5 +95,5 @@ class DatagramServerProtocol:
         # print(f'TLM RCV: queue size = {self.data_queue.qsize()}')
 
     # Event handler
-    def connection_lost(self,exec):
+    def connection_lost(self, exec):
         print(f'Disconnected from {self.tlm_type}') 

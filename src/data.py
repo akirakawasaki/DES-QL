@@ -2,12 +2,11 @@
 import asyncio
 import csv
 import math
-from os import spawnve
 import queue
-import socket
 import sys
 
 # import cProfile
+from os import spawnve
 # import pprint as pp
 # import pstats
 
@@ -23,8 +22,10 @@ import pandas as pd
 #   Data handler
 #
 class DataHandler :
-    ### Class constants
-    
+    #
+    #   Class constants
+    #
+
     # telemeter properties
     BPW = 2                     # bytes per word
     NUM_OF_FRAMES = 8           # number of frames in a major frame
@@ -40,23 +41,19 @@ class DataHandler :
     __FPATH_HS_DATA = './high_speed_data_****.csv'      # high-speed data
     FPATH_ERR = './error_history.csv'                   # error history
 
-    def __init__(self, tlm_type, q_message, q_latest_data) -> None:
+
+    def __init__(self, tlm_type, g_state, g_lval, q_dgram) -> None:
         self.tlm_type = tlm_type
+        self.g_state = g_state
+        self.g_lval = g_lval
 
         ### general settings
 
+
         # queues for inter-process message passing
-        self.q_message = q_message              # receiving ONLY
-        self.q_latest_data = q_latest_data      # sending ONLY
+        self.q_dgram = q_dgram      # receiving ONLY
 
         ### Initialize 
-
-        # - datagram listner
-        self.HOST = '172.20.140.255'                                # mac
-        # self.HOST = socket.gethostbyname(socket.gethostname())      # windows / mac(debug)
-        self.PORT =      60142 if (self.tlm_type == 'smt') \
-                    else 60140
-
         # - decoder
         # load configuration for word assignment
         try: 
@@ -86,12 +83,14 @@ class DataHandler :
         df_mf.to_csv(self.fpath_ls_data, mode='w')
 
 
-    # Telemetry data hundler
-    async def tlm_handler(self) -> None:
-        print(f'TLM {self.tlm_type}: Starting tlm handlar...')
+    #
+    #   Telemetry data handler
+    #
+    async def data_handler(self) -> None:
+        print(f'DAT {self.tlm_type}: Starting data handlar...')
 
         # create FIFO queues to communicate among async coroutines
-        self.q_dgram = asyncio.Queue()          # transferring datagram     from listner to decorder
+        # self.q_dgram = asyncio.Queue()          # transferring datagram     from listner to decorder
         self.q_write_data = asyncio.Queue()     # transferring decoded data from decoder to file writer
 
         # invoke async tasks in the running event loop (ORDER OF INVOCATION IS IMPORTAN)
@@ -101,32 +100,16 @@ class DataHandler :
         # - data decoder
         task_decoder = asyncio.create_task( self.decoder() )
 
-        # - datagram listner
-        loop = asyncio.get_running_loop()
-        transport, _ = await loop.create_datagram_endpoint(
-                                    protocol_factory=(lambda: DatagramServerProtocol(self.tlm_type, self.q_dgram)),
-                                    local_addr=(self.HOST,self.PORT))
-
         # block until GUI task done
         while True:
-            await asyncio.sleep(1)
-
-            try:
-                msg = self.q_message.get_nowait()
-            except queue.Empty:            
-                continue
-
-            if msg == 'stop': 
+            if self.g_state[self.tlm_type]['Tlm_Server_Is_Active'] == False: 
                 break
             else:
-                self.q_message.task_done()
+                await asyncio.sleep(1)
     
-        print(f'TLM {self.tlm_type}: STOP message received!')
+        print(f'DAT {self.tlm_type}: Data handler will be closed soon!')
 
         # quit async tasks after GUI task done
-        # - detagram listner
-        transport.close()
-
         # - deta decoder
         # print(f'TLM {self.tlm_type}: queue size = {self.q_dgram.qsize()}')
         await self.q_dgram.join()           # wait for queue to be fully processed
@@ -138,15 +121,12 @@ class DataHandler :
         task_file_writer.cancel()
         await task_file_writer              # wait for task to be cancelled
 
-        # 
-        self.q_message.task_done()
-
-        print(f'TLM {self.tlm_type}: Closing tlm handler...')
+        print(f'DAT {self.tlm_type}: Closing data handler...')
 
 
     # General file writer
     async def file_writer(self) -> None:
-        print(f'TLM {self.tlm_type}: Starting file writer...')
+        print(f'DAT {self.tlm_type}: Starting file writer...')
 
         while True:
             try:
@@ -159,22 +139,39 @@ class DataHandler :
                 writer.writerows(write_data)
             
             self.q_write_data.task_done()
-        
-        print(f'TLM {self.tlm_type}: Closing file writer...')
+
+            # for debug 
+            # print(f'DAT {self.tlm_type}: Data saved!')
+
+        print(f'DAT {self.tlm_type}: Closing file writer...')
 
 
     # Datagram decoder
     async def decoder(self) -> None:
-        print(f'TLM {self.tlm_type}: Starting data decoder...')
+        print(f'DAT {self.tlm_type}: Starting data decoder...')
 
         while True:
+            # poll datagram reception or task cacellation
             try:
-                data = await self.q_dgram.get()
-            except asyncio.CancelledError:
-                break
+                data = self.q_dgram.get_nowait()
+            except queue.Empty:
+                try:
+                    await asyncio.sleep(0.0005)
+                except asyncio.CancelledError:
+                    break
+                
+                continue
+
+            # for debug
+            # print(f'DAT {self.tlm_type}: Data received!')
+            # print(data)
 
             ### decode datagram
             df_mf, hs_data, err_history = self.decode(data)
+
+            # for debug
+            # print(f'DAT {self.tlm_type}: Data decoded!')
+            # print(df_mf)
 
             ### output decoded data
             # - To Files
@@ -183,6 +180,9 @@ class DataHandler :
             # if self.iLine % 10 == 0:
                 write_data = df_mf.values.tolist()
                 self.q_write_data.put_nowait( (self.fpath_ls_data, write_data) )
+                
+                # for debug 
+                # print(f'DAT {self.tlm_type}: Data saved!')
 
             # high-speed data
             if hs_data != []:
@@ -193,7 +193,7 @@ class DataHandler :
                 self.q_write_data.put_nowait( (self.FPATH_ERR, err_history) )
 
             # - To CUI
-            if self.iLine % 5000 == 0:
+            if self.iLine % 10000 == 0:
             # if iLine % 1 == 0:
                 print('')
                 print(f'{self.tlm_type} iLine: {self.iLine}')
@@ -205,7 +205,7 @@ class DataHandler :
 
             self.q_dgram.task_done()
 
-        print(f'TLM {self.tlm_type}: Closing data decoder...')
+        print(f'DAT {self.tlm_type}: Closing data decoder...')
 
 
     # Notify GUI of latest values
@@ -222,7 +222,8 @@ class DataHandler :
         
             df_tmp.at[0, 'Error Code'] = self.last_error
 
-        self.q_latest_data.put_nowait( df_tmp )
+        self.g_lval[self.tlm_type] = df_tmp.copy()
+        # self.q_latest_data.put_nowait( df_tmp )
 
 
     # Decode raw telemetry data into physical values
@@ -605,10 +606,6 @@ class DataHandler :
 
     ''' Utilities ''' 
     # Get a physical value from raw telemeter words
-    # def get_physical_value(self, itemAttr, data, idx_byte):
-        # byte_length = self.BPW * int(itemAttr['word len']) 
-        # byte_string = data[idx_byte:idx_byte+byte_length]
-
     def get_physical_value(self, itemAttr, byte_string):        
 
         ###
@@ -773,62 +770,33 @@ class DataHandler :
 
 
 #
-#   Datagram Listner
-#
-class DatagramServerProtocol:    
-    # Initialize instance
-    def __init__(self, tlm_type, data_queue) -> None:
-        self.TLM_TYPE = tlm_type
-        self.data_queue = data_queue
-
-        print(f'TLM {self.TLM_TYPE}: Starting datagram listner...')
-
-    # Event handler
-    def connection_made(self,transport):
-        print(f'Connected to {self.TLM_TYPE}')
-        #self.transport = transport
-
-    # Event handler
-    def datagram_received(self, data, addr):
-        # print(f'TLM {self.TLM_TYPE}: Received a datagram')
-        
-        # for debug
-        # print_mf(data)      
-        # print(f'TLM RCV: queue size = {self.data_queue.qsize()}')
-
-        self.data_queue.put_nowait(data)
-
-    # Event handler
-    def connection_lost(self,exec):
-        print(f'Disconnected from {self.TLM_TYPE}')    
-
-
-#
 #   Main
 #
 if __name__ == "__main__":
-    print('MAIN: Invoking Telemetry Data Handler...')
+    pass
 
-    tlm_type = sys.argv[1]
+    # print('MAIN: Invoking Telemetry Data Handler...')
 
-    # error trap
-    if tlm_type == '':
-        print("ERROR: TLM_TYPE is NOT designated!")
-        sys.exit()
-    elif tlm_type != 'smt' and tlm_type != 'pcm':
-        print("ERROR: TLM_TYPE is wrong!")
-        sys.exit()
+    # tlm_type = sys.argv[1]
 
-    # set GIL switching time to a vlaue other than the default [s]
-    # sys.setswitchinterval(0.001)
+    # # error trap
+    # if tlm_type == '':
+    #     print("ERROR: TLM_TYPE is NOT designated!")
+    #     sys.exit()
+    # elif tlm_type != 'smt' and tlm_type != 'pcm':
+    #     print("ERROR: TLM_TYPE is wrong!")
+    #     sys.exit()
 
-    # create instances
-    # q_message = asyncio.Queue
-    q_message = queue.Queue
-    q_latest_values = queue.Queue if (tlm_type == 'smt') else queue.Queue
-    tlm = TelemeterHandler(tlm_type, q_message, q_latest_values)
+    # # set GIL switching time to a vlaue other than the default [s]
+    # # sys.setswitchinterval(0.001)
 
-    # invoke event loop to enter async coroutine
-    asyncio.run(tlm.tlm_handler(), debug=True)
+    # # create instances
+    # # q_message = asyncio.Queue
+    # q_message = queue.Queue
+    # q_latest_values = queue.Queue if (tlm_type == 'smt') else queue.Queue
+    # tlm = TelemeterHandler(tlm_type, q_message, q_latest_values)
 
-    print('Program terminated normally')
+    # # invoke event loop to enter async coroutine
+    # asyncio.run(tlm.tlm_handler(), debug=True)
+
+    # print('Program terminated normally')

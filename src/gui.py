@@ -31,7 +31,6 @@ Matplotlib configuration
 plt.style.use('dark_background')
 
 # Plotter margins
-# plt.rcParams["figure.subplot.bottom"] = 0.03    # Bottom
 plt.rcParams["figure.subplot.bottom"] = 0.07    # Bottom
 plt.rcParams["figure.subplot.top"]    = 0.99    # Top
 plt.rcParams["figure.subplot.left"]   = 0.15    # Left
@@ -43,22 +42,28 @@ plt.rcParams["figure.subplot.hspace"] = 0.05    # Height Margin between subplots
 #   Top-level window
 #
 class frmMain(wx.Frame):
-    ### Class constants
-    
     #
+    #   Class constants
+    #
+
+    #    
     WINDOW_CAPTION = 'Telemetry Data Quick Look for Detonation Engine System'
     
     # input file pathes
     FPATH_CONFIG = './config_tlm.xlsx'
     
-    def __init__(self, q_msg_smt, q_msg_pcm, q_data_smt, q_data_pcm):
+
+    def __init__(self, g_state, g_lval):
         super().__init__(None, wx.ID_ANY, self.WINDOW_CAPTION)
 
         # shere arguments within the class
-        self.q_msg_smt = q_msg_smt      # sending ONLY (to TLM)
-        self.q_msg_pcm = q_msg_pcm      # sending ONLY (to TLM)
-        self.q_data_smt = q_data_smt    # receiving ONLY (from TLM)
-        self.q_data_pcm = q_data_pcm    # receiving ONLY (from TLM)
+        self.g_state = g_state
+        self.g_lval = g_lval
+
+        # self.q_msg_smt = q_msg_smt      # sending ONLY (to TLM)
+        # self.q_msg_pcm = q_msg_pcm      # sending ONLY (to TLM)
+        # self.q_data_smt = q_data_smt    # receiving ONLY (from TLM)
+        # self.q_data_pcm = q_data_pcm    # receiving ONLY (from TLM)
 
         ### Initialize data
         # - load configurations from an external file
@@ -132,38 +137,41 @@ class frmMain(wx.Frame):
         self.Bind(wx.EVT_TIMER, self.OnFetchLatestValues, self.tmrFetchTelemeterData)
         self.tmrFetchTelemeterData.Start(RATE_FETCH_LATEST_VALUES)
 
+
     # Event handler: EVT_CLOSE
     def OnClose(self, event):
-        # quit tlm handlers
-        self.q_msg_smt.put_nowait('stop') 
-        self.q_msg_pcm.put_nowait('stop')
-
         self.Destroy()
+
 
     # Event handler: EVT_TIMER
     def OnFetchLatestValues(self, event):
         # print('GUI FTC: fetched tlm data')
         
-        self.dfTlm_smt = pd.DataFrame()
-        self.dfTlm_pcm = pd.DataFrame()
+        # self.dfTlm_smt = pd.DataFrame()
+        # self.dfTlm_pcm = pd.DataFrame()
 
-        ### fetch current values
+        ### fetch latest values
         # - smt
-        while True:
-            try:
-                self.dfTlm_smt = self.q_data_smt.get_nowait()
-            except queue.Empty:
-                break
-            else:
-                self.q_data_smt.task_done()
+        self.dfTlm_smt = self.g_lval['smt'].copy()
+
+        # while True:
+        #     try:
+        #         self.dfTlm_smt = self.q_data_smt.get_nowait()
+        #     except queue.Empty:
+        #         break
+        #     else:
+        #         self.q_data_smt.task_done()
+
         # - pcm
-        while True:
-            try:
-                self.dfTlm_pcm = self.q_data_pcm.get_nowait()
-            except queue.Empty:
-                break
-            else:
-                self.q_data_pcm.task_done()
+        self.dfTlm_pcm = self.g_lval['pcm'].copy()
+
+        # while True:
+        #     try:
+        #         self.dfTlm_pcm = self.q_data_pcm.get_nowait()
+        #     except queue.Empty:
+        #         break
+        #     else:
+        #         self.q_data_pcm.task_done()
 
         # break off when tlm data not exist
         if len(self.dfTlm_smt.index) == 0 or len(self.dfTlm_pcm.index) == 0:
@@ -187,13 +195,17 @@ class frmMain(wx.Frame):
 #   Panel: Plotter Pane (Time-history plot)
 # 
 class pnlPlotter(wx.Panel):
-    ### Class constants
+    #
+    #   Class constants
+    #
+
     N_PLOTTER = 5
     # __T_RANGE = 30    # [s]
     __T_RANGE = 31    # [s]
 
     __PLOT_SKIP = 9    ### T.B.REFAC. ###
     # __PLOT_SKIP = 39    ### T.B.REFAC. ###
+
 
     def __init__(self, parent):
         super().__init__(parent, wx.ID_ANY)
@@ -220,6 +232,7 @@ class pnlPlotter(wx.Panel):
         self.tmrRefresh = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.OnTimerRefresh, self.tmrRefresh)
         self.tmrRefresh.Start(RATE_REFLESH_PLOTTER)
+
 
     # Event handler: EVT_TIMER
     def OnTimerRefresh(self, event):
@@ -290,6 +303,7 @@ class pnlPlotter(wx.Panel):
         
         # print("GUI PLT: redraw plots...")
 
+
     # Load configurations from external files
     def loadConfig(self):
 
@@ -314,6 +328,7 @@ class pnlPlotter(wx.Panel):
                 break
 
             self.dictPlotterAttr[i] = dict_tmp
+
 
     # Configure appearance for plotters to display time histories
     def configure(self):
@@ -388,6 +403,7 @@ class pnlDigitalIndicator(wx.Panel):
         # for button in self.tbtnLabel:
         #     button.Bind(wx.EVT_TOGGLEBUTTON, self.graphTest)
 
+
     # Event handler: EVT_TIMER
     def OnTimerRefresh(self, event):
         # skip refresh when TLM NOT active
@@ -438,6 +454,7 @@ class pnlDigitalIndicator(wx.Panel):
 
                     stxtInidicator.Refresh()
 
+
     # Load configurations from external files
     def loadConfig(self):
         ### T.B.REFAC.: TEMPORALLY DESIGNATED BY LITERALS ###
@@ -470,6 +487,7 @@ class pnlDigitalIndicator(wx.Panel):
                 dict_temp[i] = item
 
             self.dictIndID2Item[strGroupName] = dict_temp
+
 
     # Configure appearance for digital indicators to display current values
     def configure(self):

@@ -1,14 +1,13 @@
 ### Standard libraries
 import socket
-#import struct
 import sys
 import time
 
 ### Third-party libraries
-# import numpy as np
+# n/a
 
 ### Local libraries
-# import common
+# n/a
 
 
 def tlmsvsim(dist_host, dist_port, file_path, n_lb, slp_time):
@@ -75,7 +74,7 @@ if __name__ == "__main__":
     if tlm_type == 'smt':
         dist_port = 60142
         # dist_port = 49157       # old
-        file_path = './dat/' + 'smt.bin'
+        file_path = './dat-in/' + 'smt.bin'
         n_lb = 0                # 20210205 full sequence
         # n_lb = 67000            # 20201020 shortened sequence
         # slp_time = 0.005         # 
@@ -84,7 +83,7 @@ if __name__ == "__main__":
     elif tlm_type == 'pcm':
         dist_port = 60140
         # dist_port = 49158       # old
-        file_path = './dat/' + 'pcm.bin'
+        file_path = './dat-in/' + 'pcm.bin'
         n_lb = 0                # 20210205 full sequence
         # n_lb = 135000           # 20201020 shortened sequence
         # slp_time = 0.0025        # 

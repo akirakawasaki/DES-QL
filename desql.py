@@ -1,7 +1,10 @@
 ### Standard libraries
 import asyncio
+import concurrent.futures
 import multiprocessing as mp
-import queue
+import pandas as pd
+import queue                        # Only for exception handling
+import socket
 import subprocess
 import sys
 
@@ -18,71 +21,69 @@ from src import gui
 #
 #   Socket Communication (UDP/IP) Handler
 #
-def telemeter_handler_wrapper(tlm_type, q_msg, q_datagram):
+def telemeter_handler_wrapper(tlm_type, q_msg, q_dgram):
     print(f'MAIN: Invoking UDP Communication Handler Wrapper for {tlm_type}...')
 
-    tlm = telemeter.TelemeterHandler(tlm_type, q_msg, q_datagram)
+    # datagram server
+    # HOST = '172.20.140.255'                                # mac
+    HOST = socket.gethostbyname(socket.gethostname())      # windows / mac(debug)
+    PORT =      60142 if (tlm_type == 'smt') \
+           else 60140
 
-    # asyncio.run( tlm.ttelemeter_handler() )
-    asyncio.run( tlm.telemeter_handler(), debug=True )      # for debug
+    tlm = telemeter.TelemeterHandler(tlm_type, HOST, PORT, q_msg, q_dgram)
 
-    print(f'Closing {tlm_type}...')
+    asyncio.run( tlm.telemeter_handler() )
+    # asyncio.run( tlm.telemeter_handler(), debug=True )      # for debug
+
+    print(f'MAIN: {tlm_type} Communication Handler Closed.')
 
 
 #
 #   Data Handler
 #
-def data_handler(tlm_type, q_datagram):
-    print(f'MAIN: Invoking Data Hundler Wrapper for {tlm_type}...')
+def data_handler_wrapper(tlm_type, g_state, g_lval, q_dgram):
+    print(f'MAIN: Invoking Data Handler Wrapper for {tlm_type}...')
     
-    tlm = data.DataHandler(tlm_type, q_datagram)
+    tlm = data.DataHandler(tlm_type, g_state, g_lval, q_dgram)
 
-    # asyncio.run( tlm.tlm_handler() )
-    asyncio.run( tlm.tlm_handler(), debug=True )      # for debug
+    asyncio.run( tlm.data_handler() )
+    # asyncio.run( tlm.data_handler(), debug=True )      # for debug
 
-    q_datagram.join()
+    # wait for queue to be fully processed
+    # q_dgram.join()  
 
-    print(f'Closing {tlm_type} Data Handler...')
+    print(f'MAIN: {tlm_type} Data Handler Closed.')
 
 
 #
 #   Graphical User Interface (GUI) Handler
 #
-def gui_handler(q_msg_smt, q_msg_pcm, q_data_smt, q_data_pcm):
+def gui_handler(g_state, g_lval, q_msg_smt, q_msg_pcm):
     print('MAIN: Invoking GUI...')
     
     # create the wx app
     app = wx.App()
 
     # create the main window & show
-    frame = gui.frmMain(q_msg_smt, q_msg_pcm, q_data_smt, q_data_pcm)
+    frame = gui.frmMain(g_state, g_lval)
     frame.Show()
 
     # launch event loop for GUI <BLOCKING>
     app.MainLoop()
 
-    # dump leftover queue tasks
-    # - smt
+    # quit telemeter handlers
+    q_msg_smt.put_nowait('stop')
+    q_msg_pcm.put_nowait('stop')
+
+    # quit data handlers
+    g_state['smt']['Tlm_Server_Is_Active'] == False
+    g_state['pcm']['Tlm_Server_Is_Active'] == False
+
+    # wait
     q_msg_smt.join()
-    while True:
-        try:
-            q_data_smt.get_nowait()
-        except queue.Empty:
-            break
-        else:
-            q_data_smt.task_done()
-
-    # - pcm
     q_msg_pcm.join()
-    while True:
-        try:
-            q_data_pcm.get_nowait()
-        except queue.Empty:
-            break
-        else:
-            q_data_pcm.task_done()
 
-    print('Closing GUI...')
+    print('MAIN: GUI Closed.')
 
 
 #
@@ -102,28 +103,64 @@ if __name__ == "__main__":
         sp_smt = subprocess.Popen(['python', './tlmsvsim.py', 'smt'], stdout=subprocess.DEVNULL)
         sp_pcm = subprocess.Popen(['python', './tlmsvsim.py', 'pcm'], stdout=subprocess.DEVNULL)
 
+    g_state = { 'smt': {'Tlm_Server_Is_Active': True}, 
+                'pcm': {'Tlm_Server_Is_Active': True}   }
+    # g_lval = {  'smt': {}, 
+    #             'pcm': {}   }
+    g_lval = {  'smt': pd.DataFrame(), 
+                'pcm': pd.DataFrame()   }
+
     # generate FIFO queues for inter-process communication
-    # - SMT/GUI
+    # - From SMT SERVER To SMT DATA HANDLER
+    q_dgram_smt = mp.JoinableQueue()
+    # - From GUI To SMT SERVER
     q_msg_smt = mp.JoinableQueue()
-    q_data_smt = mp.JoinableQueue()
-    # - PCM/GUI
+    # - From PCM SERVER To SMT DATA HANDLER
+    q_dgram_pcm = mp.JoinableQueue()
+    # - From GUI To SMT SERVER
     q_msg_pcm = mp.JoinableQueue()
-    q_data_pcm = mp.JoinableQueue()
+
+    # launch data handler in other threads concurrently
+    executor = concurrent.futures.ThreadPoolExecutor()
+    future_smt = executor.submit(data_handler_wrapper, 'smt', g_state, g_lval, q_dgram_smt)
+    future_pcm = executor.submit(data_handler_wrapper, 'pcm', g_state, g_lval, q_dgram_pcm)
 
     # launch UDP communication handler in other processes <NON-BLOCKING>
     # - smt
-    p_smt = mp.Process(target=telemeter_handler_wrapper, args=('smt', q_msg_smt, q_data_smt))
+    p_smt = mp.Process(target=telemeter_handler_wrapper, args=('smt', q_msg_smt, q_dgram_smt))
     p_smt.start()
     # - pcm
-    p_pcm = mp.Process(target=telemeter_handler_wrapper, args=('pcm', q_msg_pcm, q_data_pcm))
+    p_pcm = mp.Process(target=telemeter_handler_wrapper, args=('pcm', q_msg_pcm, q_dgram_pcm))
     p_pcm.start()
 
     # launch GUI handler in the main process/thread <BLOCKING>
-    gui_handler(q_msg_smt, q_msg_pcm, q_data_smt, q_data_pcm)
+    gui_handler(g_state, g_lval, q_msg_smt, q_msg_pcm)
     
-    # end processing
+    # dump leftover queue tasks
+    # - smt
+    # while True:
+    #     try:
+    #         _ = q_dgram_smt.get_nowait()
+    #     except queue.Empty:
+    #         break
+        
+    #     q_dgram_smt.task_done()
+
+    # - pcm
+    # while True:
+    #     try:
+    #         _ = q_dgram_pcm.get_nowait()
+    #     except queue.Empty:
+    #         break
+
+    #     q_dgram_pcm.task_done()
+    
+    # wait UDP communication handler
     p_smt.join()    
     p_pcm.join()
+
+    # quit data handlers
+    executor.shutdown(wait=True, cancel_futures=True)
 
     if mode == 'debug':
         sp_smt.terminate()
