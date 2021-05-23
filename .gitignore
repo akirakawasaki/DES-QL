@@ -1,2 +1,7 @@
 dat-in/pcm.bin
 dat-in/smt.bin
+.DS_Store
+src/__pycache__/data.cpython-39.pyc
+src/__pycache__/gui.cpython-39.pyc
+src/__pycache__/telemeter.cpython-39.pyc
+
