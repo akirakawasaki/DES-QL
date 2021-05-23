@@ -101,20 +101,32 @@ class DataHandler :
         task_decoder = asyncio.create_task( self.decoder() )
 
         # block until GUI task done
-        while True:
+        while True:            
             if self.g_state[self.tlm_type]['Tlm_Server_Is_Active'] == False: 
                 break
             else:
                 await asyncio.sleep(1)
-    
+
+            # for debug
+            # print(f"{self.tlm_type}: g_state = {self.g_state[self.tlm_type]['Tlm_Server_Is_Active']}")
+
         print(f'DAT {self.tlm_type}: Data handler will be closed soon!')
 
         # quit async tasks after GUI task done
         # - deta decoder
         # print(f'TLM {self.tlm_type}: queue size = {self.q_dgram.qsize()}')
-        await self.q_dgram.join()           # wait for queue to be fully processed
+        # await self.q_dgram.join()           # wait for queue to be fully processed
         task_decoder.cancel()
         await task_decoder                  # wait for task to be cancelled
+
+        # dump leftover queue tasks
+        # while True:
+        #     try:
+        #         _ = self.q_dgram.get_nowait()
+        #     except queue.Empty:
+        #         break
+            
+        #     self.q_dgram.task_done()
 
         # - file writer
         await self.q_write_data.join()      # wait for queue to be fully processed
@@ -150,16 +162,22 @@ class DataHandler :
     async def decoder(self) -> None:
         print(f'DAT {self.tlm_type}: Starting data decoder...')
 
+        Decoder_Task_Is_Canceled = False
+
         while True:
-            # poll datagram reception or task cacellation
+            # poll task cacellation
+            try:
+                pass
+            except asyncio.CancelledError:
+                Decoder_Task_Is_Canceled = True
+            
+            # poll datagram reception
             try:
                 data = self.q_dgram.get_nowait()
             except queue.Empty:
-                try:
-                    await asyncio.sleep(0.0005)
-                except asyncio.CancelledError:
-                    break
-                
+                if Decoder_Task_Is_Canceled == True:    break
+
+                await asyncio.sleep(0.0005)
                 continue
 
             # for debug

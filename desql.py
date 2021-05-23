@@ -76,8 +76,8 @@ def gui_handler(g_state, g_lval, q_msg_smt, q_msg_pcm):
     q_msg_pcm.put_nowait('stop')
 
     # quit data handlers
-    g_state['smt']['Tlm_Server_Is_Active'] == False
-    g_state['pcm']['Tlm_Server_Is_Active'] == False
+    g_state['smt']['Tlm_Server_Is_Active'] = False
+    g_state['pcm']['Tlm_Server_Is_Active'] = False
 
     # wait
     q_msg_smt.join()
@@ -136,31 +136,20 @@ if __name__ == "__main__":
     # launch GUI handler in the main process/thread <BLOCKING>
     gui_handler(g_state, g_lval, q_msg_smt, q_msg_pcm)
     
-    # dump leftover queue tasks
-    # - smt
-    # while True:
-    #     try:
-    #         _ = q_dgram_smt.get_nowait()
-    #     except queue.Empty:
-    #         break
-        
-    #     q_dgram_smt.task_done()
-
-    # - pcm
-    # while True:
-    #     try:
-    #         _ = q_dgram_pcm.get_nowait()
-    #     except queue.Empty:
-    #         break
-
-    #     q_dgram_pcm.task_done()
-    
     # wait UDP communication handler
     p_smt.join()    
     p_pcm.join()
 
+    # for debug
+    print('MAIN: Processes joined.')
+    # print(f"SMT: g_state = {g_state['smt']['Tlm_Server_Is_Active']}")
+    # print(f"PCM: g_state = {g_state['pcm']['Tlm_Server_Is_Active']}")
+
     # quit data handlers
-    executor.shutdown(wait=True, cancel_futures=True)
+    executor.shutdown(wait=True, cancel_futures=False)
+
+    # for debug
+    print('MAIN: Executor shut down.')
 
     if mode == 'debug':
         sp_smt.terminate()
