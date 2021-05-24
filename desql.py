@@ -25,8 +25,8 @@ def telemeter_handler_wrapper(tlm_type, q_msg, q_dgram):
     print(f'MAIN: Invoking UDP Communication Handler Wrapper for {tlm_type}...')
 
     # datagram server
-    HOST = '172.20.140.255'                                # mac
-    # HOST = socket.gethostbyname(socket.gethostname())      # windows / mac(debug)
+    # HOST = '172.20.140.255'                                # mac
+    HOST = socket.gethostbyname(socket.gethostname())      # windows / mac(debug)
     PORT =      60142 if (tlm_type == 'smt') \
            else 60140
 
@@ -102,10 +102,10 @@ if __name__ == "__main__":
 
     g_state = { 'smt': {'Tlm_Server_Is_Active': True}, 
                 'pcm': {'Tlm_Server_Is_Active': True}   }
-    # g_lval = {  'smt': {}, 
-    #             'pcm': {}   }
-    g_lval = {  'smt': pd.DataFrame(), 
-                'pcm': pd.DataFrame()   }
+    g_lval = {  'smt': {}, 
+                'pcm': {}   }
+    # g_lval = {  'smt': pd.DataFrame(), 
+    #             'pcm': pd.DataFrame()   }
 
     # generate FIFO queues for inter-process communication
     # - From SMT SERVER To SMT DATA HANDLER

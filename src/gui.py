@@ -173,6 +173,16 @@ class frmMain(wx.Frame):
         #     else:
         #         self.q_data_pcm.task_done()
 
+        # for debug
+        # print('self.dfTlm_smt = ')
+        # print(self.dfTlm_smt)
+        # print('self.dfTlm_pcm = ')
+        # print(self.dfTlm_pcm)
+        # print("self.g_lval['smt'] = ")
+        # print(self.g_lval['smt'])
+        # print("self.g_lval['pcm'] = ")
+        # print(self.g_lval['pcm'])
+
         # break off when tlm data not exist
         # if len(self.dfTlm_smt.index) == 0 or len(self.dfTlm_pcm.index) == 0:
         if len(self.g_lval['smt']) == 0 or len(self.g_lval['pcm']) == 0:
@@ -180,18 +190,11 @@ class frmMain(wx.Frame):
             self.F_TLM_IS_ACTIVE = False
             return None
         
-        # for debug
-        # print('self.dfTlm_smt = ')
-        # print(self.dfTlm_smt)
-        # print('self.dfTlm_pcm = ')
-        # print(self.dfTlm_pcm)
-
         # self.dictTlmLatestValues.update( self.dfTlm_smt.to_dict(orient='index')[0] )
         # self.dictTlmLatestValues.update( self.dfTlm_pcm.to_dict(orient='index')[0] )
 
         self.dictTlmLatestValues.update( self.g_lval['smt'] )
         self.dictTlmLatestValues.update( self.g_lval['pcm'] )
-
 
         self.F_TLM_IS_ACTIVE = True
 

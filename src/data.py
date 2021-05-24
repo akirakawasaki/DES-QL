@@ -213,7 +213,7 @@ class DataHandler :
                 self.q_write_data.put_nowait( (self.FPATH_ERR, err_history) )
 
             # - To CUI
-            if self.iLine % 10000 == 0:
+            if self.iLine % 50000 == 0:
             # if iLine % 1 == 0:
                 print('')
                 print(f'{self.tlm_type} iLine: {self.iLine}')
@@ -252,13 +252,19 @@ class DataHandler :
     def notify_gui(self, dict_mf) -> None:
         dict_tmp = dict_mf[0].copy()
 
+        # for debug
+        # print(f'DAT {self.tlm_type}: dict_tmp = ')
+        # print(dict_tmp)
+
         # fill NaN backword
         for key in dict_tmp.keys():
-            if dict_tmp[key] == math.nan:
-                for iFrame in range(self.NUM_OF_FRAMES):
-                    if dict_mf[iFrame][key] != math.nan:
-                        dict_tmp[key] = dict_mf[iFrame][key]
-                        break
+            if math.isnan(dict_tmp[key]) == False:  continue
+
+            for iFrame in range(self.NUM_OF_FRAMES):
+                if math.isnan(dict_mf[iFrame][key]) == True:    continue
+            
+                dict_tmp[key] = dict_mf[iFrame][key]
+                break
 
         # serch last MCU error
         if self.tlm_type == 'smt':
@@ -266,7 +272,7 @@ class DataHandler :
                 if dict_mf[iFrame]['Error Code'] != 0:
                     dict_tmp['Error Code'] = dict_mf[iFrame]['Error Code']
 
-        self.g_lval[self.tlm_type] = dict_tmp
+        self.g_lval[self.tlm_type].update(dict_tmp) 
         # self.g_lval[self.tlm_type] = df_tmp.copy()
         # self.q_latest_data.put_nowait( df_tmp )
 
