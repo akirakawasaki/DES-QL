@@ -1,5 +1,6 @@
 ### Standard libraries
 import asyncio
+import copy
 import csv
 import math
 import queue
@@ -250,27 +251,36 @@ class DataHandler :
 
     # Notify GUI of latest values
     def notify_gui(self, dict_mf) -> None:
-        dict_tmp = dict_mf[0].copy()
-
-        # for debug
-        # print(f'DAT {self.tlm_type}: dict_tmp = ')
-        # print(dict_tmp)
+        # dict_tmp = dict_mf[0].copy()
+        dict_tmp = copy.deepcopy(dict_mf[0])
 
         # fill NaN backword
         for key in dict_tmp.keys():
             if math.isnan(dict_tmp[key]) == False:  continue
 
+            # for debug
+            print(f'DAT {self.tlm_type}: NaN detected! key = {key}; value = {dict_tmp[key]}')
+            print(f'DAT {self.tlm_type}: dict_tmp = ')
+            print(dict_tmp)
+
             for iFrame in range(self.NUM_OF_FRAMES):
                 if math.isnan(dict_mf[iFrame][key]) == True:    continue
-            
-                dict_tmp[key] = dict_mf[iFrame][key]
+
+                # dict_tmp[key] = 0
+                # dict_tmp[key] = dict_mf[iFrame].get(key)
+
                 break
 
         # serch last MCU error
         if self.tlm_type == 'smt':
             for iFrame in range(self.NUM_OF_FRAMES):
-                if dict_mf[iFrame]['Error Code'] != 0:
-                    dict_tmp['Error Code'] = dict_mf[iFrame]['Error Code']
+                if dict_mf[iFrame]['Error Code'] == 0:  continue
+
+                dict_tmp['Error Code'] = dict_mf[iFrame].get('Error Code')
+
+        # for debug
+        # print(f'DAT {self.tlm_type}: dict_tmp = ')
+        # print(dict_tmp)
 
         self.g_lval[self.tlm_type].update(dict_tmp) 
         # self.g_lval[self.tlm_type] = df_tmp.copy()

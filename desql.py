@@ -32,8 +32,8 @@ def telemeter_handler_wrapper(tlm_type, q_msg, q_dgram):
 
     tlm = telemeter.TelemeterHandler(tlm_type, HOST, PORT, q_msg, q_dgram)
 
-    asyncio.run( tlm.telemeter_handler() )
-    # asyncio.run( tlm.telemeter_handler(), debug=True )      # for debug
+    # asyncio.run( tlm.telemeter_handler() )
+    asyncio.run( tlm.telemeter_handler(), debug=True )      # for debug
 
     print(f'MAIN: {tlm_type} Communication Handler Closed.')
 
@@ -46,8 +46,8 @@ def data_handler_wrapper(tlm_type, g_state, g_lval, q_dgram):
     
     tlm = data.DataHandler(tlm_type, g_state, g_lval, q_dgram)
 
-    asyncio.run( tlm.data_handler() )
-    # asyncio.run( tlm.data_handler(), debug=True )      # for debug
+    # asyncio.run( tlm.data_handler() )
+    asyncio.run( tlm.data_handler(), debug=True )      # for debug
 
     print(f'MAIN: {tlm_type} Data Handler Closed.')
 

@@ -59,7 +59,7 @@ class TelemeterHandler :
         # transport.close()
 
         # 
-        self.q_dgram.join()
+        # self.q_dgram.join()
 
         # 
         self.q_msg.task_done()
