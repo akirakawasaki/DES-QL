@@ -185,7 +185,8 @@ class DataHandler :
             # print(data)
 
             ### decode datagram
-            df_mf, hs_data, err_history = self.decode(data)
+            dict_mf, hs_data, err_history = self.decode(data)
+            # df_mf, hs_data, err_history = self.decode(data)
 
             # for debug
             # print(f'DAT {self.tlm_type}: Data decoded!')
@@ -196,7 +197,8 @@ class DataHandler :
             # low-speed data 
             if self.iLine % 1 == 0:
             # if self.iLine % 10 == 0:
-                write_data = df_mf.values.tolist()
+                # write_data = df_mf.values.tolist()
+                write_data = list(dict_mf.values())
                 self.q_write_data.put_nowait( (self.fpath_ls_data, write_data) )
                 
                 # for debug 
@@ -215,11 +217,13 @@ class DataHandler :
             # if iLine % 1 == 0:
                 print('')
                 print(f'{self.tlm_type} iLine: {self.iLine}')
-                print(df_mf)
+                # print(df_mf)
+                print(dict_mf)
                 print('')
 
             # - To GUI
-            self.notify_gui(df_mf)
+            # self.notify_gui(df_mf)
+            self.notify_gui(dict_mf)
 
             self.q_dgram.task_done()
 
@@ -227,20 +231,43 @@ class DataHandler :
 
 
     # Notify GUI of latest values
-    def notify_gui(self, df_mf) -> None:
-        df_tmp = df_mf.fillna(method='bfill').head(1)
-        # df_tmp = df_mf.fillna(method='bfill').tail(1)
+    # def notify_gui(self, df_mf) -> None:
+    #     df_tmp = df_mf.fillna(method='bfill').head(1)
+    #     # df_tmp = df_mf.fillna(method='bfill').tail(1)
 
-        # latch last error
-        if self.tlm_type == 'smt':
-            # detect last MCU error
-            for i in range(self.NUM_OF_FRAMES):
-                ec_temp = df_mf.at[i, 'Error Code']
-                if ec_temp != 0:   self.last_error = ec_temp
+    #     # latch last error
+    #     if self.tlm_type == 'smt':
+    #         # detect last MCU error
+    #         for i in range(self.NUM_OF_FRAMES):
+    #             ec_temp = df_mf.at[i, 'Error Code']
+    #             if ec_temp != 0:   self.last_error = ec_temp
         
-            df_tmp.at[0, 'Error Code'] = self.last_error
+    #         df_tmp.at[0, 'Error Code'] = self.last_error
 
-        self.g_lval[self.tlm_type] = df_tmp.copy()
+    #     self.g_lval[self.tlm_type] = df_tmp.copy()
+    #     # self.q_latest_data.put_nowait( df_tmp )
+
+
+    # Notify GUI of latest values
+    def notify_gui(self, dict_mf) -> None:
+        dict_tmp = dict_mf[0].copy()
+
+        # fill NaN backword
+        for key in dict_tmp.keys():
+            if dict_tmp[key] == math.nan:
+                for iFrame in range(self.NUM_OF_FRAMES):
+                    if dict_mf[iFrame][key] != math.nan:
+                        dict_tmp[key] = dict_mf[iFrame][key]
+                        break
+
+        # serch last MCU error
+        if self.tlm_type == 'smt':
+            for iFrame in range(self.NUM_OF_FRAMES):
+                if dict_mf[iFrame]['Error Code'] != 0:
+                    dict_tmp['Error Code'] = dict_mf[iFrame]['Error Code']
+
+        self.g_lval[self.tlm_type] = dict_tmp
+        # self.g_lval[self.tlm_type] = df_tmp.copy()
         # self.q_latest_data.put_nowait( df_tmp )
 
 
@@ -606,9 +633,11 @@ class DataHandler :
 
             self.iLine += 1
 
-        df_mf = pd.DataFrame.from_dict(dict_data_matrix, orient='index')
+        return dict_data_matrix, hs_data, err_history
 
-        return df_mf, hs_data, err_history
+        # df_mf = pd.DataFrame.from_dict(dict_data_matrix, orient='index')
+
+        # return df_mf, hs_data, err_history
 
 
     ''' Implimentations of decoding rules '''
