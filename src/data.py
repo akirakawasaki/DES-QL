@@ -254,19 +254,29 @@ class DataHandler :
         # dict_tmp = dict_mf[0].copy()
         dict_tmp = copy.deepcopy(dict_mf[0])
 
-        # fill NaN backword
+        # for debug
+        # print(f'DAT {self.tlm_type}: dict_tmp = ')
+        # print(dict_tmp)
+
+        # fill NaN backward
         for key in dict_tmp.keys():
-            if math.isnan(dict_tmp[key]) == False:  continue
+            try:
+                if math.isnan(dict_tmp[key]) == False:  continue
+            except TypeError:
+                continue
 
             # for debug
-            print(f'DAT {self.tlm_type}: NaN detected! key = {key}; value = {dict_tmp[key]}')
-            print(f'DAT {self.tlm_type}: dict_tmp = ')
-            print(dict_tmp)
+            # print(f'DAT {self.tlm_type}: NaN detected! key = {key}; value = {dict_tmp[key]}')
+            # print(f'DAT {self.tlm_type}: dict_tmp = ')
+            # print(dict_tmp)
 
             for iFrame in range(self.NUM_OF_FRAMES):
-                if math.isnan(dict_mf[iFrame][key]) == True:    continue
+                try:
+                    if math.isnan(dict_mf[iFrame][key]) == True:    continue
+                except TypeError:
+                    continue
 
-                # dict_tmp[key] = 0
+                dict_tmp[key] = dict_mf[iFrame][key]
                 # dict_tmp[key] = dict_mf[iFrame].get(key)
 
                 break
