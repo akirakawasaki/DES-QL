@@ -8,7 +8,7 @@ import sys
 
 # import cProfile
 from os import spawnve
-# import pprint as pp
+import pprint as pp
 # import pstats
 
 ### Third-party libraries
@@ -175,10 +175,6 @@ class DataHandler :
                 await asyncio.sleep(0.0005)
                 continue
 
-            # for debug
-            # print(f'DAT {self.tlm_type}: Data received!')
-            # print(data)
-
             ### decode datagram
             dict_mf, hs_data, err_history = self.decode(data)
 
@@ -187,11 +183,15 @@ class DataHandler :
             # low-speed data 
             if self.iLine % 1 == 0:
             # if self.iLine % 10 == 0:
-                write_data = list(dict_mf.values())
+                write_data = [  list(dict_mf[0].values()),
+                                list(dict_mf[1].values()),
+                                list(dict_mf[2].values()),
+                                list(dict_mf[3].values()),
+                                list(dict_mf[4].values()),
+                                list(dict_mf[5].values()),
+                                list(dict_mf[6].values()),
+                                list(dict_mf[7].values()) ]
                 self.q_write_data.put_nowait( (self.fpath_ls_data, write_data) )
-                
-                # for debug 
-                # print(f'DAT {self.tlm_type}: Data saved!')
 
             # high-speed data
             if hs_data != []:
@@ -202,16 +202,15 @@ class DataHandler :
                 self.q_write_data.put_nowait( (self.FPATH_ERR, err_history) )
 
             # - To CUI
-            if self.iLine % 50000 == 0:
             # if iLine % 1 == 0:
+            if self.iLine % 20000 == 0:
+            # if self.iLine % 50000 == 0:
                 print('')
                 print(f'{self.tlm_type} iLine: {self.iLine}')
-                # print(df_mf)
                 print(dict_mf)
                 print('')
 
             # - To GUI
-            # self.notify_gui(df_mf)
             self.notify_gui(dict_mf)
 
             self.q_dgram.task_done()
