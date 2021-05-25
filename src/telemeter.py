@@ -20,6 +20,7 @@ class TelemeterHandler :
 
     # n/a    
 
+
     def __init__(self, tlm_type, HOST, PORT, q_msg, q_dgram) -> None:
         self.tlm_type = tlm_type
 
@@ -30,6 +31,7 @@ class TelemeterHandler :
         # datagram server attributions
         self.HOST = HOST
         self.PORT = PORT
+
 
     async def telemeter_handler(self) -> None:
         # invoke async datagram listner
@@ -56,7 +58,6 @@ class TelemeterHandler :
 
         # quit async detagram server
         transport.abort()
-        # transport.close()
 
         # 
         # self.q_dgram.join()
@@ -71,6 +72,13 @@ class TelemeterHandler :
 #   Datagram Server
 #
 class DatagramServerProtocol:    
+    #
+    # Class constants
+    #
+
+    # n/a   
+
+
     # Initialize instance
     def __init__(self, tlm_type, q_dgram) -> None:
         self.tlm_type = tlm_type
@@ -78,11 +86,13 @@ class DatagramServerProtocol:
 
         print(f'TLM {self.tlm_type}: Starting datagram listner...')
 
+
     # Event handler
     def connection_made(self, transport):
         print(f'Connected to {self.tlm_type}')
         
         self.transport = transport
+
 
     # Event handler
     def datagram_received(self, data, addr):
@@ -93,6 +103,7 @@ class DatagramServerProtocol:
         # for debug
         # print_mf(data)      
         # print(f'TLM RCV: queue size = {self.data_queue.qsize()}')
+
 
     # Event handler
     def connection_lost(self, exec):

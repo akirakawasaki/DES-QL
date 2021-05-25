@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 
 ### Local libraries
-#n/a
+# n/a
 
 
 #
@@ -49,8 +49,6 @@ class DataHandler :
         self.g_lval = g_lval
 
         ### general settings
-
-
         # queues for inter-process message passing
         self.q_dgram = q_dgram      # receiving ONLY
 
@@ -103,13 +101,9 @@ class DataHandler :
 
         # block until GUI task done
         while True:            
-            if self.g_state[self.tlm_type]['Tlm_Server_Is_Active'] == False: 
-                break
-            else:
-                await asyncio.sleep(1)
-
-            # for debug
-            # print(f"{self.tlm_type}: g_state = {self.g_state[self.tlm_type]['Tlm_Server_Is_Active']}")
+            if self.g_state[self.tlm_type]['Tlm_Server_Is_Active'] == False:    break
+            
+            await asyncio.sleep(1)
 
         print(f'DAT {self.tlm_type}: Data handler will be closed soon!')
 
@@ -187,18 +181,12 @@ class DataHandler :
 
             ### decode datagram
             dict_mf, hs_data, err_history = self.decode(data)
-            # df_mf, hs_data, err_history = self.decode(data)
-
-            # for debug
-            # print(f'DAT {self.tlm_type}: Data decoded!')
-            # print(df_mf)
 
             ### output decoded data
             # - To Files
             # low-speed data 
             if self.iLine % 1 == 0:
             # if self.iLine % 10 == 0:
-                # write_data = df_mf.values.tolist()
                 write_data = list(dict_mf.values())
                 self.q_write_data.put_nowait( (self.fpath_ls_data, write_data) )
                 
@@ -232,31 +220,9 @@ class DataHandler :
 
 
     # Notify GUI of latest values
-    # def notify_gui(self, df_mf) -> None:
-    #     df_tmp = df_mf.fillna(method='bfill').head(1)
-    #     # df_tmp = df_mf.fillna(method='bfill').tail(1)
-
-    #     # latch last error
-    #     if self.tlm_type == 'smt':
-    #         # detect last MCU error
-    #         for i in range(self.NUM_OF_FRAMES):
-    #             ec_temp = df_mf.at[i, 'Error Code']
-    #             if ec_temp != 0:   self.last_error = ec_temp
-        
-    #         df_tmp.at[0, 'Error Code'] = self.last_error
-
-    #     self.g_lval[self.tlm_type] = df_tmp.copy()
-    #     # self.q_latest_data.put_nowait( df_tmp )
-
-
-    # Notify GUI of latest values
     def notify_gui(self, dict_mf) -> None:
         # dict_tmp = dict_mf[0].copy()
         dict_tmp = copy.deepcopy(dict_mf[0])
-
-        # for debug
-        # print(f'DAT {self.tlm_type}: dict_tmp = ')
-        # print(dict_tmp)
 
         # fill NaN backward
         for key in dict_tmp.keys():
@@ -265,11 +231,6 @@ class DataHandler :
             except TypeError:
                 continue
 
-            # for debug
-            # print(f'DAT {self.tlm_type}: NaN detected! key = {key}; value = {dict_tmp[key]}')
-            # print(f'DAT {self.tlm_type}: dict_tmp = ')
-            # print(dict_tmp)
-
             for iFrame in range(self.NUM_OF_FRAMES):
                 try:
                     if math.isnan(dict_mf[iFrame][key]) == True:    continue
@@ -277,7 +238,6 @@ class DataHandler :
                     continue
 
                 dict_tmp[key] = dict_mf[iFrame][key]
-                # dict_tmp[key] = dict_mf[iFrame].get(key)
 
                 break
 
@@ -288,13 +248,7 @@ class DataHandler :
 
                 dict_tmp['Error Code'] = dict_mf[iFrame].get('Error Code')
 
-        # for debug
-        # print(f'DAT {self.tlm_type}: dict_tmp = ')
-        # print(dict_tmp)
-
         self.g_lval[self.tlm_type].update(dict_tmp) 
-        # self.g_lval[self.tlm_type] = df_tmp.copy()
-        # self.q_latest_data.put_nowait( df_tmp )
 
 
     # Decode raw telemetry data into physical values
