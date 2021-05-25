@@ -207,7 +207,15 @@ class DataHandler :
             # if self.iLine % 50000 == 0:
                 print('')
                 print(f'{self.tlm_type} iLine: {self.iLine}')
-                print(dict_mf)
+                # print(dict_mf)
+                print(dict_mf[0])
+                print(dict_mf[1])
+                print(dict_mf[2])
+                print(dict_mf[3])
+                print(dict_mf[4])
+                print(dict_mf[5])
+                print(dict_mf[6])
+                print(dict_mf[7])
                 print('')
 
             # - To GUI

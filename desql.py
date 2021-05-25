@@ -104,18 +104,14 @@ if __name__ == "__main__":
                 'pcm': {'Tlm_Server_Is_Active': True}   }
     g_lval = {  'smt': {}, 
                 'pcm': {}   }
-    # g_lval = {  'smt': pd.DataFrame(), 
-    #             'pcm': pd.DataFrame()   }
 
     # generate FIFO queues for inter-process communication
-    # - From SMT SERVER To SMT DATA HANDLER
-    q_dgram_smt = mp.JoinableQueue()
-    # - From GUI To SMT SERVER
-    q_msg_smt = mp.JoinableQueue()
-    # - From PCM SERVER To SMT DATA HANDLER
-    q_dgram_pcm = mp.JoinableQueue()
-    # - From GUI To SMT SERVER
-    q_msg_pcm = mp.JoinableQueue()
+    # - control message
+    q_msg_smt = mp.JoinableQueue()          # From GUI To SMT Server
+    q_msg_pcm = mp.JoinableQueue()          # From GUI To SMT Server
+    # - datagram
+    q_dgram_smt = mp.JoinableQueue()        # From SMT Server To SMT Data Handler
+    q_dgram_pcm = mp.JoinableQueue()        # From PCM Server To SMT Data Handler
 
     # launch data handler in other threads concurrently
     executor = concurrent.futures.ThreadPoolExecutor()
@@ -141,6 +137,10 @@ if __name__ == "__main__":
     print('MAIN: Processes joined.')
     # print(f"SMT: g_state = {g_state['smt']['Tlm_Server_Is_Active']}")
     # print(f"PCM: g_state = {g_state['pcm']['Tlm_Server_Is_Active']}")
+
+    # wait for futures
+    while True:
+        if future_smt.done() and future_pcm.done(): break
 
     # quit data handlers
     executor.shutdown(wait=True, cancel_futures=False)
