@@ -4,3 +4,7 @@ dat-in/smt.bin
 src/__pycache__/data.cpython-39.pyc
 src/__pycache__/gui.cpython-39.pyc
 src/__pycache__/telemeter.cpython-39.pyc
+data_pcm.csv
+data_smt.csv
+high_speed_data_0000.csv
+high_speed_data_0001.csv

@@ -147,52 +147,13 @@ class frmMain(wx.Frame):
     def OnFetchLatestValues(self, event):
         # print('GUI FTC: fetched tlm data')
         
-        # self.dfTlm_smt = pd.DataFrame()
-        # self.dfTlm_pcm = pd.DataFrame()
-
-        ### fetch latest values
-        # - smt
-        # self.dfTlm_smt = self.g_lval['smt'].copy()
-
-        # while True:
-        #     try:
-        #         self.dfTlm_smt = self.q_data_smt.get_nowait()
-        #     except queue.Empty:
-        #         break
-        #     else:
-        #         self.q_data_smt.task_done()
-
-        # - pcm
-        # self.dfTlm_pcm = self.g_lval['pcm'].copy()
-
-        # while True:
-        #     try:
-        #         self.dfTlm_pcm = self.q_data_pcm.get_nowait()
-        #     except queue.Empty:
-        #         break
-        #     else:
-        #         self.q_data_pcm.task_done()
-
-        # for debug
-        # print('self.dfTlm_smt = ')
-        # print(self.dfTlm_smt)
-        # print('self.dfTlm_pcm = ')
-        # print(self.dfTlm_pcm)
-        # print("self.g_lval['smt'] = ")
-        # print(self.g_lval['smt'])
-        # print("self.g_lval['pcm'] = ")
-        # print(self.g_lval['pcm'])
-
         # break off when tlm data not exist
-        # if len(self.dfTlm_smt.index) == 0 or len(self.dfTlm_pcm.index) == 0:
         if len(self.g_lval['smt']) == 0 or len(self.g_lval['pcm']) == 0:
             print('GUI FTC: awaiting SMT and/or PCM data')
             self.F_TLM_IS_ACTIVE = False
             return None
         
-        # self.dictTlmLatestValues.update( self.dfTlm_smt.to_dict(orient='index')[0] )
-        # self.dictTlmLatestValues.update( self.dfTlm_pcm.to_dict(orient='index')[0] )
-
+        ### fetch latest values
         self.dictTlmLatestValues.update( self.g_lval['smt'] )
         self.dictTlmLatestValues.update( self.g_lval['pcm'] )
 

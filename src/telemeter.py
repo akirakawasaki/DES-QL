@@ -57,13 +57,16 @@ class TelemeterHandler :
         print(f'TLM {self.tlm_type}: STOP message received!')
 
         # quit async detagram server
-        transport.abort()
+        transport.close()
+        # transport.abort()
+
+        # 
+        self.q_msg.task_done()
+
 
         # 
         # self.q_dgram.join()
 
-        # 
-        self.q_msg.task_done()
 
         print(f'TLM {self.tlm_type}: Closing tlm handler...')
 

@@ -72,13 +72,13 @@ def gui_handler(g_state, g_lval, q_msg_smt, q_msg_pcm):
     q_msg_smt.put_nowait('stop')
     q_msg_pcm.put_nowait('stop')
 
+    # block
+    q_msg_smt.join()
+    q_msg_pcm.join()
+
     # quit data handlers
     g_state['smt']['Tlm_Server_Is_Active'] = False
     g_state['pcm']['Tlm_Server_Is_Active'] = False
-
-    # wait
-    q_msg_smt.join()
-    q_msg_pcm.join()
 
     print('MAIN: GUI Closed.')
 
@@ -128,13 +128,14 @@ if __name__ == "__main__":
 
     # launch GUI handler in the main process/thread <BLOCKING>
     gui_handler(g_state, g_lval, q_msg_smt, q_msg_pcm)
-    
+
     # wait UDP communication handler
     p_smt.join()    
     p_pcm.join()
 
-    # for debug
     print('MAIN: Processes joined.')
+
+    # for debug
     # print(f"SMT: g_state = {g_state['smt']['Tlm_Server_Is_Active']}")
     # print(f"PCM: g_state = {g_state['pcm']['Tlm_Server_Is_Active']}")
 

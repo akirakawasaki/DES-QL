@@ -101,30 +101,22 @@ class DataHandler :
 
         # block until GUI task done
         while True:            
-            if self.g_state[self.tlm_type]['Tlm_Server_Is_Active'] == False:    break
-            
             await asyncio.sleep(1)
+            if self.g_state[self.tlm_type]['Tlm_Server_Is_Active'] == False:    break
 
-        print(f'DAT {self.tlm_type}: Data handler will be closed soon!')
+        print(f'DAT {self.tlm_type}: Data handler will be closed soon...')
+
+        await self.q_dgram.join()           # wait for queue to be fully processed
+
+        await self.q_write_data.join()      # wait for queue to be fully processed
 
         # quit async tasks after GUI task done
         # - deta decoder
         # print(f'TLM {self.tlm_type}: queue size = {self.q_dgram.qsize()}')
-        # await self.q_dgram.join()           # wait for queue to be fully processed
         task_decoder.cancel()
         await task_decoder                  # wait for task to be cancelled
 
-        # dump leftover queue tasks
-        # while True:
-        #     try:
-        #         _ = self.q_dgram.get_nowait()
-        #     except queue.Empty:
-        #         break
-            
-        #     self.q_dgram.task_done()
-
         # - file writer
-        await self.q_write_data.join()      # wait for queue to be fully processed
         task_file_writer.cancel()
         await task_file_writer              # wait for task to be cancelled
 
