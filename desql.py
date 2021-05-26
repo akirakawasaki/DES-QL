@@ -101,7 +101,8 @@ if __name__ == "__main__":
         sp_pcm = subprocess.Popen(['python', './tlmsvsim.py', 'pcm'], stdout=subprocess.DEVNULL)
 
     g_state = { 'smt': {'Tlm_Server_Is_Active': True}, 
-                'pcm': {'Tlm_Server_Is_Active': True}   }
+                'pcm': {'Tlm_Server_Is_Active': True},
+                'last_error': 0 }
     g_lval = {  'smt': {}, 
                 'pcm': {}   }
 
@@ -134,10 +135,6 @@ if __name__ == "__main__":
     p_pcm.join()
 
     print('MAIN: Processes joined.')
-
-    # for debug
-    # print(f"SMT: g_state = {g_state['smt']['Tlm_Server_Is_Active']}")
-    # print(f"PCM: g_state = {g_state['pcm']['Tlm_Server_Is_Active']}")
 
     # wait for futures
     while True:

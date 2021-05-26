@@ -106,9 +106,11 @@ class DataHandler :
 
         print(f'DAT {self.tlm_type}: Data handler will be closed soon...')
 
-        await self.q_dgram.join()           # wait for queue to be fully processed
+        # wait for queue to be fully processed
+        await self.q_dgram.join()           
 
-        await self.q_write_data.join()      # wait for queue to be fully processed
+        # wait for queue to be fully processed
+        await self.q_write_data.join()      
 
         # quit async tasks after GUI task done
         # - deta decoder
@@ -245,7 +247,12 @@ class DataHandler :
             for iFrame in range(self.NUM_OF_FRAMES):
                 if dict_mf[iFrame]['Error Code'] == 0:  continue
 
-                dict_tmp['Error Code'] = dict_mf[iFrame].get('Error Code')
+                dict_tmp['Error Code'] = dict_mf[iFrame]['Error Code']
+
+            # save last MCU error as a global status
+            if dict_tmp['Error Code'] != 0:
+                pass
+                self.g_state['last_error'] = dict_tmp['Error Code']
 
         self.g_lval[self.tlm_type].update(dict_tmp) 
 

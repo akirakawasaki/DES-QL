@@ -157,6 +157,9 @@ class frmMain(wx.Frame):
         self.dictTlmLatestValues.update( self.g_lval['smt'] )
         self.dictTlmLatestValues.update( self.g_lval['pcm'] )
 
+        # latch last error
+        self.dictTlmLatestValues['Error Code'] = self.g_state['last_error']
+
         self.F_TLM_IS_ACTIVE = True
 
 
