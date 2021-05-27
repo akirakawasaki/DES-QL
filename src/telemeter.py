@@ -49,9 +49,6 @@ class TelemeterHandler :
                 await asyncio.sleep(1)
                 continue
 
-            # for debug
-            # print(f'TLM {self.tlm_type}: msg = {msg}')
-
             if msg == 'stop': 
                 break
             else:
@@ -65,11 +62,6 @@ class TelemeterHandler :
 
         # 
         self.q_msg.task_done()
-
-
-        # 
-        # self.q_dgram.join()
-
 
         print(f'TLM {self.tlm_type}: Closing tlm handler...')
 
@@ -106,11 +98,10 @@ class DatagramServerProtocol:
         
         self.q_dgram.put_nowait(data)
 
-        # for debug
-        # print_mf(data)      
-        # print(f'TLM RCV: queue size = {self.data_queue.qsize()}')
-
 
     # Event handler
     def connection_lost(self, exec):
         print(f'Disconnected from {self.tlm_type}') 
+
+        # block till queue tasks done
+        self.q_dgram.join()
