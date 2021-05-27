@@ -49,6 +49,9 @@ class TelemeterHandler :
                 await asyncio.sleep(1)
                 continue
 
+            # for debug
+            print(f'TLM {self.tlm_type}: msg = {msg}')
+
             if msg == 'stop': 
                 break
             else:
