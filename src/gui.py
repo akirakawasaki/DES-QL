@@ -140,6 +140,11 @@ class frmMain(wx.Frame):
 
     # Event handler: EVT_CLOSE
     def OnClose(self, event):
+        # stop timers
+        self.tmrFetchTelemeterData.Stop()
+        self.pnlPlotter.tmrRefresh.Stop()
+        self.pnlDigitalIndicator.tmrRefresh.Stop()
+        
         self.Destroy()
 
 

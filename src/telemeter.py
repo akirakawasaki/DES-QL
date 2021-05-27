@@ -50,7 +50,7 @@ class TelemeterHandler :
                 continue
 
             # for debug
-            print(f'TLM {self.tlm_type}: msg = {msg}')
+            # print(f'TLM {self.tlm_type}: msg = {msg}')
 
             if msg == 'stop': 
                 break
