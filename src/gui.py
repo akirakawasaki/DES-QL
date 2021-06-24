@@ -439,12 +439,20 @@ class pnlDigitalIndicator(wx.Panel):
 
         self.dictGroupAttr = {
             'Time':          {'gidx': 0, 'rows': 1, 'cols': N_ITEM_PER_ROW},
-            'DES State':     {'gidx': 1, 'rows': 5, 'cols': N_ITEM_PER_ROW},
+            'DES State':     {'gidx': 1, 'rows': 3, 'cols': 8},
             'Pressure':      {'gidx': 2, 'rows': 2, 'cols': N_ITEM_PER_ROW},
             'Temperature':   {'gidx': 3, 'rows': 2, 'cols': N_ITEM_PER_ROW},
             'IMU':           {'gidx': 4, 'rows': 3, 'cols': N_ITEM_PER_ROW},
             'House Keeping': {'gidx': 5, 'rows': 3, 'cols': N_ITEM_PER_ROW}
         }
+        # self.dictGroupAttr = {
+        #     'Time':          {'gidx': 0, 'rows': 1, 'cols': N_ITEM_PER_ROW},
+        #     'DES State':     {'gidx': 1, 'rows': 5, 'cols': N_ITEM_PER_ROW},
+        #     'Pressure':      {'gidx': 2, 'rows': 2, 'cols': N_ITEM_PER_ROW},
+        #     'Temperature':   {'gidx': 3, 'rows': 2, 'cols': N_ITEM_PER_ROW},
+        #     'IMU':           {'gidx': 4, 'rows': 3, 'cols': N_ITEM_PER_ROW},
+        #     'House Keeping': {'gidx': 5, 'rows': 3, 'cols': N_ITEM_PER_ROW}
+        # }
 
         ### T.B.REFAC. ###
         # group_order = {'Time':0, 'DES State':1, 'Pressure':2, 'Temperature':3, 'IMU':4, 'House Keeping':5}
@@ -489,34 +497,55 @@ class pnlDigitalIndicator(wx.Panel):
         # place StaticBoxes, as envelopes of Indicator Groups, within the Pane
         for strGroupName in self.dictGroupAttr:
             i = self.dictGroupAttr[strGroupName]['gidx']
+            rows = self.dictGroupAttr[strGroupName]['rows']
 
             # generate StaticBox
             #   parent   : Pane
             #   children : Indicator Group
             self.sboxIndGroup.append( wx.StaticBox(self, wx.ID_ANY, strGroupName) )
             self.sboxIndGroup[-1].SetForegroundColour('WHITE')
-            self.sboxIndGroup[-1].SetFont(wx.Font(15, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+            self.sboxIndGroup[-1].SetFont( wx.Font(15, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL) )
+            # self.sboxIndGroup[-1].SetFont(wx.Font(70, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
             # - generate associated Sizer
             self.sboxSizer.append( wx.StaticBoxSizer(self.sboxIndGroup[-1]) )
-            # - designate parent
+            # - designate parent Sizer
             # lytPane.Add(self.sboxSizer[-1])
-            lytPane.Add(self.sboxSizer[-1], flag=wx.EXPAND)
-            # lytPane.Add(self.sboxIndGroup[-1], flag=wx.EXPAND)
-            # lytPane.Add(self.sboxIndGroup[-1], proportion=1, flag=wx.EXPAND)
+            # lytPane.Add(self.sboxSizer[-1], flag=wx.EXPAND)
+            # lytPane.Add(self.sboxSizer[-1], proportion=1, flag=wx.EXPAND)
+            lytPane.Add(self.sboxSizer[-1], proportion=rows, flag=wx.EXPAND)
 
             # generate Indicator Group (Panel)
             #   parent   : StaticBox
             #   children : Indicator Pairs
             self.pnlIndGroup.append( wx.Panel(self.sboxIndGroup[-1], wx.ID_ANY) )
-            self.pnlIndGroup[-1].SetBackgroundColour('WHITE')   # for debug
+            # self.pnlIndGroup[-1].SetBackgroundColour('WHITE')   # for debug
             # - generate associated Sizer
             self.lytIndGroup.append(
                 wx.GridSizer(   rows=self.dictGroupAttr[strGroupName]['rows'], 
                                 cols=self.dictGroupAttr[strGroupName]['cols'], 
                                 gap=(10,5)) )
-            # - designate the Parent
-            self.sboxSizer[-1].Add(self.pnlIndGroup[-1])
+            # self.lytIndGroup.append(
+            #     wx.FlexGridSizer(   rows=self.dictGroupAttr[strGroupName]['rows'], 
+            #                         cols=self.dictGroupAttr[strGroupName]['cols'], 
+            #                         gap=(10,5)) )
+            # self.lytIndGroup[-1].AddGrowableCol(0)
+            # self.lytIndGroup[-1].AddGrowableCol(1)
+            # self.lytIndGroup[-1].AddGrowableCol(2)
+            # self.lytIndGroup[-1].AddGrowableCol(3)
+            # self.lytIndGroup[-1].AddGrowableCol(4)
+            # self.lytIndGroup[-1].AddGrowableCol(5)
+            # self.lytIndGroup[-1].AddGrowableCol(0, 1)
+            # self.lytIndGroup[-1].AddGrowableCol(1, 1)
+            # self.lytIndGroup[-1].AddGrowableCol(2, 1)
+            # self.lytIndGroup[-1].AddGrowableCol(3, 1)
+            # self.lytIndGroup[-1].AddGrowableCol(4, 1)
+            # self.lytIndGroup[-1].AddGrowableCol(5, 1)
+            # - designate the Parent Sizer
+            # self.sboxSizer[-1].Add(self.sboxSizer[-1], flag=wx.EXPAND)
+            # self.sboxSizer[-1].Add(self.sboxIndGroup[-1], flag=wx.EXPAND)
+            # self.sboxSizer[-1].Add(self.pnlIndGroup[-1])
             # self.sboxSizer[-1].Add(self.pnlIndGroup[-1], flag=wx.EXPAND)
+            self.sboxSizer[-1].Add(self.pnlIndGroup[-1], proportion=1, flag=wx.EXPAND)
             # - designate the Sizer
             self.pnlIndGroup[-1].SetSizer(self.lytIndGroup[-1])
             # self.sboxIndGroup[-1].SetSizer(self.sboxSizer[-1])
@@ -526,19 +555,23 @@ class pnlDigitalIndicator(wx.Panel):
             for j, strItemName in self.dictIndID2Item[strGroupName].items():
                 # handle blank cell
                 if strItemName == '':
-                    self.lytIndGroup[-1].Add((0,0), flag=wx.EXPAND)
+                    self.lytIndGroup[-1].AddStretchSpacer()
+                    # self.lytIndGroup[-1].Add((0,0))
+                    # self.lytIndGroup[-1].Add((0,0), flag=wx.EXPAND)
                     continue
                 
-                # generate Indicator Pair (Panel) 
+                # generate Indicator Pair as a child Sizer
                 #   parent   : Indicator Group
                 #   children : Label & Digital Indicator
                 self.pnlIndPair.append( wx.Panel(self.pnlIndGroup[-1], wx.ID_ANY) )
                 # - generate associated sizer
                 self.lytIndPair.append( wx.BoxSizer(wx.VERTICAL) )
                 # self.lytIndPair.append( wx.GridSizer(rows=2, cols=1, gap=(0,0)) )
-                # - designate the Parent
-                self.lytIndGroup[-1].Add(self.pnlIndPair[-1], flag=wx.EXPAND)
-                # self.lytIndGroup[-1].Add(self.pnlIndPair[-1], proportion=1, flag=wx.EXPAND)
+                # - designate the Parent Sizer
+                # self.lytIndGroup[-1].Add(self.lytIndPair[-1], flag=wx.EXPAND)
+                # self.lytIndGroup[-1].Add(self.lytIndPair[-1], proportion=1, flag=wx.EXPAND)
+                # self.lytIndGroup[-1].Add(self.pnlIndPair[-1], flag=wx.EXPAND)
+                self.lytIndGroup[-1].Add(self.pnlIndPair[-1], proportion=1, flag=wx.EXPAND)
                 # - designate the Sizer
                 self.pnlIndPair[-1].SetSizer(self.lytIndPair[-1])
 
@@ -548,20 +581,32 @@ class pnlDigitalIndicator(wx.Panel):
                 unit = str( self.parent.dictTlmItemAttr[strItemName]['unit'] )
                 label =     (strItemName + ' [' + unit + ']')   if (unit != 'nan') \
                        else strItemName
+                # self.tbtnLabel.append( wx.ToggleButton(self.sboxIndGroup[-1], wx.ID_ANY, label=label) )
+                # self.tbtnLabel.append( wx.ToggleButton(self.pnlIndGroup[-1], wx.ID_ANY, label=label) )
                 self.tbtnLabel.append( wx.ToggleButton(self.pnlIndPair[-1], wx.ID_ANY, label=label) )
                 # self.tbtnLabel.append( wx.ToggleButton(self.pnlIndPair[-1], wx.ID_ANY, label=label, size=(143,22)) )       # for debug
-                # - designate the Parent
-                self.lytIndPair[-1].Add(self.tbtnLabel[-1], flag=wx.EXPAND)
+                # self.tbtnLabel[-1].SetFont(wx.Font(13, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+                self.tbtnLabel[-1].SetFont(wx.Font(70, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+                # - designate the Parent Sizer
+                # self.lytIndPair[-1].Add(self.tbtnLabel[-1], flag=wx.EXPAND)
+                self.lytIndPair[-1].Add(self.tbtnLabel[-1], proportion=1, flag=wx.EXPAND)
 
                 # generate Digital Indicator (StaticText)
                 #   parent   : Indicator Pair
                 #   children : N/A
+                # self.stxtIndicator.append(
+                #     wx.StaticText(self.sboxIndGroup[-1], wx.ID_ANY, label=str(i*100 + j), style=wx.ALIGN_CENTRE | wx.ST_NO_AUTORESIZE))
+                # self.stxtIndicator.append(
+                #     wx.StaticText(self.pnlIndGroup[-1], wx.ID_ANY, label=str(i*100 + j), style=wx.ALIGN_CENTRE | wx.ST_NO_AUTORESIZE))
                 self.stxtIndicator.append(
                     wx.StaticText(self.pnlIndPair[-1], wx.ID_ANY, label=str(i*100 + j), style=wx.ALIGN_CENTRE | wx.ST_NO_AUTORESIZE))
+                self.stxtIndicator[-1].SetFont(wx.Font(15, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+                # self.stxtIndicator[-1].SetFont(wx.Font(70, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
                 self.stxtIndicator[-1].SetBackgroundColour('BLACK')
                 self.stxtIndicator[-1].SetForegroundColour('GREEN')
-                # - designate the parent
-                self.lytIndPair[-1].Add(self.stxtIndicator[-1], flag=wx.EXPAND)
+                # - designate the parent Sizer
+                # self.lytIndPair[-1].Add(self.stxtIndicator[-1], flag=wx.EXPAND)
+                self.lytIndPair[-1].Add(self.stxtIndicator[-1], proportion=1, flag=wx.EXPAND)
 
         # set states for ToggleButton
         # for i in range(pnlPlotter.N_PLOTTER):
