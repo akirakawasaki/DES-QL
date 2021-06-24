@@ -58,10 +58,10 @@ def data_handler_wrapper(tlm_type, g_state, g_lval, q_dgram):
 def gui_handler(g_state, g_lval, q_msg_smt, q_msg_pcm):
     print('MAIN: Invoking GUI...')
     
-    # create the wx app
+    # create wx app
     app = wx.App()
 
-    # create the main window & show
+    # create main window & show
     frame = gui.frmMain(g_state, g_lval)
     frame.Show()
 
