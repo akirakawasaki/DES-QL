@@ -365,10 +365,7 @@ class pnlDigitalIndicator(wx.Panel):
 
         self.layoutPane()
 
-        # self.configure()
-        # layout = wx.GridBagSizer()
-        # layout.Add(self.IndicatorPane, pos=(0,0))
-        # self.SetSizer(layout)
+        self.configurePane()
 
         ### bind events
         # - set timer to refresh current-value pane
@@ -393,69 +390,74 @@ class pnlDigitalIndicator(wx.Panel):
         
         # - sweep groups
         for strGroupName in self.dictGroupAttr.keys():
-            # - seep items belong each group
-            for i in range( self.dictGroupAttr[strGroupName]['rows'] * self.dictGroupAttr[strGroupName]['cols']) :
+            
+            # - sweep grid within each group
+            for i in range( self.dictGroupAttr[strGroupName]['rows'] * self.dictGroupAttr[strGroupName]['cols'] ) :
+                
+                #
+                #   Refresh indicators
+                #
                 strItemName = self.dictIndID2Item[strGroupName][i]
-                if strItemName == '':   continue        # skip brank cell
+
+                # skip brank cell
+                if strItemName == '':   continue        
 
                 # get instance from iterator
                 stxtInidicator = next(iterIndicator)
                 tbtnLabel = next(iterLabel)
 
+                val_float = self.parent.dictTlmLatestValues[strItemName]
+
+                # rounding
+                deci = self.parent.dictTlmItemAttr[strItemName]['decimal']
+                val_rounded =      str( round( val_float ) ) if (deci <= 0) \
+                              else str( round( val_float, deci ) )
+
                 # refresh indicator
-                if self.parent.dictTlmItemAttr[strItemName]['decimal'] <= 0:
-                    stxtInidicator.SetLabel( 
-                        str( round( self.parent.dictTlmLatestValues[strItemName] ) ) )
-                else :
-                    stxtInidicator.SetLabel( 
-                        str( round( self.parent.dictTlmLatestValues[strItemName], 
-                                    int(self.parent.dictTlmItemAttr[strItemName]['decimal']) ) ) )
+                stxtInidicator.SetLabel( val_rounded )
 
-                # stxtInidicator.SetLabel( 
-                #     str( np.round(self.parent.dictTlmLatestValues[strItemName], 2)) )
+                #
+                #   Judge Green/Red
+                #
+                lim_l = float(self.parent.dictTlmItemAttr[strItemName]['alert_lim_l'])
+                lim_u = float(self.parent.dictTlmItemAttr[strItemName]['alert_lim_u'])
 
-                # accentuate indicator by colors
-                if self.parent.dictTlmItemAttr[strItemName]['type'] == 'bool':
-                    # - OFF
-                    if int(self.parent.dictTlmLatestValues[strItemName]) == 0:
-                        stxtInidicator.SetBackgroundColour('NullColour')
-                        # stxtInidicator.SetBackgroundColour('NAVY')
-                        tbtnLabel.SetForegroundColour('NullColour')
-                    # - ON
-                    else:
-                        stxtInidicator.SetBackgroundColour('MAROON')
-                        # stxtInidicator.SetBackgroundColour('NAVY')
-                        # stxtInidicator.SetBackgroundColour('GREY')
-                        tbtnLabel.SetForegroundColour('RED')
-                        # tbtnLabel.SetForegroundColour('BLUE')
+                if (val_float < lim_l) or (val_float > lim_u):
+                    stxtInidicator.SetBackgroundColour('MAROON')
+                else: 
+                    stxtInidicator.SetBackgroundColour('NullColour')
 
-                    stxtInidicator.Refresh()
+                stxtInidicator.Refresh()
+
+                # if self.parent.dictTlmItemAttr[strItemName]['type'] == 'bool':
+                #     # - OFF
+                #     if int(self.parent.dictTlmLatestValues[strItemName]) == 0:
+                #         stxtInidicator.SetBackgroundColour('NullColour')
+                #         # stxtInidicator.SetBackgroundColour('NAVY')
+                #         tbtnLabel.SetForegroundColour('NullColour')
+                #     # - ON
+                #     else:
+                #         stxtInidicator.SetBackgroundColour('MAROON')
+                #         # stxtInidicator.SetBackgroundColour('NAVY')
+                #         # stxtInidicator.SetBackgroundColour('GREY')
+                #         tbtnLabel.SetForegroundColour('RED')
+                #         # tbtnLabel.SetForegroundColour('BLUE')
+
+                #     stxtInidicator.Refresh()
 
 
-    # Load configurations from external files
+    # Load configurations
     def loadConfig(self):
         ### T.B.REFAC.: TEMPORALLY DESIGNATED BY LITERALS ###
         N_ITEM_PER_ROW = 6
-
         self.dictGroupAttr = {
             'Time':          {'gidx': 0, 'rows': 1, 'cols': N_ITEM_PER_ROW},
-            'DES State':     {'gidx': 1, 'rows': 3, 'cols': 8},
+            'DES State':     {'gidx': 1, 'rows': 3, 'cols': N_ITEM_PER_ROW+2},
             'Pressure':      {'gidx': 2, 'rows': 2, 'cols': N_ITEM_PER_ROW},
             'Temperature':   {'gidx': 3, 'rows': 2, 'cols': N_ITEM_PER_ROW},
             'IMU':           {'gidx': 4, 'rows': 3, 'cols': N_ITEM_PER_ROW},
             'House Keeping': {'gidx': 5, 'rows': 3, 'cols': N_ITEM_PER_ROW}
         }
-        # self.dictGroupAttr = {
-        #     'Time':          {'gidx': 0, 'rows': 1, 'cols': N_ITEM_PER_ROW},
-        #     'DES State':     {'gidx': 1, 'rows': 5, 'cols': N_ITEM_PER_ROW},
-        #     'Pressure':      {'gidx': 2, 'rows': 2, 'cols': N_ITEM_PER_ROW},
-        #     'Temperature':   {'gidx': 3, 'rows': 2, 'cols': N_ITEM_PER_ROW},
-        #     'IMU':           {'gidx': 4, 'rows': 3, 'cols': N_ITEM_PER_ROW},
-        #     'House Keeping': {'gidx': 5, 'rows': 3, 'cols': N_ITEM_PER_ROW}
-        # }
-
-        ### T.B.REFAC. ###
-        # group_order = {'Time':0, 'DES State':1, 'Pressure':2, 'Temperature':3, 'IMU':4, 'House Keeping':5}
 
         # Prepare hash: Group name -> {Item order -> Item name}
         self.dictIndID2Item = {}
@@ -474,13 +476,18 @@ class pnlDigitalIndicator(wx.Panel):
             self.dictIndID2Item[strGroupName] = dict_temp
 
 
-    # Lay out the pane
+    # Lay out Pane
     def layoutPane(self):
-        # Sizer for the Pane
-        lytPane = wx.BoxSizer(wx.VERTICAL)
-        # lytPane = wx.StaticBoxSizer(wx.VERTICAL)
-        # lytPane = wx.GridSizer(rows=6, cols=1, gap=(0, 10))     # for debug
-        self.SetSizer(lytPane)
+
+        # "Window" hierarchy
+        # Pane - Sizer: lytPane
+        #         + sboxIndGroup1 - Sizer: sboxSizer
+        #         |                   + pnlIndGroup - Sizer: lytIndGroup
+        #         |                                       + pnlIndPair1 - Sizer: lytIndPair
+        #         |                                       |                   + sbtnLabel
+        #         |                                       |                   + stxtIndicator
+        #         |                                       + pnlIndPair2 ...
+        #         + sboxIndGroup2 ...
 
         self.sboxIndGroup = []      
         self.sboxSizer = []
@@ -494,199 +501,120 @@ class pnlDigitalIndicator(wx.Panel):
         self.tbtnLabel = []
         self.stxtIndicator = []
 
-        # place StaticBoxes, as envelopes of Indicator Groups, within the Pane
+        # Pane (Panel)
+        #   parent  : Frame
+        #   chidren : sboxIndGroups
+        ###
+        # - generate Window instance
+        # done in the frmMain class
+        # - add the Window to the parent Sizer
+        # ???
+        # - generate associated Sizer to lay out this Window
+        lytPane = wx.BoxSizer(wx.VERTICAL)
+        # - set a Sizer to the Window
+        self.SetSizer(lytPane)
+
+
+        # loop for sboxIndGroups
         for strGroupName in self.dictGroupAttr:
             i = self.dictGroupAttr[strGroupName]['gidx']
             rows = self.dictGroupAttr[strGroupName]['rows']
 
-            # generate StaticBox
+
+            # sboxIndGroup (StaticBox), as an envelope of an Indicator Group
             #   parent   : Pane
-            #   children : Indicator Group
+            #   children : 1 Indicator Group
+            ###
+            # - generate Widow instance
             self.sboxIndGroup.append( wx.StaticBox(self, wx.ID_ANY, strGroupName) )
             self.sboxIndGroup[-1].SetForegroundColour('WHITE')
-            self.sboxIndGroup[-1].SetFont( wx.Font(15, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL) )
-            # self.sboxIndGroup[-1].SetFont(wx.Font(70, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
-            # - generate associated Sizer
+            # self.sboxIndGroup[-1].SetFont( 
+            #   wx.Font(15, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL) )
+            self.sboxIndGroup[-1].SetFont( 
+                wx.Font(70, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL) )      # 70 is a magic # in wx
+            # - generate associated Sizer to lay out this Window
             self.sboxSizer.append( wx.StaticBoxSizer(self.sboxIndGroup[-1]) )
-            # - designate parent Sizer
-            # lytPane.Add(self.sboxSizer[-1])
-            # lytPane.Add(self.sboxSizer[-1], flag=wx.EXPAND)
-            # lytPane.Add(self.sboxSizer[-1], proportion=1, flag=wx.EXPAND)
+            # - add the Window to the parent Sizer
             lytPane.Add(self.sboxSizer[-1], proportion=rows, flag=wx.EXPAND)
 
-            # generate Indicator Group (Panel)
+
+            # Indicator Group (Panel)
             #   parent   : StaticBox
             #   children : Indicator Pairs
+            ###
+            # - generate Window instance
             self.pnlIndGroup.append( wx.Panel(self.sboxIndGroup[-1], wx.ID_ANY) )
-            # self.pnlIndGroup[-1].SetBackgroundColour('WHITE')   # for debug
-            # - generate associated Sizer
+            # - add the Window to the parent Sizer
+            self.sboxSizer[-1].Add(self.pnlIndGroup[-1], proportion=1, flag=wx.EXPAND)
+            # - generate associated Sizer to lay out this Window
             self.lytIndGroup.append(
                 wx.GridSizer(   rows=self.dictGroupAttr[strGroupName]['rows'], 
                                 cols=self.dictGroupAttr[strGroupName]['cols'], 
                                 gap=(10,5)) )
-            # self.lytIndGroup.append(
-            #     wx.FlexGridSizer(   rows=self.dictGroupAttr[strGroupName]['rows'], 
-            #                         cols=self.dictGroupAttr[strGroupName]['cols'], 
-            #                         gap=(10,5)) )
-            # self.lytIndGroup[-1].AddGrowableCol(0)
-            # self.lytIndGroup[-1].AddGrowableCol(1)
-            # self.lytIndGroup[-1].AddGrowableCol(2)
-            # self.lytIndGroup[-1].AddGrowableCol(3)
-            # self.lytIndGroup[-1].AddGrowableCol(4)
-            # self.lytIndGroup[-1].AddGrowableCol(5)
-            # self.lytIndGroup[-1].AddGrowableCol(0, 1)
-            # self.lytIndGroup[-1].AddGrowableCol(1, 1)
-            # self.lytIndGroup[-1].AddGrowableCol(2, 1)
-            # self.lytIndGroup[-1].AddGrowableCol(3, 1)
-            # self.lytIndGroup[-1].AddGrowableCol(4, 1)
-            # self.lytIndGroup[-1].AddGrowableCol(5, 1)
-            # - designate the Parent Sizer
-            # self.sboxSizer[-1].Add(self.sboxSizer[-1], flag=wx.EXPAND)
-            # self.sboxSizer[-1].Add(self.sboxIndGroup[-1], flag=wx.EXPAND)
-            # self.sboxSizer[-1].Add(self.pnlIndGroup[-1])
-            # self.sboxSizer[-1].Add(self.pnlIndGroup[-1], flag=wx.EXPAND)
-            self.sboxSizer[-1].Add(self.pnlIndGroup[-1], proportion=1, flag=wx.EXPAND)
-            # - designate the Sizer
+            # - set a Sizer to the Window
             self.pnlIndGroup[-1].SetSizer(self.lytIndGroup[-1])
-            # self.sboxIndGroup[-1].SetSizer(self.sboxSizer[-1])
-            # self.sboxIndGroup[-1].SetSizer(self.lytIndGroup[-1])
 
-            # place Indicator Pairs within a Indicaotr Group
+
+            # loop for Indicator Pairs
             for j, strItemName in self.dictIndID2Item[strGroupName].items():
-                # handle blank cell
+                # exception handling for blank cell
                 if strItemName == '':
                     self.lytIndGroup[-1].AddStretchSpacer()
-                    # self.lytIndGroup[-1].Add((0,0))
-                    # self.lytIndGroup[-1].Add((0,0), flag=wx.EXPAND)
                     continue
                 
-                # generate Indicator Pair as a child Sizer
+                # Indicator Pair (Panel)
                 #   parent   : Indicator Group
                 #   children : Label & Digital Indicator
+                ###
+                # - generate Window instance
                 self.pnlIndPair.append( wx.Panel(self.pnlIndGroup[-1], wx.ID_ANY) )
-                # - generate associated sizer
-                self.lytIndPair.append( wx.BoxSizer(wx.VERTICAL) )
-                # self.lytIndPair.append( wx.GridSizer(rows=2, cols=1, gap=(0,0)) )
-                # - designate the Parent Sizer
-                # self.lytIndGroup[-1].Add(self.lytIndPair[-1], flag=wx.EXPAND)
-                # self.lytIndGroup[-1].Add(self.lytIndPair[-1], proportion=1, flag=wx.EXPAND)
-                # self.lytIndGroup[-1].Add(self.pnlIndPair[-1], flag=wx.EXPAND)
+                # - add the Window to the parent Sizer
                 self.lytIndGroup[-1].Add(self.pnlIndPair[-1], proportion=1, flag=wx.EXPAND)
-                # - designate the Sizer
+                # - generate associated Sizer to lay out this Window
+                self.lytIndPair.append( wx.BoxSizer(wx.VERTICAL) )
+                # - set a Sizer to the Window
                 self.pnlIndPair[-1].SetSizer(self.lytIndPair[-1])
 
-                # generate Item Label (ToggleButton) 
+
+                # Item Label (ToggleButton) 
                 #   parent   : Indicator Pair
                 #   children : N/A
+                ###
+                # - generate Window instance
                 unit = str( self.parent.dictTlmItemAttr[strItemName]['unit'] )
                 label =     (strItemName + ' [' + unit + ']')   if (unit != 'nan') \
                        else strItemName
-                # self.tbtnLabel.append( wx.ToggleButton(self.sboxIndGroup[-1], wx.ID_ANY, label=label) )
-                # self.tbtnLabel.append( wx.ToggleButton(self.pnlIndGroup[-1], wx.ID_ANY, label=label) )
                 self.tbtnLabel.append( wx.ToggleButton(self.pnlIndPair[-1], wx.ID_ANY, label=label) )
-                # self.tbtnLabel.append( wx.ToggleButton(self.pnlIndPair[-1], wx.ID_ANY, label=label, size=(143,22)) )       # for debug
-                # self.tbtnLabel[-1].SetFont(wx.Font(13, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
-                self.tbtnLabel[-1].SetFont(wx.Font(70, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
-                # - designate the Parent Sizer
-                # self.lytIndPair[-1].Add(self.tbtnLabel[-1], flag=wx.EXPAND)
+                # self.tbtnLabel[-1].SetFont(
+                #   wx.Font(13, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL) )
+                self.tbtnLabel[-1].SetFont(
+                    wx.Font(70, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL) )     # 70 is a　magic # in wx
+                # - add the Window to the parent Sizer
                 self.lytIndPair[-1].Add(self.tbtnLabel[-1], proportion=1, flag=wx.EXPAND)
 
-                # generate Digital Indicator (StaticText)
+
+                # Digital Indicator (StaticText)
                 #   parent   : Indicator Pair
                 #   children : N/A
-                # self.stxtIndicator.append(
-                #     wx.StaticText(self.sboxIndGroup[-1], wx.ID_ANY, label=str(i*100 + j), style=wx.ALIGN_CENTRE | wx.ST_NO_AUTORESIZE))
-                # self.stxtIndicator.append(
-                #     wx.StaticText(self.pnlIndGroup[-1], wx.ID_ANY, label=str(i*100 + j), style=wx.ALIGN_CENTRE | wx.ST_NO_AUTORESIZE))
+                ###
+                # - generate Window instance
                 self.stxtIndicator.append(
                     wx.StaticText(self.pnlIndPair[-1], wx.ID_ANY, label=str(i*100 + j), style=wx.ALIGN_CENTRE | wx.ST_NO_AUTORESIZE))
-                self.stxtIndicator[-1].SetFont(wx.Font(15, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
-                # self.stxtIndicator[-1].SetFont(wx.Font(70, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+                self.stxtIndicator[-1].SetFont(
+                    wx.Font(15, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL) )     ### T.B.REFAC. ###
+                # self.stxtIndicator[-1].SetFont(
+                #   wx.Font(70, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL) )     # 70 is a　magic # in wx
                 self.stxtIndicator[-1].SetBackgroundColour('BLACK')
                 self.stxtIndicator[-1].SetForegroundColour('GREEN')
-                # - designate the parent Sizer
-                # self.lytIndPair[-1].Add(self.stxtIndicator[-1], flag=wx.EXPAND)
+                # - add the Window to the parent Sizer
                 self.lytIndPair[-1].Add(self.stxtIndicator[-1], proportion=1, flag=wx.EXPAND)
 
-        # set states for ToggleButton
-        # for i in range(pnlPlotter.N_PLOTTER):
-        #     self.tbtnLabel[self.PlotterAttr[i]['idx_item']].SetValue(True)
 
-
-    # Configure appearance for digital indicators to display current values
-    def configure(self):
-        self.IndicatorPane = wx.BoxSizer(wx.VERTICAL)
-
-        ### generate containers to groupe indicators (StaticBox)
-        ### generate indicators & their labels
-        ### lay out pairs of indicators & labels in the grouping SBoxes
-        
-        self.SBoxGroup = []
-        self.lytSBoxGroup = []        
-        
-        self.tbtnLabel = []
-        self.stxtIndicator = []
-        self.lytPair = []           # pair of Indicator & Label
-
-        self.lytIndicator = []
-
-        for strGroupName in self.dictGroupAttr:
-            i = self.dictGroupAttr[strGroupName]['gidx']
-
-            # - generate an instance
-            self.SBoxGroup.append(wx.StaticBox(self, wx.ID_ANY, strGroupName))
-            self.SBoxGroup[-1].SetForegroundColour('WHITE')
-            self.SBoxGroup[-1].SetFont(wx.Font(15, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
-            
-            # - lay out the instance
-            self.lytSBoxGroup.append(wx.StaticBoxSizer(self.SBoxGroup[-1], wx.VERTICAL))
-            self.IndicatorPane.Add(self.lytSBoxGroup[-1], flag=wx.EXPAND)
-            # self.IndicatorPane.Add(self.lytSBoxGroup[-1])
-
-            # generate grid in the grouping SBox
-
-            self.lytIndicator.append(
-                wx.GridSizer(   rows=self.dictGroupAttr[strGroupName]['rows'], 
-                                cols=self.dictGroupAttr[strGroupName]['cols'], 
-                                gap=(10,5)) )
-            
-            # place items in the grid
-            for j, strItemName in self.dictIndID2Item[strGroupName].items():
-                # handle blank cell
-                if strItemName == '':
-                    self.lytIndicator[i].Add((0,0))
-                    continue
-
-                # generate instance 
-                # - item label (ToggleButton)
-                unit = str( self.parent.dictTlmItemAttr[strItemName]['unit'] )
-                label =     (strItemName + ' [' + unit + ']')   if (unit != 'nan') \
-                       else strItemName
-                self.tbtnLabel.append(wx.ToggleButton(self, wx.ID_ANY, label=label))
-                # self.tbtnLabel.append(wx.ToggleButton(self, wx.ID_ANY, label=label, size=(143,22)))
-                
-                # - digital indicator (StaticText)
-                self.stxtIndicator.append(
-                    wx.StaticText(self, wx.ID_ANY, label=str(i*100 + j), style=wx.ALIGN_CENTRE | wx.ST_NO_AUTORESIZE))
-                self.stxtIndicator[-1].SetBackgroundColour('BLACK')
-                self.stxtIndicator[-1].SetForegroundColour('GREEN')
-
-                # - pair of item label & inidicator
-                self.lytPair.append(wx.GridSizer(rows=2, cols=1, gap=(0,0)))
-                self.lytPair[-1].Add(self.tbtnLabel[-1], flag=wx.EXPAND)
-                self.lytPair[-1].Add(self.stxtIndicator[-1], flag=wx.EXPAND)
-                
-                # lay out the instance
-                self.lytIndicator[i].Add(self.lytPair[-1], flag=wx.EXPAND)
-            
-            # snap
-            self.lytSBoxGroup[i].Add(self.lytIndicator[i])
+    # Configure Pane
+    def configurePane(self):
+        pass
 
         # set states for ToggleButton
         # for i in range(pnlPlotter.N_PLOTTER):
         #     self.tbtnLabel[self.PlotterAttr[i]['idx_item']].SetValue(True)
-
-
-
-
 
