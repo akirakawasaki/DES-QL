@@ -53,6 +53,7 @@ class frmMain(wx.Frame):
     FPATH_CONFIG = './config_tlm.xlsx'
     
 
+    # def __init__(self, g_state, g_lval, q_msg_smt, q_msg_pcm):
     def __init__(self, g_state, g_lval):
         super().__init__(None, wx.ID_ANY, self.WINDOW_CAPTION)
 
@@ -60,6 +61,8 @@ class frmMain(wx.Frame):
         self.g_state = g_state
         self.g_lval = g_lval
 
+        # self.q_msg_smt = q_msg_smt
+        # self.q_msg_pcm = q_msg_pcm
 
         ### Initialize data
         # - load configurations from an external file
@@ -198,7 +201,8 @@ class pnlPlotter(wx.Panel):
         ### 
         layout = wx.BoxSizer()
         # layout = wx.GridBagSizer()
-        layout.Add(self.canvas, proportion=0, flag=wx.SHAPED | wx.ALIGN_CENTER)
+        layout.Add(self.canvas, proportion=0, flag=wx.ALIGN_BOTTOM)
+        # layout.Add(self.canvas, proportion=0, flag=wx.SHAPED | wx.ALIGN_CENTER)
         # layout.Add(self.canvas, proportion=1, flag=wx.EXPAND)
         # layout.Add(self.canvas, proportion=0, flag=wx.EXPAND | wx.ALL, border=5)
         self.SetSizer(layout)
@@ -313,22 +317,15 @@ class pnlPlotter(wx.Panel):
         self.y_series = np.empty(0)
         
         # generate empty matplotlib Fugure
-        
-        w_window, h_window = self.parent.GetClientSize()
         dpi = matplotlib.rcParams['figure.dpi']
-
-        # ratio = 4.0 / 11.0 
-        # w_fig = 1.0 * w_window * ratio * 0.9 / float(dpi)
-        # h_fig = 1.4 * w_window * ratio * 0.9 / float(dpi)
+        w_window, h_window = self.parent.GetClientSize()
 
         h_fig = 1.00 * h_window * 0.97 / float(dpi)
         w_fig = 0.65 * h_window * 0.97 / float(dpi)
 
         # self.fig = Figure()
         self.fig = Figure(figsize=(w_fig, h_fig))
-        # self.fig = Figure(figsize=(3.25, 5))
         # self.fig = Figure(figsize=(6.5, 10))
-        # self.fig = Figure(figsize=(6, 9.7))
         
         # register Figure with matplotlib Canvas
         self.canvas = FigureCanvasWxAgg(self, wx.ID_ANY, self.fig)
@@ -341,9 +338,9 @@ class pnlPlotter(wx.Panel):
             self.axes.append(self.fig.add_subplot(self.N_PLOTTER, 1, i+1))
 
             # - set limit for x axis
-            # t_min = -30
             t_min = -self.__T_RANGE
-            self.axes[i].set_xlim([t_min, t_min + self.__T_RANGE])
+            t_max = 0.0
+            self.axes[i].set_xlim([t_min, t_max])
 
             # - set label for x axis
             self.axes[i].set_xlabel('time [s]')
@@ -362,6 +359,67 @@ class pnlPlotter(wx.Panel):
         self.backgrounds = []
         for i in range(self.N_PLOTTER):
             self.backgrounds.append(self.canvas.copy_from_bbox(self.axes[i].bbox))
+
+
+#
+#   Control Pane (Panel)
+#
+class pnlControl(wx.Panel):
+    
+    def __init__(self, parent):
+        super().__init__(parent, wx.ID_ANY)
+
+        self.parent = parent
+
+        self.layoutPane()
+
+        ### bind Events
+        # - Reset Button
+        self.btnReset.Bind(wx.EVT_BUTTON, self.OnClickResetButton)
+
+
+    def OnClickResetButton(self, event):
+                
+        pass
+
+
+    def layoutPane(self):
+
+        # "Window" hierarchy
+        # Pane - Sizer: lytPane
+        #         + sboxIndGroup1 - Sizer: sboxSizer
+        #         |                   + pnlIndGroup - Sizer: lytIndGroup
+        #         |                                       + pnlIndPair1 - Sizer: lytIndPair
+        #         |                                       |                   + sbtnLabel
+        #         |                                       |                   + stxtIndicator
+        #         |                                       + pnlIndPair2 ...
+        #         + sboxIndGroup2 ...
+
+        # Pane (Panel)
+        #   parent  : Frame
+        #   chidren : 
+        ###
+        # - generate Window instance
+        # done in the frmMain class
+        # - add the Window to the parent Sizer
+        # ???
+        # - generate associated Sizer to lay out this Window
+        lytPane = wx.GridSizer(rows=1, cols=6, gap=(10,0))
+        # lytPane = wx.BoxSizer(wx.HORIZONTAL)
+        # - set a Sizer to the Window
+        self.SetSizer(lytPane)
+
+        # Reset Button (Button)
+        #   parent   : Pane
+        #   children : N/A
+        ###
+        # - generate Window instance
+        self.btnReset = wx.Button(self, wx.ID_ANY, label='RESET')
+        self.btnReset.SetFont(
+            wx.Font(70, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL) )     # 70 is a　magic # in wx
+        # - add the Window to the parent Sizer
+        lytPane.Add(self.btnReset, proportion=0, flag=wx.EXPAND)
+
 
 
 # 
@@ -630,4 +688,5 @@ class pnlDigitalIndicator(wx.Panel):
         # set states for ToggleButton
         # for i in range(pnlPlotter.N_PLOTTER):
         #     self.tbtnLabel[self.PlotterAttr[i]['idx_item']].SetValue(True)
+
 
