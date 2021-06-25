@@ -60,10 +60,6 @@ class frmMain(wx.Frame):
         self.g_state = g_state
         self.g_lval = g_lval
 
-        # self.q_msg_smt = q_msg_smt      # sending ONLY (to TLM)
-        # self.q_msg_pcm = q_msg_pcm      # sending ONLY (to TLM)
-        # self.q_data_smt = q_data_smt    # receiving ONLY (from TLM)
-        # self.q_data_pcm = q_data_pcm    # receiving ONLY (from TLM)
 
         ### Initialize data
         # - load configurations from an external file
@@ -124,8 +120,8 @@ class frmMain(wx.Frame):
         # - lay out panels by using sizer
         # layout = wx.FlexGridSizer(rows=1, cols=2, gap=(0,0))
         layout = wx.BoxSizer(wx.HORIZONTAL)
-        layout.Add(window=self.pnlPlotter, proportion=0, flag=wx.ALL | wx.EXPAND, border=20)            # plotter pane
-        layout.Add(window=self.pnlDigitalIndicator, proportion=0, flag=wx.ALL | wx.EXPAND, border=20)   # digital indicator pane
+        layout.Add(window=self.pnlPlotter, proportion=0, flag=wx.ALIGN_BOTTOM)                          # plotter pane
+        layout.Add(window=self.pnlDigitalIndicator, proportion=1, flag=wx.EXPAND | wx.ALL, border=15)   # digital indicator pane
         self.SetSizer(layout)
 
         ### Bind events
@@ -169,7 +165,7 @@ class frmMain(wx.Frame):
 
 
 # 
-#   Panel: Plotter Pane (Time-history plot)
+#   Plotter Pane for Time-history (Panel)
 # 
 class pnlPlotter(wx.Panel):
     #
@@ -200,8 +196,11 @@ class pnlPlotter(wx.Panel):
         self.configure()
 
         ### 
-        layout = wx.GridBagSizer()
-        layout.Add(window=self.canvas, pos=(0,0), border=10)
+        layout = wx.BoxSizer()
+        # layout = wx.GridBagSizer()
+        layout.Add(self.canvas, proportion=0, flag=wx.SHAPED | wx.ALIGN_CENTER)
+        # layout.Add(self.canvas, proportion=1, flag=wx.EXPAND)
+        # layout.Add(self.canvas, proportion=0, flag=wx.EXPAND | wx.ALL, border=5)
         self.SetSizer(layout)
 
         ### Bind events
@@ -314,8 +313,22 @@ class pnlPlotter(wx.Panel):
         self.y_series = np.empty(0)
         
         # generate empty matplotlib Fugure
+        
+        w_window, h_window = self.parent.GetClientSize()
+        dpi = matplotlib.rcParams['figure.dpi']
+
+        # ratio = 4.0 / 11.0 
+        # w_fig = 1.0 * w_window * ratio * 0.9 / float(dpi)
+        # h_fig = 1.4 * w_window * ratio * 0.9 / float(dpi)
+
+        h_fig = 1.00 * h_window * 0.97 / float(dpi)
+        w_fig = 0.65 * h_window * 0.97 / float(dpi)
+
         # self.fig = Figure()
-        self.fig = Figure(figsize=(6, 9.7))
+        self.fig = Figure(figsize=(w_fig, h_fig))
+        # self.fig = Figure(figsize=(3.25, 5))
+        # self.fig = Figure(figsize=(6.5, 10))
+        # self.fig = Figure(figsize=(6, 9.7))
         
         # register Figure with matplotlib Canvas
         self.canvas = FigureCanvasWxAgg(self, wx.ID_ANY, self.fig)
@@ -352,7 +365,7 @@ class pnlPlotter(wx.Panel):
 
 
 # 
-#   Panel: Digital Indicator Pane (Latest-value indicate)
+#   Digital Indicator Pane for Latest values (Panel)
 # 
 class pnlDigitalIndicator(wx.Panel):
     
