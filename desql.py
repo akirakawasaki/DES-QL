@@ -62,17 +62,21 @@ def gui_handler(g_state, g_lval, q_msg_smt, q_msg_pcm):
     app = wx.App()
 
     # create main window & show
-    frame = gui.frmMain(g_state, g_lval, q_msg_smt, q_msg_pcm)
+    frame = gui.frmMain(g_state, g_lval)
+    # frame = gui.frmMain(g_state, g_lval, q_msg_smt, q_msg_pcm)
     frame.Show()
 
     # launch event loop for GUI <BLOCKING>
     app.MainLoop()
 
+
+    ### After frmMain Closed ###
+
     # quit telemeter handlers
     q_msg_smt.put_nowait('stop')
     q_msg_pcm.put_nowait('stop')
 
-    # block
+    # block until the queue tasks processed
     q_msg_smt.join()
     q_msg_pcm.join()
 
@@ -100,8 +104,9 @@ if __name__ == "__main__":
         sp_smt = subprocess.Popen(['python', './tlmsvsim.py', 'smt'], stdout=subprocess.DEVNULL)
         sp_pcm = subprocess.Popen(['python', './tlmsvsim.py', 'pcm'], stdout=subprocess.DEVNULL)
 
-    g_state = { 'smt': {'Tlm_Server_Is_Active': True}, 
-                'pcm': {'Tlm_Server_Is_Active': True},
+    ### define
+    g_state = { 'smt': {'Tlm_Server_Is_Active': True, 'Data_Save_Is_Active': False}, 
+                'pcm': {'Tlm_Server_Is_Active': True, 'Data_Save_Is_Active': False},
                 'last_error': 0 }
     g_lval = {  'smt': {}, 
                 'pcm': {}   }
@@ -114,12 +119,13 @@ if __name__ == "__main__":
     q_dgram_smt = mp.JoinableQueue()        # From SMT Server To SMT Data Handler
     q_dgram_pcm = mp.JoinableQueue()        # From PCM Server To SMT Data Handler
 
-    # launch data handler in other threads concurrently
+    ### Launch handlers
+    # data handler in other threads concurrently <NON-BLOCKING>
     executor = concurrent.futures.ThreadPoolExecutor()
     future_smt = executor.submit(data_handler_wrapper, 'smt', g_state, g_lval, q_dgram_smt)
     future_pcm = executor.submit(data_handler_wrapper, 'pcm', g_state, g_lval, q_dgram_pcm)
 
-    # launch UDP communication handler in other processes <NON-BLOCKING>
+    # UDP communication handler in other processes <NON-BLOCKING>
     # - smt
     p_smt = mp.Process(target=telemeter_handler_wrapper, args=('smt', q_msg_smt, q_dgram_smt))
     p_smt.start()
@@ -127,10 +133,12 @@ if __name__ == "__main__":
     p_pcm = mp.Process(target=telemeter_handler_wrapper, args=('pcm', q_msg_pcm, q_dgram_pcm))
     p_pcm.start()
 
-    # launch GUI handler in the main process/thread <BLOCKING>
+    # GUI handler in the main process/thread <BLOCKING>
     gui_handler(g_state, g_lval, q_msg_smt, q_msg_pcm)
 
-    # wait UDP communication handler
+    ### Wait for GUI to Be Closed ###
+
+    # wait for UDP communication handler
     p_smt.join()    
     p_pcm.join()
 

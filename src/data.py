@@ -242,8 +242,11 @@ class DataHandler :
 
                 break
 
-        # serch last MCU error
+        #
+        #   Specialized Feature: Last Error Latch
+        #
         if self.tlm_type == 'smt':
+            # serch for last MCU error
             for iFrame in range(self.NUM_OF_FRAMES):
                 if dict_mf[iFrame]['Error Code'] == 0:  continue
 
@@ -251,9 +254,10 @@ class DataHandler :
 
             # save last MCU error as a global status
             if dict_tmp['Error Code'] != 0:
-                pass
                 self.g_state['last_error'] = dict_tmp['Error Code']
+        ###
 
+        # 
         self.g_lval[self.tlm_type].update(dict_tmp) 
 
 

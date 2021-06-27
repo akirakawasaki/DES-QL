@@ -5,6 +5,7 @@ import sys
 ### Third-party libraries
 import numpy as np
 import pandas as pd
+from wx.core import EXPAND
 import wx
 #import wx.lib
 #import wx.lib.plot as plt
@@ -116,22 +117,88 @@ class frmMain(wx.Frame):
         # self.SetBackgroundColour('Dark Grey')
         self.Maximize(True)
 
-        # - 
-        self.pnlPlotter = pnlPlotter(parent=self)                       # Time History Plots
-        self.pnlDigitalIndicator = pnlDigitalIndicator(parent=self)     # Current Value Indicators
 
-        # - lay out panels by using sizer
-        # layout = wx.FlexGridSizer(rows=1, cols=2, gap=(0,0))
+        #
+        #   Lay out frm Main
+        #
+
+        # "Window" hierarchy
+        # frmMain - Sizer: layout
+        #               + pnlPlotter
+        #               + Sizer: sublayout1
+        #                   + pnlControl
+        #                   + pnlDigitalIndicator
+
+        # frmMain (Frame)
+        #   parent  : N/A
+        #   chidren : pnlPlotter, pnlControl, pnlDigitalIndicator
+        ###
+        # - generate Window instance
+        # done in "gui_handler" function
+        # - add the Window to the parent Sizer
+        # N/A
+        # - generate associated Sizer to lay out this Window
         layout = wx.BoxSizer(wx.HORIZONTAL)
-        layout.Add(window=self.pnlPlotter, proportion=0, flag=wx.ALIGN_BOTTOM)                          # plotter pane
-        layout.Add(window=self.pnlDigitalIndicator, proportion=1, flag=wx.EXPAND | wx.ALL, border=15)   # digital indicator pane
+        # - set a Sizer to the Window
         self.SetSizer(layout)
 
-        ### Bind events
-        # - close
+        # Plotter Pane for Time History Plots (Panel)
+        #   parent  : frmMain
+        #   chidren : N/A
+        ###
+        # - generate Window instance
+        self.pnlPlotter = pnlPlotter(parent=self, g_state=self.g_state)                     # 
+        # - add the Window to the parent Sizer
+        layout.Add(window=self.pnlPlotter, proportion=0, flag=wx.ALIGN_BOTTOM)
+        # - generate associated Sizer to lay out this Window
+        # N/A
+        # - set a Sizer to the Window
+        # N/A
+
+        # Sub-Lay-Out (Sizer)
+        #   parent   : frmMain
+        #   children : pnlControl, pnlDigitalIndicator
+        ###
+        # - generate Sizer instance
+        sublayout1 = wx.BoxSizer(wx.VERTICAL)
+        # - add the Sizer to the parent Sizer
+        layout.Add(sizer=sublayout1, proportion=1, flag=wx.EXPAND | wx.ALL, border=15)
+
+        # Controller Pane (Panel)
+        #   parent  : Sub-Lay-Out
+        #   chidren : N/A
+        ###
+        # - generate Window instance
+        self.pnlController = pnlController(parent=self, g_state=self.g_state)
+        # - add the Window to the parent Sizer
+        sublayout1.Add(window=self.pnlController, proportion=0, flag=wx.EXPAND | wx.BOTTOM, border=15)
+        # - generate associated Sizer to lay out this Window
+        # N/A
+        # - set a Sizer to the Window
+        # N/A
+
+        # Digital Indicator Pane for Current Values (Panel)
+        #   parent  : Sub-Lay-Out
+        #   chidren : N/A
+        ###
+        # - generate Window instance
+        self.pnlDigitalIndicator = pnlDigitalIndicator(parent=self, g_state=self.g_state)
+        # - add the Window to the parent Sizer
+        sublayout1.Add(window=self.pnlDigitalIndicator, proportion=1, flag=wx.EXPAND)
+        # - generate associated Sizer to lay out this Window
+        # N/A
+        # - set a Sizer to the Window
+        # N/A
+        
+
+        #
+        #   Bind events
+        #
+        
+        # close
         self.Bind(wx.EVT_CLOSE, self.OnClose)
                 
-        # - timer to fetch latest telemeter data
+        # timer to fetch latest telemeter data
         self.tmrFetchTelemeterData = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.OnFetchLatestValues, self.tmrFetchTelemeterData)
         self.tmrFetchTelemeterData.Start(RATE_FETCH_LATEST_VALUES)
@@ -157,12 +224,16 @@ class frmMain(wx.Frame):
             self.F_TLM_IS_ACTIVE = False
             return None
         
-        ### fetch latest values
+        # fetch latest values
         self.dictTlmLatestValues.update( self.g_lval['smt'] )
         self.dictTlmLatestValues.update( self.g_lval['pcm'] )
 
-        # latch last error
-        self.dictTlmLatestValues['Error Code'] = self.g_state['last_error']
+        #
+        #   Specialized Feature: Last Error Latch
+        #
+        if self.g_state['last_error'] != 0:
+            self.dictTlmLatestValues['Error Code'] = self.g_state['last_error']
+        ###
 
         self.F_TLM_IS_ACTIVE = True
 
@@ -183,11 +254,12 @@ class pnlPlotter(wx.Panel):
     # __PLOT_SKIP = 39    ### T.B.REFAC. ###
 
 
-    def __init__(self, parent):
+    def __init__(self, parent, g_state):
         super().__init__(parent, wx.ID_ANY)
         
         # shere arguments within the class
         self.parent = parent
+        self.g_state = g_state
 
         self.__PLOT_COUNT = self.__PLOT_SKIP   ### T.B.REFAC. ###
 
@@ -364,12 +436,14 @@ class pnlPlotter(wx.Panel):
 #
 #   Control Pane (Panel)
 #
-class pnlControl(wx.Panel):
+class pnlController(wx.Panel):
     
-    def __init__(self, parent):
+    def __init__(self, parent, g_state):
         super().__init__(parent, wx.ID_ANY)
 
+        # shere arguments within the class
         self.parent = parent
+        self.g_state = g_state
 
         self.layoutPane()
 
@@ -379,21 +453,18 @@ class pnlControl(wx.Panel):
 
 
     def OnClickResetButton(self, event):
-                
-        pass
+        ### Specialized Feature: Last Error Latch ###
+        # reset last error
+        self.g_state['last_error'] = 0
+        ####
 
 
     def layoutPane(self):
 
         # "Window" hierarchy
         # Pane - Sizer: lytPane
-        #         + sboxIndGroup1 - Sizer: sboxSizer
-        #         |                   + pnlIndGroup - Sizer: lytIndGroup
-        #         |                                       + pnlIndPair1 - Sizer: lytIndPair
-        #         |                                       |                   + sbtnLabel
-        #         |                                       |                   + stxtIndicator
-        #         |                                       + pnlIndPair2 ...
-        #         + sboxIndGroup2 ...
+        #         + Reset Button
+
 
         # Pane (Panel)
         #   parent  : Frame
@@ -421,16 +492,17 @@ class pnlControl(wx.Panel):
         lytPane.Add(self.btnReset, proportion=0, flag=wx.EXPAND)
 
 
-
 # 
 #   Digital Indicator Pane for Latest values (Panel)
 # 
 class pnlDigitalIndicator(wx.Panel):
     
-    def __init__(self, parent):
+    def __init__(self, parent, g_state):
         super().__init__(parent, wx.ID_ANY)
         
+        # shere arguments within the class
         self.parent = parent
+        self.g_state = g_state
 
         self.loadConfig()
 
@@ -438,7 +510,7 @@ class pnlDigitalIndicator(wx.Panel):
 
         self.configurePane()
 
-        ### bind events
+        # bind events
         # - set timer to refresh current-value pane
         self.tmrRefresh = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.OnTimerRefresh, self.tmrRefresh)
@@ -559,6 +631,7 @@ class pnlDigitalIndicator(wx.Panel):
         #         |                                       |                   + stxtIndicator
         #         |                                       + pnlIndPair2 ...
         #         + sboxIndGroup2 ...
+
 
         self.sboxIndGroup = []      
         self.sboxSizer = []
