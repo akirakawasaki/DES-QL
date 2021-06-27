@@ -63,7 +63,6 @@ def gui_handler(g_state, g_lval, q_msg_smt, q_msg_pcm):
 
     # create main window & show
     frame = gui.frmMain(g_state, g_lval)
-    # frame = gui.frmMain(g_state, g_lval, q_msg_smt, q_msg_pcm)
     frame.Show()
 
     # launch event loop for GUI <BLOCKING>

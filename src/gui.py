@@ -447,9 +447,20 @@ class pnlController(wx.Panel):
 
         self.layoutPane()
 
-        ### bind Events
-        # - Reset Button
+        #
+        #   bind Events
+        #
+        
+        # Record Button
+        self.tbtnRecord.Bind(wx.EVT_TOGGLEBUTTON, self.OnClickRecordButton) 
+
+        # Reset Button
         self.btnReset.Bind(wx.EVT_BUTTON, self.OnClickResetButton)
+
+
+    def OnClickRecordButton(self, event):
+        self.g_state['smt']['Data_Save_Is_Active'] = self.tbtnRecord.GetValue()
+        self.g_state['pcm']['Data_Save_Is_Active'] = self.tbtnRecord.GetValue()
 
 
     def OnClickResetButton(self, event):
@@ -463,12 +474,13 @@ class pnlController(wx.Panel):
 
         # "Window" hierarchy
         # Pane - Sizer: lytPane
-        #         + Reset Button
+        #           + Record Button
+        #           + Reset Button
 
 
         # Pane (Panel)
         #   parent  : Frame
-        #   chidren : 
+        #   chidren : Record Button, Reset Button
         ###
         # - generate Window instance
         # done in the frmMain class
@@ -479,6 +491,18 @@ class pnlController(wx.Panel):
         # lytPane = wx.BoxSizer(wx.HORIZONTAL)
         # - set a Sizer to the Window
         self.SetSizer(lytPane)
+
+        # Record Button (ToggleButton)
+        #   parent   : Pane
+        #   children : N/A
+        ###
+        # - generate Window instance
+        self.tbtnRecord = wx.ToggleButton(self, wx.ID_ANY, label='RECORD')
+        self.tbtnRecord.SetFont(
+            wx.Font(70, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL) )     # 70 is a　magic # in wx
+        self.tbtnRecord.SetValue = False
+        # - add the Window to the parent Sizer
+        lytPane.Add(self.tbtnRecord, proportion=0, flag=wx.EXPAND)
 
         # Reset Button (Button)
         #   parent   : Pane

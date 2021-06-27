@@ -44,6 +44,7 @@ class DataHandler :
 
 
     def __init__(self, tlm_type, g_state, g_lval, q_dgram) -> None:
+        # shere arguments within the class
         self.tlm_type = tlm_type
         self.g_state = g_state
         self.g_lval = g_lval
@@ -174,26 +175,29 @@ class DataHandler :
 
             ### output decoded data
             # - To Files
-            # low-speed data 
-            if self.iLine % 1 == 0:
-            # if self.iLine % 10 == 0:
-                write_data = [  list(dict_mf[0].values()),
-                                list(dict_mf[1].values()),
-                                list(dict_mf[2].values()),
-                                list(dict_mf[3].values()),
-                                list(dict_mf[4].values()),
-                                list(dict_mf[5].values()),
-                                list(dict_mf[6].values()),
-                                list(dict_mf[7].values()) ]
-                self.q_write_data.put_nowait( (self.fpath_ls_data, write_data) )
+            if self.g_state[self.tlm_type]['Data_Save_Is_Active'] == True:
+                # low-speed data 
+                if self.iLine % 1 == 0:
+                # if self.iLine % 10 == 0:
+                    write_data = [  list(dict_mf[0].values()),
+                                    list(dict_mf[1].values()),
+                                    list(dict_mf[2].values()),
+                                    list(dict_mf[3].values()),
+                                    list(dict_mf[4].values()),
+                                    list(dict_mf[5].values()),
+                                    list(dict_mf[6].values()),
+                                    list(dict_mf[7].values()) ]
+                    self.q_write_data.put_nowait( (self.fpath_ls_data, write_data) )
 
-            # high-speed data
-            if hs_data != []:
-                self.q_write_data.put_nowait( (self.fpath_hs_data, hs_data) )
+                # high-speed data
+                if hs_data != []:
+                    self.q_write_data.put_nowait( (self.fpath_hs_data, hs_data) )
 
-            # error history
-            if err_history != []:
-                self.q_write_data.put_nowait( (self.FPATH_ERR, err_history) )
+                # error history
+                if err_history != []:
+                    self.q_write_data.put_nowait( (self.FPATH_ERR, err_history) )
+
+                # print(f'TLM {self.tlm_type}:  Data Save Is Active!')    # for debug
 
             # - To CUI
             # if iLine % 1 == 0:
