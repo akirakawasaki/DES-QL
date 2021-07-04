@@ -1,5 +1,6 @@
 ### Standard libraries
 import queue
+# import math
 import sys
 
 ### Third-party libraries
@@ -23,8 +24,10 @@ from matplotlib.figure import Figure
 wxPython configurations
 """
 RATE_FETCH_LATEST_VALUES       = 25     # ms/cycle
-RATE_REFLESH_DIGITAL_INDICATOR = 800    # ms/cycle
-RATE_REFLESH_PLOTTER           = 100    # ms/cycle
+RATE_REFLESH_DIGITAL_INDICATOR = 500    # ms/cycle
+# RATE_REFLESH_DIGITAL_INDICATOR = 800    # ms/cycle
+# RATE_REFLESH_PLOTTER           = 100    # ms/cycle
+RATE_REFLESH_PLOTTER           = 110    # ms/cycle
 
 """
 Matplotlib configuration
@@ -109,7 +112,7 @@ class frmMain(wx.Frame):
         self.dfTlm_pcm = pd.DataFrame()
 
         ###
-        self.F_TLM_IS_ACTIVE = False
+        # self.F_TLM_IS_ACTIVE = False
 
         ### configure GUI appearance 
         # - initialize attributions
@@ -119,7 +122,7 @@ class frmMain(wx.Frame):
 
 
         #
-        #   Lay out frm Main
+        #   Lay out frmMain
         #
 
         # "Window" hierarchy
@@ -147,7 +150,7 @@ class frmMain(wx.Frame):
         #   chidren : N/A
         ###
         # - generate Window instance
-        self.pnlPlotter = pnlPlotter(parent=self, g_state=self.g_state)                     # 
+        self.pnlPlotter = pnlPlotter(parent=self, g_state=self.g_state)
         # - add the Window to the parent Sizer
         layout.Add(window=self.pnlPlotter, proportion=0, flag=wx.ALIGN_BOTTOM)
         # - generate associated Sizer to lay out this Window
@@ -217,25 +220,119 @@ class frmMain(wx.Frame):
     # Event handler: EVT_TIMER
     def OnFetchLatestValues(self, event):
         # print('GUI FTC: fetched tlm data')
+
+        # # break off when tlm data not exist
+        # if len(self.g_lval['smt']) == 0 or len(self.g_lval['pcm']) == 0:
+        #     print('GUI FTC: awaiting SMT and/or PCM data')
+        #     self.F_TLM_IS_ACTIVE = False
+        #     return None
         
-        # break off when tlm data not exist
-        if len(self.g_lval['smt']) == 0 or len(self.g_lval['pcm']) == 0:
-            print('GUI FTC: awaiting SMT and/or PCM data')
-            self.F_TLM_IS_ACTIVE = False
-            return None
-        
-        # fetch latest values
-        self.dictTlmLatestValues.update( self.g_lval['smt'] )
-        self.dictTlmLatestValues.update( self.g_lval['pcm'] )
+        # # fetch latest values
+        # self.dictTlmLatestValues.update( self.g_lval['smt'] )
+        # self.dictTlmLatestValues.update( self.g_lval['pcm'] )
+
+
+        # fetch last values
+        # - SMT
+        if len( self.g_lval['smt'] ) == 0:
+            self.g_state['smt']['Tlm_Server_Is_Active'] = False
+            print('GUI FTC: awaiting SMT data')
+        else:
+            self.g_state['smt']['Tlm_Server_Is_Active'] = True
+            self.dictTlmLatestValues.update( self.g_lval['smt'] ) 
+
+        # - PCM
+        if len( self.g_lval['pcm'] ) == 0:
+            self.g_state['pcm']['Tlm_Server_Is_Active'] = False
+            print('GUI FTC: awaiting PCM data')
+        else:
+            self.g_state['pcm']['Tlm_Server_Is_Active'] = True
+            self.dictTlmLatestValues.update( self.g_lval['pcm'] ) 
+
 
         #
         #   Specialized Feature: Last Error Latch
         #
         if self.g_state['last_error'] != 0:
-            self.dictTlmLatestValues['Error Code'] = self.g_state['last_error']
+            self.dictTlmLatestValues['Error code'] = self.g_state['last_error']
+            # try:
+            #     self.dictTlmLatestValues['Error code'] = self.g_state['last_error']
+            # except:
+            #     pass
         ###
 
-        self.F_TLM_IS_ACTIVE = True
+        # self.F_TLM_IS_ACTIVE = True
+
+
+    def layoutFrame(self):
+
+        # "Window" hierarchy
+        # frmMain - Sizer: layout
+        #               + pnlPlotter
+        #               + Sizer: sublayout1
+        #                   + pnlControl
+        #                   + pnlDigitalIndicator
+
+        # frmMain (Frame)
+        #   parent  : N/A
+        #   chidren : pnlPlotter, pnlControl, pnlDigitalIndicator
+        ###
+        # - generate Window instance
+        # done in "gui_handler" function
+        # - add the Window to the parent Sizer
+        # N/A
+        # - generate associated Sizer to lay out this Window
+        layout = wx.BoxSizer(wx.HORIZONTAL)
+        # - set a Sizer to the Window
+        self.SetSizer(layout)
+
+        # Plotter Pane for Time History Plots (Panel)
+        #   parent  : frmMain
+        #   chidren : N/A
+        ###
+        # - generate Window instance
+        self.pnlPlotter = pnlPlotter(parent=self, g_state=self.g_state)
+        # - add the Window to the parent Sizer
+        layout.Add(window=self.pnlPlotter, proportion=0, flag=wx.ALIGN_BOTTOM)
+        # - generate associated Sizer to lay out this Window
+        # N/A
+        # - set a Sizer to the Window
+        # N/A
+
+        # Sub-Lay-Out (Sizer)
+        #   parent   : frmMain
+        #   children : pnlControl, pnlDigitalIndicator
+        ###
+        # - generate Sizer instance
+        sublayout1 = wx.BoxSizer(wx.VERTICAL)
+        # - add the Sizer to the parent Sizer
+        layout.Add(sizer=sublayout1, proportion=1, flag=wx.EXPAND | wx.ALL, border=15)
+
+        # Controller Pane (Panel)
+        #   parent  : Sub-Lay-Out
+        #   chidren : N/A
+        ###
+        # - generate Window instance
+        self.pnlController = pnlController(parent=self, g_state=self.g_state)
+        # - add the Window to the parent Sizer
+        sublayout1.Add(window=self.pnlController, proportion=0, flag=wx.EXPAND | wx.BOTTOM, border=15)
+        # - generate associated Sizer to lay out this Window
+        # N/A
+        # - set a Sizer to the Window
+        # N/A
+
+        # Digital Indicator Pane for Current Values (Panel)
+        #   parent  : Sub-Lay-Out
+        #   chidren : N/A
+        ###
+        # - generate Window instance
+        self.pnlDigitalIndicator = pnlDigitalIndicator(parent=self, g_state=self.g_state)
+        # - add the Window to the parent Sizer
+        sublayout1.Add(window=self.pnlDigitalIndicator, proportion=1, flag=wx.EXPAND)
+        # - generate associated Sizer to lay out this Window
+        # N/A
+        # - set a Sizer to the Window
+        # N/A
 
 
 # 
@@ -289,13 +386,28 @@ class pnlPlotter(wx.Panel):
     # Event handler: EVT_TIMER
     def OnTimerRefresh(self, event):
         # skip refresh when TLM NOT active
-        if self.parent.F_TLM_IS_ACTIVE == False:    return None
+        # if self.parent.F_TLM_IS_ACTIVE == False:    return None
+        if     (self.g_state['smt']['Tlm_Server_Is_Active'] == False) \
+           and (self.g_state['pcm']['Tlm_Server_Is_Active'] == False):
+            return None
 
         ### update data set for plot
         # - update plot points by appending latest values
-        self.x_series = np.append(self.x_series, self.parent.dictTlmLatestValues['GSE time'])
+        if self.g_state['smt']['Tlm_Server_Is_Active'] == True:
+            gse_time = self.parent.dictTlmLatestValues['GSE time']
+        else:
+            gse_time = self.parent.dictTlmLatestValues['GSE time (pcm)']
+
+        self.x_series = np.append(self.x_series, gse_time)
+
         for i in range(self.N_PLOTTER):
-            self.y_series = np.append(self.y_series, self.parent.dictTlmLatestValues[self.dictPlotterAttr[i]['item']])
+            if np.isnan( self.parent.dictTlmLatestValues[self.dictPlotterAttr[i]['item']] ):
+                latest_value = 0.0                
+            else:
+                latest_value = self.parent.dictTlmLatestValues[self.dictPlotterAttr[i]['item']]
+
+            self.y_series = np.append( self.y_series, latest_value )
+
 
         # for debug
         # print(f'GUI PLT: append latest values {df_tmp.iloc[-1,self.index_x]}')
@@ -548,8 +660,12 @@ class pnlDigitalIndicator(wx.Panel):
     # Event handler: EVT_TIMER
     def OnTimerRefresh(self, event):
         # skip refresh when TLM NOT active
-        if self.parent.F_TLM_IS_ACTIVE == False:    return None
-        
+        # if self.parent.F_TLM_IS_ACTIVE == False:    return None
+        if     (self.g_state['smt']['Tlm_Server_Is_Active'] == False) \
+           and (self.g_state['pcm']['Tlm_Server_Is_Active'] == False):
+            return None
+
+
         ### refresh indicators
         # - prepare iterator
         iterIndicator = iter( self.stxtIndicator )
@@ -572,6 +688,8 @@ class pnlDigitalIndicator(wx.Panel):
                 # get instance from iterator
                 stxtInidicator = next(iterIndicator)
                 tbtnLabel = next(iterLabel)
+
+                if np.isnan( self.parent.dictTlmLatestValues[strItemName] ):  continue
 
                 val_float = self.parent.dictTlmLatestValues[strItemName]
 

@@ -103,7 +103,8 @@ class DataHandler :
         # block until GUI task done
         while True:            
             await asyncio.sleep(1)
-            if self.g_state[self.tlm_type]['Tlm_Server_Is_Active'] == False:    break
+            if self.g_state[self.tlm_type]['F_Quit_Data_Handler'] == True:  break
+            # if self.g_state[self.tlm_type]['Tlm_Server_Is_Active'] == False:    break
 
         print(f'DAT {self.tlm_type}: Data handler will be closed soon...')
 
@@ -252,13 +253,13 @@ class DataHandler :
         if self.tlm_type == 'smt':
             # serch for last MCU error
             for iFrame in range(self.NUM_OF_FRAMES):
-                if dict_mf[iFrame]['Error Code'] == 0:  continue
+                if dict_mf[iFrame]['Error code'] == 0:  continue
 
-                dict_tmp['Error Code'] = dict_mf[iFrame]['Error Code']
+                dict_tmp['Error code'] = dict_mf[iFrame]['Error code']
 
             # save last MCU error as a global status
-            if dict_tmp['Error Code'] != 0:
-                self.g_state['last_error'] = dict_tmp['Error Code']
+            if dict_tmp['Error code'] != 0:
+                self.g_state['last_error'] = dict_tmp['Error code']
         ###
 
         # 

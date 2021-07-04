@@ -80,8 +80,10 @@ def gui_handler(g_state, g_lval, q_msg_smt, q_msg_pcm):
     q_msg_pcm.join()
 
     # quit data handlers
-    g_state['smt']['Tlm_Server_Is_Active'] = False
-    g_state['pcm']['Tlm_Server_Is_Active'] = False
+    g_state['smt']['F_Quit_Data_Handler'] = True
+    g_state['pcm']['F_Quit_Data_Handler'] = True
+    # g_state['smt']['Tlm_Server_Is_Active'] = False
+    # g_state['pcm']['Tlm_Server_Is_Active'] = False
 
     print('MAIN: GUI Closed.')
 
@@ -104,8 +106,8 @@ if __name__ == "__main__":
         sp_pcm = subprocess.Popen(['python', './tlmsvsim.py', 'pcm'], stdout=subprocess.DEVNULL)
 
     ### define
-    g_state = { 'smt': {'Tlm_Server_Is_Active': True, 'Data_Save_Is_Active': False}, 
-                'pcm': {'Tlm_Server_Is_Active': True, 'Data_Save_Is_Active': False},
+    g_state = { 'smt': {'Tlm_Server_Is_Active': False, 'Data_Save_Is_Active': False, 'F_Quit_Data_Handler': False}, 
+                'pcm': {'Tlm_Server_Is_Active': False, 'Data_Save_Is_Active': False, 'F_Quit_Data_Handler': False},
                 'last_error': 0 }
     g_lval = {  'smt': {}, 
                 'pcm': {}   }
