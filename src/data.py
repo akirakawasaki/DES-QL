@@ -23,10 +23,8 @@ import pandas as pd
 #   Data handler
 #
 class DataHandler :
-    #
-    #   Class constants
-    #
-
+    ''' Class constants '''
+    
     # telemeter properties
     BPW = 2                     # bytes per word
     NUM_OF_FRAMES = 8           # number of frames in a major frame

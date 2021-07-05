@@ -14,10 +14,7 @@ import queue
 #   Socket Communication (UDP/IP) handler
 #
 class TelemeterHandler :
-    #
-    # Class constants
-    #
-
+    ''' Class constants '''
     # n/a    
 
 
@@ -69,10 +66,7 @@ class TelemeterHandler :
 #   Datagram Server
 #
 class DatagramServerProtocol:    
-    #
-    # Class constants
-    #
-
+    ''' Class constants '''
     # n/a   
 
 

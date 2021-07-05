@@ -1,6 +1,5 @@
 ### Standard libraries
 import queue
-# import math
 import sys
 
 ### Third-party libraries
@@ -12,9 +11,6 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg
 from matplotlib.figure import Figure
 import wx
-# import wx.lib
-# import wx.lib.plot as plt
-# from wx.core import EXPAND
 
 ### Local libraries
 # n/a
@@ -25,21 +21,7 @@ wxPython configurations
 """
 RATE_FETCH_LATEST_VALUES       = 25     # ms/cycle
 RATE_REFLESH_DIGITAL_INDICATOR = 490    # ms/cycle
-# RATE_REFLESH_DIGITAL_INDICATOR = 800    # ms/cycle
-# RATE_REFLESH_PLOTTER           = 100    # ms/cycle
 RATE_REFLESH_PLOTTER           = 100    # ms/cycle
-
-# """
-# Matplotlib configuration
-# """
-# plt.style.use('dark_background')
-
-# # Plotter margins
-# plt.rcParams["figure.subplot.bottom"] = 0.07    # Bottom
-# plt.rcParams["figure.subplot.top"]    = 0.99    # Top
-# plt.rcParams["figure.subplot.left"]   = 0.15    # Left
-# plt.rcParams["figure.subplot.right"]  = 0.97    # Right
-# plt.rcParams["figure.subplot.hspace"] = 0.05    # Height Margin between subplots
 
 
 #
@@ -112,81 +94,7 @@ class frmMain(wx.Frame):
         #
         #   Lay out frmMain
         #
-
         self.layoutFrame()
-
-        '''
-        # "Window" hierarchy
-        # frmMain - Sizer: layout
-        #               + pnlPlotter
-        #               + Sizer: sublayout1
-        #                   + pnlControl
-        #                   + pnlDigitalIndicator
-
-        # frmMain (Frame)
-        #   parent  : N/A
-        #   chidren : pnlPlotter, pnlControl, pnlDigitalIndicator
-        ###
-        # - generate and configure Window instance 
-        # done in "gui_handler" function
-        self.SetBackgroundColour('Black')
-        # self.SetBackgroundColour('Dark Grey')
-        self.Maximize(True)
-        # - add the Window to the parent Sizer
-        # N/A
-        # - generate associated Sizer to lay out this Window
-        layout = wx.BoxSizer(wx.HORIZONTAL)
-        # - set a Sizer to the Window
-        self.SetSizer(layout)
-
-        # Plotter Pane for Time History Plots (Panel)
-        #   parent  : frmMain
-        #   chidren : N/A
-        ###
-        # - generate and configure Window instance 
-        self.pnlPlotter = pnlPlotter(parent=self, g_state=self.g_state)
-        # - add the Window to the parent Sizer
-        layout.Add(window=self.pnlPlotter, proportion=0, flag=wx.ALIGN_BOTTOM)
-        # - generate associated Sizer to lay out this Window
-        # N/A
-        # - set a Sizer to the Window
-        # N/A
-
-        # Sub-Lay-Out (Sizer)
-        #   parent   : frmMain
-        #   children : pnlControl, pnlDigitalIndicator
-        ###
-        # - generate Sizer instance
-        sublayout1 = wx.BoxSizer(wx.VERTICAL)
-        # - add the Sizer to the parent Sizer
-        layout.Add(sizer=sublayout1, proportion=1, flag=wx.EXPAND | wx.ALL, border=15)
-
-        # Controller Pane (Panel)
-        #   parent  : Sub-Lay-Out
-        #   chidren : N/A
-        ###
-        # - generate and configure Window instance 
-        self.pnlController = pnlController(parent=self, g_state=self.g_state)
-        # - add the Window to the parent Sizer
-        sublayout1.Add(window=self.pnlController, proportion=0, flag=wx.EXPAND | wx.BOTTOM, border=15)
-        # - generate associated Sizer to lay out this Window
-        # N/A
-        # - set a Sizer to the Window
-        # N/A
-
-        # Digital Indicator Pane for Current Values (Panel)
-        #   parent  : Sub-Lay-Out
-        #   chidren : N/A
-        ###
-        # - generate and configure Window instance 
-        self.pnlDigitalIndicator = pnlDigitalIndicator(parent=self, g_state=self.g_state)
-        # - add the Window to the parent Sizer
-        sublayout1.Add(window=self.pnlDigitalIndicator, proportion=1, flag=wx.EXPAND)
-        # - generate associated Sizer to lay out this Window
-        # N/A
-        # - set a Sizer to the Window
-        # N/A
-        '''
 
 
         #
@@ -261,14 +169,16 @@ class frmMain(wx.Frame):
 
     def layoutFrame(self):
 
-        # "Window" hierarchy
-        # frmMain - Sizer: layout
-        #               + pnlPlotter
-        #               + Sizer: sublayout1
-        #                   + pnlControl
-        #                   + pnlDigitalIndicator
+        '''
+        "Window" hierarchy
+        frmMain - Sizer: layout
+                    + pnlPlotter
+                    + Sizer: sublayout1
+                        + pnlControl
+                        + pnlDigitalIndicator
+        '''
 
-        # frmMain (Frame)
+        ''' frmMain (Frame) '''
         #   parent  : N/A
         #   chidren : pnlPlotter, pnlControl, pnlDigitalIndicator
         ###
@@ -284,7 +194,7 @@ class frmMain(wx.Frame):
         # - set a Sizer to the Window
         self.SetSizer(layout)
 
-        # Plotter Pane for Time History Plots (Panel)
+        ''' Plotter Pane for Time History Plots (Panel) '''
         #   parent  : frmMain
         #   chidren : N/A
         ###
@@ -297,7 +207,7 @@ class frmMain(wx.Frame):
         # - set a Sizer to the Window
         # N/A
 
-        # Sub-Lay-Out (Sizer)
+        ''' Sub-Lay-Out (Sizer) '''
         #   parent   : frmMain
         #   children : pnlControl, pnlDigitalIndicator
         ###
@@ -306,7 +216,7 @@ class frmMain(wx.Frame):
         # - add the Sizer to the parent Sizer
         layout.Add(sizer=sublayout1, proportion=1, flag=wx.EXPAND | wx.ALL, border=15)
 
-        # Controller Pane (Panel)
+        ''' Controller Pane (Panel) '''
         #   parent  : Sub-Lay-Out
         #   chidren : N/A
         ###
@@ -319,7 +229,7 @@ class frmMain(wx.Frame):
         # - set a Sizer to the Window
         # N/A
 
-        # Digital Indicator Pane for Current Values (Panel)
+        ''' Digital Indicator Pane for Current Values (Panel) '''
         #   parent  : Sub-Lay-Out
         #   chidren : N/A
         ###
@@ -544,10 +454,13 @@ class pnlPlotter(wx.Panel):
 
 
 #
-#   Control Pane (Panel)
+#   Panel: Control Pane
 #
 class pnlController(wx.Panel):
-    
+    ''' Class Constants '''
+    # n/a
+
+
     def __init__(self, parent, g_state):
         super().__init__(parent, wx.ID_ANY)
 
@@ -629,10 +542,13 @@ class pnlController(wx.Panel):
 
 
 # 
-#   Digital Indicator Pane for Latest values (Panel)
+#   Panel: Digital Indicator Pane for Latest values
 # 
 class pnlDigitalIndicator(wx.Panel):
-    
+    ''' Class Constants '''
+    # n/a
+
+
     def __init__(self, parent, g_state):
         super().__init__(parent, wx.ID_ANY)
         
@@ -646,13 +562,17 @@ class pnlDigitalIndicator(wx.Panel):
 
         self.configurePane()
 
-        # bind events
-        # - set timer to refresh current-value pane
+
+        #
+        #   bind events
+        #
+
+        # set timer to refresh current-value pane
         self.tmrRefresh = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.OnTimerRefresh, self.tmrRefresh)
         self.tmrRefresh.Start(RATE_REFLESH_DIGITAL_INDICATOR)
 
-        # - toggle button
+        # toggle button
         # for button in self.tbtnLabel:
         #     button.Bind(wx.EVT_TOGGLEBUTTON, self.graphTest)
 
@@ -801,12 +721,10 @@ class pnlDigitalIndicator(wx.Panel):
         # - set a Sizer to the Window
         self.SetSizer(lytPane)
 
-
         # loop for sboxIndGroups
         for strGroupName in self.dictGroupAttr:
             i = self.dictGroupAttr[strGroupName]['gidx']
             rows = self.dictGroupAttr[strGroupName]['rows']
-
 
             ''' sboxIndGroup (StaticBox), as an envelope of an Indicator Group '''
             #   parent   : Pane
@@ -823,7 +741,6 @@ class pnlDigitalIndicator(wx.Panel):
             self.sboxSizer.append( wx.StaticBoxSizer(self.sboxIndGroup[-1]) )
             # - add the Window to the parent Sizer
             lytPane.Add(self.sboxSizer[-1], proportion=rows, flag=wx.EXPAND)
-
 
             ''' Indicator Group (Panel) '''
             #   parent   : StaticBox
@@ -862,7 +779,6 @@ class pnlDigitalIndicator(wx.Panel):
                 # - set a Sizer to the Window
                 self.pnlIndPair[-1].SetSizer(self.lytIndPair[-1])
 
-
                 ''' Item Label (ToggleButton)  '''
                 #   parent   : Indicator Pair
                 #   children : N/A
@@ -878,7 +794,6 @@ class pnlDigitalIndicator(wx.Panel):
                     wx.Font(70, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL) )     # 70 is a　magic # in wx
                 # - add the Window to the parent Sizer
                 self.lytIndPair[-1].Add(self.tbtnLabel[-1], proportion=1, flag=wx.EXPAND)
-
 
                 ''' Digital Indicator (StaticText) '''
                 #   parent   : Indicator Pair
