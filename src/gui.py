@@ -6,15 +6,15 @@ import sys
 ### Third-party libraries
 import numpy as np
 import pandas as pd
-from wx.core import EXPAND
-import wx
-#import wx.lib
-#import wx.lib.plot as plt
-import matplotlib
-matplotlib.use('WxAgg')
+import matplotlib as mpl
+mpl.use('WxAgg')
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg
 from matplotlib.figure import Figure
+import wx
+# import wx.lib
+# import wx.lib.plot as plt
+# from wx.core import EXPAND
 
 ### Local libraries
 # n/a
@@ -24,40 +24,33 @@ from matplotlib.figure import Figure
 wxPython configurations
 """
 RATE_FETCH_LATEST_VALUES       = 25     # ms/cycle
-RATE_REFLESH_DIGITAL_INDICATOR = 500    # ms/cycle
+RATE_REFLESH_DIGITAL_INDICATOR = 490    # ms/cycle
 # RATE_REFLESH_DIGITAL_INDICATOR = 800    # ms/cycle
 # RATE_REFLESH_PLOTTER           = 100    # ms/cycle
-RATE_REFLESH_PLOTTER           = 110    # ms/cycle
+RATE_REFLESH_PLOTTER           = 100    # ms/cycle
 
-"""
-Matplotlib configuration
-"""
-plt.style.use('dark_background')
+# """
+# Matplotlib configuration
+# """
+# plt.style.use('dark_background')
 
-# Plotter margins
-plt.rcParams["figure.subplot.bottom"] = 0.07    # Bottom
-plt.rcParams["figure.subplot.top"]    = 0.99    # Top
-plt.rcParams["figure.subplot.left"]   = 0.15    # Left
-plt.rcParams["figure.subplot.right"]  = 0.97    # Right
-plt.rcParams["figure.subplot.hspace"] = 0.05    # Height Margin between subplots
+# # Plotter margins
+# plt.rcParams["figure.subplot.bottom"] = 0.07    # Bottom
+# plt.rcParams["figure.subplot.top"]    = 0.99    # Top
+# plt.rcParams["figure.subplot.left"]   = 0.15    # Left
+# plt.rcParams["figure.subplot.right"]  = 0.97    # Right
+# plt.rcParams["figure.subplot.hspace"] = 0.05    # Height Margin between subplots
 
 
 #
-#   Top-level window
+#   Frame: Top-level window
 #
 class frmMain(wx.Frame):
-    #
-    #   Class constants
-    #
-
-    #    
+    ''' Class constants '''
     WINDOW_CAPTION = 'Telemetry Data Quick Look for Detonation Engine System'
-    
-    # input file pathes
     FPATH_CONFIG = './config_tlm.xlsx'
     
 
-    # def __init__(self, g_state, g_lval, q_msg_smt, q_msg_pcm):
     def __init__(self, g_state, g_lval):
         super().__init__(None, wx.ID_ANY, self.WINDOW_CAPTION)
 
@@ -65,11 +58,11 @@ class frmMain(wx.Frame):
         self.g_state = g_state
         self.g_lval = g_lval
 
-        # self.q_msg_smt = q_msg_smt
-        # self.q_msg_pcm = q_msg_pcm
 
-        ### Initialize data
-        # - load configurations from an external file
+        #
+        #   Load configurations from an external file
+        #
+
         # smt
         try: 
             df_cfg_smt = pd.read_excel(self.FPATH_CONFIG, 
@@ -100,7 +93,11 @@ class frmMain(wx.Frame):
         self.dictTlmItemAttr.update(dictTlmItemAttr_smt)
         self.dictTlmItemAttr.update(dictTlmItemAttr_pcm)
 
-        # - initialize a dictionary to store latest values
+
+        #
+        #   Initialize a dictionary to store latest values
+        #
+
         self.dictTlmLatestValues = {}
 
         self.dictTlmLatestValues_smt = dict.fromkeys(['Line# (smt)'] + list(dictTlmItemAttr_smt.keys()), np.nan)
@@ -111,20 +108,14 @@ class frmMain(wx.Frame):
         self.dictTlmLatestValues.update(self.dictTlmLatestValues_pcm)
         self.dfTlm_pcm = pd.DataFrame()
 
-        ###
-        # self.F_TLM_IS_ACTIVE = False
-
-        ### configure GUI appearance 
-        # - initialize attributions
-        self.SetBackgroundColour('Black')
-        # self.SetBackgroundColour('Dark Grey')
-        self.Maximize(True)
-
 
         #
         #   Lay out frmMain
         #
 
+        self.layoutFrame()
+
+        '''
         # "Window" hierarchy
         # frmMain - Sizer: layout
         #               + pnlPlotter
@@ -136,8 +127,11 @@ class frmMain(wx.Frame):
         #   parent  : N/A
         #   chidren : pnlPlotter, pnlControl, pnlDigitalIndicator
         ###
-        # - generate Window instance
+        # - generate and configure Window instance 
         # done in "gui_handler" function
+        self.SetBackgroundColour('Black')
+        # self.SetBackgroundColour('Dark Grey')
+        self.Maximize(True)
         # - add the Window to the parent Sizer
         # N/A
         # - generate associated Sizer to lay out this Window
@@ -149,7 +143,7 @@ class frmMain(wx.Frame):
         #   parent  : frmMain
         #   chidren : N/A
         ###
-        # - generate Window instance
+        # - generate and configure Window instance 
         self.pnlPlotter = pnlPlotter(parent=self, g_state=self.g_state)
         # - add the Window to the parent Sizer
         layout.Add(window=self.pnlPlotter, proportion=0, flag=wx.ALIGN_BOTTOM)
@@ -171,7 +165,7 @@ class frmMain(wx.Frame):
         #   parent  : Sub-Lay-Out
         #   chidren : N/A
         ###
-        # - generate Window instance
+        # - generate and configure Window instance 
         self.pnlController = pnlController(parent=self, g_state=self.g_state)
         # - add the Window to the parent Sizer
         sublayout1.Add(window=self.pnlController, proportion=0, flag=wx.EXPAND | wx.BOTTOM, border=15)
@@ -184,7 +178,7 @@ class frmMain(wx.Frame):
         #   parent  : Sub-Lay-Out
         #   chidren : N/A
         ###
-        # - generate Window instance
+        # - generate and configure Window instance 
         self.pnlDigitalIndicator = pnlDigitalIndicator(parent=self, g_state=self.g_state)
         # - add the Window to the parent Sizer
         sublayout1.Add(window=self.pnlDigitalIndicator, proportion=1, flag=wx.EXPAND)
@@ -192,7 +186,8 @@ class frmMain(wx.Frame):
         # N/A
         # - set a Sizer to the Window
         # N/A
-        
+        '''
+
 
         #
         #   Bind events
@@ -277,8 +272,11 @@ class frmMain(wx.Frame):
         #   parent  : N/A
         #   chidren : pnlPlotter, pnlControl, pnlDigitalIndicator
         ###
-        # - generate Window instance
+        # - generate and configure Window instance 
         # done in "gui_handler" function
+        self.SetBackgroundColour('Black')
+        # self.SetBackgroundColour('Dark Grey')
+        self.Maximize(True)
         # - add the Window to the parent Sizer
         # N/A
         # - generate associated Sizer to lay out this Window
@@ -290,7 +288,7 @@ class frmMain(wx.Frame):
         #   parent  : frmMain
         #   chidren : N/A
         ###
-        # - generate Window instance
+        # - generate and configure Window instance 
         self.pnlPlotter = pnlPlotter(parent=self, g_state=self.g_state)
         # - add the Window to the parent Sizer
         layout.Add(window=self.pnlPlotter, proportion=0, flag=wx.ALIGN_BOTTOM)
@@ -312,7 +310,7 @@ class frmMain(wx.Frame):
         #   parent  : Sub-Lay-Out
         #   chidren : N/A
         ###
-        # - generate Window instance
+        # - generate and configure Window instance 
         self.pnlController = pnlController(parent=self, g_state=self.g_state)
         # - add the Window to the parent Sizer
         sublayout1.Add(window=self.pnlController, proportion=0, flag=wx.EXPAND | wx.BOTTOM, border=15)
@@ -325,7 +323,7 @@ class frmMain(wx.Frame):
         #   parent  : Sub-Lay-Out
         #   chidren : N/A
         ###
-        # - generate Window instance
+        # - generate and configure Window instance 
         self.pnlDigitalIndicator = pnlDigitalIndicator(parent=self, g_state=self.g_state)
         # - add the Window to the parent Sizer
         sublayout1.Add(window=self.pnlDigitalIndicator, proportion=1, flag=wx.EXPAND)
@@ -336,19 +334,13 @@ class frmMain(wx.Frame):
 
 
 # 
-#   Plotter Pane for Time-history (Panel)
+#   Panel: Plotter Pane for Time-history
 # 
 class pnlPlotter(wx.Panel):
-    #
-    #   Class constants
-    #
-
+    ''' Class constants '''
     N_PLOTTER = 5
-    # __T_RANGE = 30    # [s]
-    __T_RANGE = 31    # [s]
-
-    __PLOT_SKIP = 9    ### T.B.REFAC. ###
-    # __PLOT_SKIP = 39    ### T.B.REFAC. ###
+    __T_RANGE = 31      # [s]
+    __PLOT_SKIP = 9
 
 
     def __init__(self, parent, g_state):
@@ -360,20 +352,13 @@ class pnlPlotter(wx.Panel):
 
         self.__PLOT_COUNT = self.__PLOT_SKIP   ### T.B.REFAC. ###
 
-        # handle exception
-        # self.N_PLOTTER = max(1, min(5, self.N_PLOTTER))
-
         self.loadConfig()
 
         self.configure()
 
         ### 
         layout = wx.BoxSizer()
-        # layout = wx.GridBagSizer()
         layout.Add(self.canvas, proportion=0, flag=wx.ALIGN_BOTTOM)
-        # layout.Add(self.canvas, proportion=0, flag=wx.SHAPED | wx.ALIGN_CENTER)
-        # layout.Add(self.canvas, proportion=1, flag=wx.EXPAND)
-        # layout.Add(self.canvas, proportion=0, flag=wx.EXPAND | wx.ALL, border=5)
         self.SetSizer(layout)
 
         ### Bind events
@@ -478,12 +463,12 @@ class pnlPlotter(wx.Panel):
 
             # search throughout items
             for strItemName in self.parent.dictTlmItemAttr:
-                # skip
                 if self.parent.dictTlmItemAttr[strItemName]['plot #'] != i:     continue
                 
                 dict_tmp['item']        = strItemName
                 dict_tmp['unit']        = str(self.parent.dictTlmItemAttr[strItemName]['unit'])
-                dict_tmp['y_label']     = dict_tmp['item'] + ' [' + dict_tmp['unit'] + ']'
+                dict_tmp['y_label']     =      dict_tmp['item'] + ' [' + dict_tmp['unit'] + ']'  if dict_tmp['unit'] != 'nan' \
+                                          else dict_tmp['item']
                 dict_tmp['y_min']       = float(self.parent.dictTlmItemAttr[strItemName]['y_min'])
                 dict_tmp['y_max']       = float(self.parent.dictTlmItemAttr[strItemName]['y_max'])
                 dict_tmp['alart_lim_l'] = float(self.parent.dictTlmItemAttr[strItemName]['alert_lim_l'])
@@ -494,16 +479,25 @@ class pnlPlotter(wx.Panel):
             self.dictPlotterAttr[i] = dict_tmp
 
 
-    # Configure appearance for plotters to display time histories
     def configure(self):
-        # initialize data set for plot
-        self.x_series = np.empty(0)
-        self.y_series = np.empty(0)
         
-        # generate empty matplotlib Fugure
-        dpi = matplotlib.rcParams['figure.dpi']
-        w_window, h_window = self.parent.GetClientSize()
+        #
+        #   Configure Matplotlib Figure
+        #
 
+        plt.style.use('dark_background')
+
+        # subplot margins
+        mpl.rcParams['figure.subplot.bottom'] = 0.07    # Bottom
+        mpl.rcParams['figure.subplot.top']    = 0.99    # Top
+        mpl.rcParams['figure.subplot.left']   = 0.15    # Left
+        mpl.rcParams['figure.subplot.right']  = 0.97    # Right
+        mpl.rcParams['figure.subplot.hspace'] = 0.05    # Height Margin between subplots
+
+        # generate empty matplotlib Fugure
+        w_window, h_window = self.parent.GetClientSize()
+        dpi = mpl.rcParams['figure.dpi']
+        
         h_fig = 1.00 * h_window * 0.97 / float(dpi)
         w_fig = 0.65 * h_window * 0.97 / float(dpi)
 
@@ -513,6 +507,10 @@ class pnlPlotter(wx.Panel):
         
         # register Figure with matplotlib Canvas
         self.canvas = FigureCanvasWxAgg(self, wx.ID_ANY, self.fig)
+
+        # initialize data set for plot
+        self.x_series = np.empty(0)
+        self.y_series = np.empty(0)
 
         ### prepare axes
         # - generate subplots containing axes in Figure
@@ -559,6 +557,7 @@ class pnlController(wx.Panel):
 
         self.layoutPane()
 
+
         #
         #   bind Events
         #
@@ -584,13 +583,14 @@ class pnlController(wx.Panel):
 
     def layoutPane(self):
 
-        # "Window" hierarchy
-        # Pane - Sizer: lytPane
-        #           + Record Button
-        #           + Reset Button
+        '''
+        "Window" hierarchy
+        Pane - Sizer: lytPane
+                  + Record Button
+                  + Reset Button
+        '''
 
-
-        # Pane (Panel)
+        ''' Pane (Panel) '''
         #   parent  : Frame
         #   chidren : Record Button, Reset Button
         ###
@@ -604,7 +604,7 @@ class pnlController(wx.Panel):
         # - set a Sizer to the Window
         self.SetSizer(lytPane)
 
-        # Record Button (ToggleButton)
+        ''' Record Button (ToggleButton) '''
         #   parent   : Pane
         #   children : N/A
         ###
@@ -616,7 +616,7 @@ class pnlController(wx.Panel):
         # - add the Window to the parent Sizer
         lytPane.Add(self.tbtnRecord, proportion=0, flag=wx.EXPAND)
 
-        # Reset Button (Button)
+        ''' Reset Button (Button) '''
         #   parent   : Pane
         #   children : N/A
         ###
@@ -764,16 +764,17 @@ class pnlDigitalIndicator(wx.Panel):
     # Lay out Pane
     def layoutPane(self):
 
-        # "Window" hierarchy
-        # Pane - Sizer: lytPane
-        #         + sboxIndGroup1 - Sizer: sboxSizer
-        #         |                   + pnlIndGroup - Sizer: lytIndGroup
-        #         |                                       + pnlIndPair1 - Sizer: lytIndPair
-        #         |                                       |                   + sbtnLabel
-        #         |                                       |                   + stxtIndicator
-        #         |                                       + pnlIndPair2 ...
-        #         + sboxIndGroup2 ...
-
+        '''
+        "Window" hierarchy
+        Pane - Sizer: lytPane
+                + sboxIndGroup1 - Sizer: sboxSizer
+                |                   + pnlIndGroup - Sizer: lytIndGroup
+                |                                       + pnlIndPair1 - Sizer: lytIndPair
+                |                                       |                   + sbtnLabel
+                |                                       |                   + stxtIndicator
+                |                                       + pnlIndPair2 ...
+                + sboxIndGroup2 ...
+        '''
 
         self.sboxIndGroup = []      
         self.sboxSizer = []
@@ -787,7 +788,7 @@ class pnlDigitalIndicator(wx.Panel):
         self.tbtnLabel = []
         self.stxtIndicator = []
 
-        # Pane (Panel)
+        ''' Pane (Panel) '''
         #   parent  : Frame
         #   chidren : sboxIndGroups
         ###
@@ -807,7 +808,7 @@ class pnlDigitalIndicator(wx.Panel):
             rows = self.dictGroupAttr[strGroupName]['rows']
 
 
-            # sboxIndGroup (StaticBox), as an envelope of an Indicator Group
+            ''' sboxIndGroup (StaticBox), as an envelope of an Indicator Group '''
             #   parent   : Pane
             #   children : 1 Indicator Group
             ###
@@ -824,7 +825,7 @@ class pnlDigitalIndicator(wx.Panel):
             lytPane.Add(self.sboxSizer[-1], proportion=rows, flag=wx.EXPAND)
 
 
-            # Indicator Group (Panel)
+            ''' Indicator Group (Panel) '''
             #   parent   : StaticBox
             #   children : Indicator Pairs
             ###
@@ -848,7 +849,7 @@ class pnlDigitalIndicator(wx.Panel):
                     self.lytIndGroup[-1].AddStretchSpacer()
                     continue
                 
-                # Indicator Pair (Panel)
+                ''' Indicator Pair (Panel) '''
                 #   parent   : Indicator Group
                 #   children : Label & Digital Indicator
                 ###
@@ -862,7 +863,7 @@ class pnlDigitalIndicator(wx.Panel):
                 self.pnlIndPair[-1].SetSizer(self.lytIndPair[-1])
 
 
-                # Item Label (ToggleButton) 
+                ''' Item Label (ToggleButton)  '''
                 #   parent   : Indicator Pair
                 #   children : N/A
                 ###
@@ -879,7 +880,7 @@ class pnlDigitalIndicator(wx.Panel):
                 self.lytIndPair[-1].Add(self.tbtnLabel[-1], proportion=1, flag=wx.EXPAND)
 
 
-                # Digital Indicator (StaticText)
+                ''' Digital Indicator (StaticText) '''
                 #   parent   : Indicator Pair
                 #   children : N/A
                 ###

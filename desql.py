@@ -92,12 +92,27 @@ def gui_handler(g_state, g_lval, q_msg_smt, q_msg_pcm):
 #   Main
 #
 if __name__ == "__main__":
+    
+    #
+    #   Define variables shared globally
+    #
+    g_state = { 'smt': {'Tlm_Server_Is_Active': False, 'Data_Save_Is_Active': False, 'F_Quit_Data_Handler': False}, 
+                'pcm': {'Tlm_Server_Is_Active': False, 'Data_Save_Is_Active': False, 'F_Quit_Data_Handler': False},
+                'last_error': 0 }
+    g_lval = {  'smt': {}, 
+                'pcm': {}   }
+
+
+    #
+    #   Initialize
+    #
+    
     mp.freeze_support()                     # for generation of executable on Windows
     mp.set_start_method('spawn', True)      
     
-    if len(sys.argv) == 2:
+    try:
         mode = sys.argv[1]
-    else:
+    except:
         mode = None
 
     if mode == 'debug':
@@ -105,22 +120,19 @@ if __name__ == "__main__":
         sp_smt = subprocess.Popen(['python', './tlmsvsim.py', 'smt'], stdout=subprocess.DEVNULL)
         sp_pcm = subprocess.Popen(['python', './tlmsvsim.py', 'pcm'], stdout=subprocess.DEVNULL)
 
-    ### define
-    g_state = { 'smt': {'Tlm_Server_Is_Active': False, 'Data_Save_Is_Active': False, 'F_Quit_Data_Handler': False}, 
-                'pcm': {'Tlm_Server_Is_Active': False, 'Data_Save_Is_Active': False, 'F_Quit_Data_Handler': False},
-                'last_error': 0 }
-    g_lval = {  'smt': {}, 
-                'pcm': {}   }
-
     # generate FIFO queues for inter-process communication
     # - control message
     q_msg_smt = mp.JoinableQueue()          # From GUI To SMT Server
-    q_msg_pcm = mp.JoinableQueue()          # From GUI To SMT Server
+    q_msg_pcm = mp.JoinableQueue()          # From GUI To PCM Server
     # - datagram
     q_dgram_smt = mp.JoinableQueue()        # From SMT Server To SMT Data Handler
-    q_dgram_pcm = mp.JoinableQueue()        # From PCM Server To SMT Data Handler
+    q_dgram_pcm = mp.JoinableQueue()        # From PCM Server To PCM Data Handler
 
-    ### Launch handlers
+
+    #
+    #   Launch handlers
+    #
+
     # data handler in other threads concurrently <NON-BLOCKING>
     executor = concurrent.futures.ThreadPoolExecutor()
     future_smt = executor.submit(data_handler_wrapper, 'smt', g_state, g_lval, q_dgram_smt)
@@ -137,22 +149,23 @@ if __name__ == "__main__":
     # GUI handler in the main process/thread <BLOCKING>
     gui_handler(g_state, g_lval, q_msg_smt, q_msg_pcm)
 
-    ### Wait for GUI to Be Closed ###
+    ### Wait for GUI to be closed ###
 
-    # wait for UDP communication handler
-    p_smt.join()    
+
+    #
+    #   Normal termination processing
+    #
+
+    # wait for UDP communication handlers to be closed
+    p_smt.join()
     p_pcm.join()
-
     print('MAIN: Processes joined.')
 
-    # wait for futures
+    # wait for data handlers to be closed
     while True:
-        if future_smt.done() and future_pcm.done(): break
+        if future_smt.done() and future_pcm.done():     break
 
-    # quit data handlers
     executor.shutdown(wait=True, cancel_futures=False)
-
-    # for debug
     print('MAIN: Executor shut down.')
 
     if mode == 'debug':

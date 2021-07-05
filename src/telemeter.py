@@ -1,7 +1,7 @@
 ### Standard libraries
 import asyncio
 import queue
-import socket
+# import socket
 
 ### Third-party libraries
 # n/a
@@ -40,7 +40,7 @@ class TelemeterHandler :
                                     protocol_factory=(lambda: DatagramServerProtocol(self.tlm_type, self.q_dgram)),
                                     local_addr=(self.HOST,self.PORT))
 
-        # block until GUI task done
+        ### block until GUI task done ###
         while True:
             # poll quitting
             try:
@@ -60,7 +60,6 @@ class TelemeterHandler :
         transport.close()
         # transport.abort()
 
-        # 
         self.q_msg.task_done()
 
         print(f'TLM {self.tlm_type}: Closing tlm handler...')
