@@ -38,10 +38,12 @@ class DataHandler :
     FPATH_CONFIG = './config_tlm.xlsx'
 
     # output file pathes
-    __FPATH_LS_DATA = './data_***.csv'                  # low-speed data
+    # __FPATH_LS_DATA = './data_***.csv'                  # low-speed data
     __FNAME_LS_DATA = 'data_***.csv'
-    __FPATH_HS_DATA = './high_speed_data_****.csv'      # high-speed data
-    FPATH_ERR = './error_history.csv'                   # error history
+    # __FPATH_HS_DATA = './high_speed_data_****.csv'      # high-speed data
+    __FNAME_HS_DATA = 'high_speed_data_****.csv'        # high-speed data
+    __FPATH_ERR = './error_history.csv'                 # error history
+    __FNAME_ERR = './error_history.csv'                 # error history
 
 
     def __init__(self, tlm_type, g_state, g_lval, q_dgram) -> None:
@@ -80,11 +82,11 @@ class DataHandler :
 
         # - file writer
         dt_now = datetime.datetime.now()
-        str_dt = dt_now.strftime('%Y%m%d%H%S')
-        fdir = './dat/' + str_dt
-        print(fdir)
-        pathlib.Path(fdir).mkdir(parents=True,exist_ok=True)
-        self.fpath_ls_data = fdir + '/' + self.__FNAME_LS_DATA.replace('***', self.tlm_type)
+        str_dt = dt_now.strftime('%Y%m%d%H%M%S')
+        self.fdir = './dat/' + str_dt
+        # print(self.fdir)
+        pathlib.Path(self.fdir).mkdir(parents=True,exist_ok=True)
+        self.fpath_ls_data = self.fdir + '/' + self.__FNAME_LS_DATA.replace('***', self.tlm_type)
         # self.fpath_ls_data = self.__FPATH_LS_DATA.replace('***', self.tlm_type)
 
         df_mf = pd.DataFrame(index=[], columns=self.dictTlmItemAttr.keys())
@@ -204,7 +206,9 @@ class DataHandler :
 
                 # error history
                 if err_history != []:
-                    self.q_write_data.put_nowait( (self.FPATH_ERR, err_history) )
+                    fpath_err = self.fdir + '/' + self.FNAME_ERR
+                    self.q_write_data.put_nowait( (fpath_err, err_history) )
+                    # self.q_write_data.put_nowait( (self.FPATH_ERR, err_history) )
 
                 # print(f'TLM {self.tlm_type}:  Data Save Is Active!')    # for debug
 
@@ -400,7 +404,9 @@ class DataHandler :
                             and (w013 == b'\x00\x01' or w013 == b'\x00\x02' or w013 == b'\x00\x03'):
 
                             self.high_speed_data_is_avtive = True
-                            self.fpath_hs_data = self.__FPATH_HS_DATA.replace('****', '{:0=4}'.format(self.idx_high_speed_data))
+                            # self.fpath_hs_data = self.__FPATH_HS_DATA.replace('****', '{:0=4}'.format(self.idx_high_speed_data))
+                            self.fpath_hs_data =  self.fdir + '/' \
+                                                + self.__FNAME_HS_DATA.replace('****', '{:0=4}'.format(self.idx_high_speed_data))
                             print('TLM DCD: Start of high-speed data is detected!')
 
                             ### file header
