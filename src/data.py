@@ -2,7 +2,9 @@
 import asyncio
 import copy
 import csv
+import datetime
 import math
+import pathlib
 import queue
 import sys
 
@@ -36,7 +38,8 @@ class DataHandler :
     FPATH_CONFIG = './config_tlm.xlsx'
 
     # output file pathes
-    __FPATH_LS_DATA = './data_***.csv'                  # low-speed data    
+    __FPATH_LS_DATA = './data_***.csv'                  # low-speed data
+    __FNAME_LS_DATA = 'data_***.csv'
     __FPATH_HS_DATA = './high_speed_data_****.csv'      # high-speed data
     FPATH_ERR = './error_history.csv'                   # error history
 
@@ -76,7 +79,14 @@ class DataHandler :
         self.last_error = 0
 
         # - file writer
-        self.fpath_ls_data = self.__FPATH_LS_DATA.replace('***', self.tlm_type)
+        dt_now = datetime.datetime.now()
+        str_dt = dt_now.strftime('%Y%m%d%H%S')
+        fdir = './dat/' + str_dt
+        print(fdir)
+        pathlib.Path(fdir).mkdir(parents=True,exist_ok=True)
+        self.fpath_ls_data = fdir + '/' + self.__FNAME_LS_DATA.replace('***', self.tlm_type)
+        # self.fpath_ls_data = self.__FPATH_LS_DATA.replace('***', self.tlm_type)
+
         df_mf = pd.DataFrame(index=[], columns=self.dictTlmItemAttr.keys())
         df_mf.to_csv(self.fpath_ls_data, mode='w')
 
