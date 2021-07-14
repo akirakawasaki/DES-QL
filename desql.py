@@ -116,9 +116,14 @@ if __name__ == "__main__":
         mode = None
 
     if mode == 'debug':
+        try:
+            start_time = sys.argv[2]
+        except:
+            start_time = str(0.0)
+        
         print('----- DEBUG MODE -----')
-        sp_smt = subprocess.Popen(['python', './tlmsvsim.py', 'smt'], stdout=subprocess.DEVNULL)
-        sp_pcm = subprocess.Popen(['python', './tlmsvsim.py', 'pcm'], stdout=subprocess.DEVNULL)
+        sp_smt = subprocess.Popen(['python', './tlmsvsim.py', 'smt', start_time], stdout=subprocess.DEVNULL)
+        sp_pcm = subprocess.Popen(['python', './tlmsvsim.py', 'pcm', start_time], stdout=subprocess.DEVNULL)
 
     # generate FIFO queues for inter-process communication
     # - control message
