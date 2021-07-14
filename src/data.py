@@ -178,7 +178,7 @@ class DataHandler :
             except queue.Empty:
                 if Decoder_Task_Is_Canceled == True:    break
 
-                await asyncio.sleep(0.0005)
+                await asyncio.sleep(0.0004)
                 continue
 
             ### decode datagram
