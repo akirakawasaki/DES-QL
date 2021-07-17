@@ -46,8 +46,8 @@ def data_handler_wrapper(tlm_type, g_state, g_lval, q_dgram):
     
     tlm = data.DataHandler(tlm_type, g_state, g_lval, q_dgram)
 
-    asyncio.run( tlm.data_handler() )
-    # asyncio.run( tlm.data_handler(), debug=True )      # for debug
+    # asyncio.run( tlm.data_handler() )
+    asyncio.run( tlm.data_handler(), debug=True )      # for debug
 
     print(f'MAIN: {tlm_type} Data Handler Closed.')
 
@@ -122,6 +122,7 @@ if __name__ == "__main__":
             start_time = str(0.0)
         
         print('----- DEBUG MODE -----')
+        # sp_pcm = subprocess.Popen(['python', './tlmsvsim.py', 'pcm', start_time], stdout=subprocess.DEVNULL)
         sp_smt = subprocess.Popen(['python', './tlmsvsim.py', 'smt', start_time], stdout=subprocess.DEVNULL)
         sp_pcm = subprocess.Popen(['python', './tlmsvsim.py', 'pcm', start_time], stdout=subprocess.DEVNULL)
 

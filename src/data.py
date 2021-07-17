@@ -39,11 +39,11 @@ class DataHandler :
 
     # output file pathes
     # __FPATH_LS_DATA = './data_***.csv'                  # low-speed data
-    __FNAME_LS_DATA = 'data_***.csv'
+    __FNAME_LS_DATA = 'data_***.csv'                    # low-speed data
     # __FPATH_HS_DATA = './high_speed_data_****.csv'      # high-speed data
     __FNAME_HS_DATA = 'high_speed_data_****.csv'        # high-speed data
-    __FPATH_ERR = './error_history.csv'                 # error history
-    __FNAME_ERR = './error_history.csv'                 # error history
+    # __FPATH_ERR = './error_history.csv'                 # error history
+    __FNAME_ERR = 'error_history.csv'                   # error history
 
 
     def __init__(self, tlm_type, g_state, g_lval, q_dgram) -> None:
@@ -177,9 +177,12 @@ class DataHandler :
                 data = self.q_dgram.get_nowait()
             except queue.Empty:
                 if Decoder_Task_Is_Canceled == True:    break
-
+                
                 await asyncio.sleep(0.0004)
                 continue
+
+            # handdle exception
+            if len(data) != self.BUFSIZE:   print(f'DAT {self.tlm_type}: data length = {len(data)}')
 
             ### decode datagram
             dict_mf, hs_data, err_history = self.decode(data)
@@ -187,7 +190,7 @@ class DataHandler :
             ### output decoded data
             # - To Files
             if self.g_state[self.tlm_type]['Data_Save_Is_Active'] == True:
-                # low-speed data 
+                # low-speed data
                 if self.iLine % 1 == 0:
                 # if self.iLine % 10 == 0:
                     write_data = [  list(dict_mf[0].values()),
@@ -206,7 +209,7 @@ class DataHandler :
 
                 # error history
                 if err_history != []:
-                    fpath_err = self.fdir + '/' + self.FNAME_ERR
+                    fpath_err = self.fdir + '/' + self.__FNAME_ERR
                     self.q_write_data.put_nowait( (fpath_err, err_history) )
                     # self.q_write_data.put_nowait( (self.FPATH_ERR, err_history) )
 
@@ -311,6 +314,13 @@ class DataHandler :
 
                 byte_length = self.BPW * int(self.dictTlmItemAttr[strItem]['word len'])
                 byte_string = data[byte_idx:byte_idx+byte_length]
+
+                # try:
+                #     byte_string = data[byte_idx:byte_idx+byte_length]
+                # except IndexError:
+                #     print(f'DAT {self.tlm_type}: data IndexError')
+                #     byte_string = bytes(byte_length)
+
 
                 ''' Decoding rules '''      ### To Be Refactored ###
                 

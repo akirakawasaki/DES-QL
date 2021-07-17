@@ -77,6 +77,8 @@ class DatagramServerProtocol:
 
         print(f'TLM {self.tlm_type}: Starting datagram listner...')
 
+        self.N = 0
+
 
     # Event handler
     def connection_made(self, transport):
@@ -86,10 +88,14 @@ class DatagramServerProtocol:
 
 
     # Event handler
-    def datagram_received(self, data, addr):
-        # print(f'TLM {self.tlm_type}: Received a datagram')
-        
+    def datagram_received(self, data, addr):        
         self.q_dgram.put_nowait(data)
+
+        self.N += 1
+        if self.N % 100 == 0:
+            print(f'TLM {self.tlm_type}: Received a datagram')
+            self.N = 0
+
 
 
     # Event handler
