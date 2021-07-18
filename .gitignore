@@ -1,7 +1,4 @@
 .DS_Store
-dat-in/pcm.bin
-dat-in/smt.bin
-dat-in/pcm_old.bin
-dat-in/smt_old.bin
 /src/__pycache__/
+/dat-in/
 /dat/
