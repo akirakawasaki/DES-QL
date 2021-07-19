@@ -46,8 +46,8 @@ def data_handler_wrapper(tlm_type, g_state, g_lval, q_dgram):
     
     tlm = data.DataHandler(tlm_type, g_state, g_lval, q_dgram)
 
-    # asyncio.run( tlm.data_handler() )
-    asyncio.run( tlm.data_handler(), debug=True )      # for debug
+    asyncio.run( tlm.data_handler() )
+    # asyncio.run( tlm.data_handler(), debug=True )      # for debug
 
     print(f'MAIN: {tlm_type} Data Handler Closed.')
 
