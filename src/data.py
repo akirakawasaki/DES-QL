@@ -379,6 +379,7 @@ class DataHandler :
 
                     continue
 
+
                 ### High-speed data    ### T.B.REFAC. ###
                 # - header
                 if self.dictTlmItemAttr[strItem]['type'] == 'data hd':
@@ -504,7 +505,7 @@ class DataHandler :
 
                 # - payload (first half)
                 elif self.dictTlmItemAttr[strItem]['type'] == 'data pl1':
-                    ###
+                    """ ###
                     # - W018
                     byte_idx_offset = 18
                     byte_length = 2
@@ -538,13 +539,13 @@ class DataHandler :
                                                     * 2**(-fractional_bit_length)
                         #####
                         
-                        hs_data.append([format(gse_time,'.3f'), decoded_value])
+                        hs_data.append([format(gse_time,'.3f'), decoded_value]) """
 
-                    continue
+                    continue 
 
                 # - payload (latter half)
                 elif self.dictTlmItemAttr[strItem]['type'] == 'data pl2':
-                    ###
+                    """ ###
                     # - W036
                     byte_idx_offset = 0
                     byte_length = 2
@@ -577,9 +578,60 @@ class DataHandler :
                                                     * 2**(-fractional_bit_length)
                         #####
                         
+                        hs_data.append([format(gse_time,'.3f'), decoded_value]) """
+
+                    continue 
+
+
+                ### PCB data
+                # - PCB data
+                if self.dictTlmItemAttr[strItem]['type'] == 'pcb': 
+                    # skip below when ***
+                    if iFrame % self.dictTlmItemAttr[strItem]['sub com mod'] != self.dictTlmItemAttr[strItem]['sub com res']:
+                        continue
+
+                    self.fpath_hs_data =  self.fdir + '/' \
+                                        + self.__FNAME_HS_DATA.replace('****', 'pcb')
+
+                    ###
+                    # - byte_string
+                    byte_idx_offset = 0
+                    byte_length = 2
+                    # byte_length = self.BPW * int(self.dictTlmItemAttr[strItem]['word len'])
+                    byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]
+                    
+                    decoded_value = byte_string
+                    dict_data_row.update({strItem:decoded_value})
+                    ###
+
+                    # output history to an external file
+                    for j in range(int(self.dictTlmItemAttr[strItem]['word len'])):
+                        # decode 1 word
+                        byte_idx_offset = self.BPW * j
+                        byte_length = 2
+                        byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]                            
+                        
+                        #####
+                        signed = self.dictTlmItemAttr[strItem]['signed']
+                        integer_bit_length = int(self.dictTlmItemAttr[strItem]['integer bit len'])    # includes a sign bit if any
+                        a_coeff = self.dictTlmItemAttr[strItem]['a coeff']
+                        b_coeff = self.dictTlmItemAttr[strItem]['b coeff']
+
+                        total_bit_length = 8 * byte_length
+                        fractional_bit_length = total_bit_length - integer_bit_length
+
+                        decoded_value =  b_coeff \
+                                       + a_coeff * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
+                                                    * 2**(-fractional_bit_length)
+                        #####
+                        
                         hs_data.append([format(gse_time,'.3f'), decoded_value])
 
                     continue
+
+                else :
+                    pass
+
 
                 ### Ordinary items
                 # decoded_value = self.get_physical_value(self.dictTlmItemAttr[strItem], data, byte_idx)
@@ -602,6 +654,7 @@ class DataHandler :
 
                     # get temperature by converting thermoelectric voltage
                     Ttc = self.uv2k(Vtc + Vcjc - Vaz, 'K')
+                    # Ttc = self.uv2k(Vtc, 'K')
 
                     # decoded_value = Ttc             # in Kelvin
                     decoded_value = Ttc - 273.15    # in deg-C

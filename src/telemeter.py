@@ -97,7 +97,6 @@ class DatagramServerProtocol:
             self.N = 0
 
 
-
     # Event handler
     def connection_lost(self, exec):
         print(f'Disconnected from {self.tlm_type}') 
