@@ -25,9 +25,9 @@ def telemeter_handler_wrapper(tlm_type, q_msg, q_dgram):
     print(f'MAIN: Invoking UDP Communication Handler Wrapper for {tlm_type}...')
 
     # datagram server
-    # HOST = '172.20.140.255'                                # mac
+    HOST = '172.20.140.255'                                # mac
     # HOST = '192.168.11.255'                                # mac (Shiraoi)
-    HOST = socket.gethostbyname(socket.gethostname())      # windows / mac(debug)
+    # HOST = socket.gethostbyname(socket.gethostname())      # windows / mac(debug)
     PORT =      60142 if (tlm_type == 'smt') \
            else 60140
 
