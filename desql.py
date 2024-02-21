@@ -95,7 +95,7 @@ def gui_handler(g_state, g_lval, q_msg_smt, q_msg_pcm):
 if __name__ == "__main__":
     
     #
-    #   Define variables shared globally
+    #   Define grobally shared variables
     #
     g_state = { 'smt': {'Tlm_Server_Is_Active': False, 'Data_Save_Is_Active': False, 'F_Quit_Data_Handler': False}, 
                 'pcm': {'Tlm_Server_Is_Active': False, 'Data_Save_Is_Active': False, 'F_Quit_Data_Handler': False},
@@ -126,6 +126,7 @@ if __name__ == "__main__":
         # sp_pcm = subprocess.Popen(['python', './tlmsvsim.py', 'pcm', start_time], stdout=subprocess.DEVNULL)
         sp_smt = subprocess.Popen(['python', './tlmsvsim.py', 'smt', start_time], stdout=subprocess.DEVNULL)
         sp_pcm = subprocess.Popen(['python', './tlmsvsim.py', 'pcm', start_time], stdout=subprocess.DEVNULL)
+
 
     # generate FIFO queues for inter-process communication
     # - control message

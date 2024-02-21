@@ -346,15 +346,17 @@ class DataHandler :
                     # byte_string = data[byte_idx:byte_idx+byte_length]
 
                     ###
-                    decoded_value =  (byte_string[1] & 0x0F) * 10  * 3600  \
-                                   + (byte_string[2] >> 4  ) * 1   * 3600  \
-                                   + (byte_string[2] & 0x0F) * 10  * 60    \
-                                   + (byte_string[3] >> 4  ) * 1   * 60    \
-                                   + (byte_string[3] & 0x0F) * 10          \
-                                   + (byte_string[4] >> 4  ) * 1           \
-                                   + (byte_string[4] & 0x0F) * 100 * 0.001 \
-                                   + (byte_string[5] >> 4  ) * 10  * 0.001 \
-                                   + (byte_string[5] & 0x0F) * 1   * 0.001
+                    decoded_value =  (byte_string[1] & 0x0F) * 10  * 3600     \
+                                   + (byte_string[2] >> 4  ) * 1   * 3600     \
+                                   + (byte_string[2] & 0x0F) * 10  * 60       \
+                                   + (byte_string[3] >> 4  ) * 1   * 60       \
+                                   + (byte_string[3] & 0x0F) * 10             \
+                                   + (byte_string[4] >> 4  ) * 1              \
+                                   + (byte_string[4] & 0x0F) * 100 * 0.001    \
+                                   + (byte_string[5] >> 4  ) * 10  * 0.001    \
+                                   + (byte_string[5] & 0x0F) * 1   * 0.001    \
+                                   + (byte_string[6] >> 4  ) * 100 * 0.000001 \
+                                   + (byte_string[6] & 0x0F) * 10  * 0.000001
 
                     gse_time = decoded_value
                     ###
@@ -582,10 +584,10 @@ class DataHandler :
 
                     continue 
 
-
                 ### PCB data
                 # - PCB data
                 if self.dictTlmItemAttr[strItem]['type'] == 'pcb': 
+                    
                     # skip below when ***
                     if iFrame % self.dictTlmItemAttr[strItem]['sub com mod'] != self.dictTlmItemAttr[strItem]['sub com res']:
                         continue
@@ -625,7 +627,10 @@ class DataHandler :
                                                     * 2**(-fractional_bit_length)
                         #####
                         
-                        hs_data.append([format(gse_time,'.3f'), decoded_value])
+                        pcb_time = gse_time + j * 19.53e-6
+                        # hs_data.append([format(pcb_time,'.6f'), decoded_value])
+
+                        hs_data.append([format(gse_time,'.6f'), decoded_value])
 
                     continue
 
