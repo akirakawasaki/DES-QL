@@ -384,9 +384,12 @@ class DataHandler :
                 else :
                     pass
 
+
                 ### High-speed data    ### T.B.REFAC. ###
                 # - header
                 if self.dictTlmItemAttr[strItem]['type'] == 'data hd':
+                    pass
+
                     # ###
                     # # - W009 + W010: start of data (SOD)
                     # byte_idx_offset = 0
@@ -505,10 +508,12 @@ class DataHandler :
                             self.idx_high_speed_data += 1
                             print('TLM DCD: End of high-speed data detected!') """
 
-                    continue
+                    # continue
 
                 # - payload (first half)
                 elif self.dictTlmItemAttr[strItem]['type'] == 'data pl1':
+                    pass
+
                     """ ###
                     # - W018
                     byte_idx_offset = 18
@@ -545,10 +550,12 @@ class DataHandler :
                         
                         hs_data.append([format(gse_time,'.3f'), decoded_value]) """
 
-                    continue 
+                    # continue 
 
                 # - payload (latter half)
                 elif self.dictTlmItemAttr[strItem]['type'] == 'data pl2':
+                    pass
+
                     """ ###
                     # - W036
                     byte_idx_offset = 0
@@ -584,7 +591,8 @@ class DataHandler :
                         
                         hs_data.append([format(gse_time,'.3f'), decoded_value]) """
 
-                    continue 
+                    # continue 
+
 
                 ### PCB data
                 # - PCB data
@@ -640,9 +648,9 @@ class DataHandler :
                     pass
 
 
-                ### Photograph
-                # - header
-                if self.dictTlmItemAttr[strItem]['type'] == 'data hd':
+                ### Camera data
+                # - camera data
+                if self.dictTlmItemAttr[strItem]['type'] == 'cam':
                     
                     # - W006: Sens No
                     byte_idx_offset = 4
@@ -686,8 +694,6 @@ class DataHandler :
                             self.file_receiver_is_avtive = False
                             print('TLM DCD: End of high-speed data detected!')
 
-                # - payload
-                elif self.dictTlmItemAttr[strItem]['type'] == 'data pl1':
 
                     # skip below when high speed data is NOT active
                     if self.high_speed_data_is_avtive == False:     continue
@@ -783,9 +789,10 @@ class DataHandler :
                                                 
                         hs_data.append(byte_string)
 
-
                     continue
-
+                
+                else:
+                    pass
 
 
                 ### Ordinary items
