@@ -619,11 +619,11 @@ class DataHandler :
                     # print('TLM DCD: PCB data is detected!')
                     
                     # - W032 : frame counter
-                    byte_idx_dd = 2 * 32 + byte_idx_head
-                    byte_length = 2
-                    byte_string = data[byte_idx_dd:byte_idx_dd+byte_length]
+                    # byte_idx_dd = 2 * 32 + byte_idx_head
+                    # byte_length = 2
+                    # byte_string = data[byte_idx_dd:byte_idx_dd+byte_length]
 
-                    w032 = int.from_bytes(byte_string, byteorder='big', signed=signed)
+                    # w032 = int.from_bytes(byte_string, byteorder='big', signed=signed)
 
                     # if     (w032 % 8 == 0) and (strItem == 'PCB PL01'):
                     #     NN = 0
@@ -708,7 +708,7 @@ class DataHandler :
 
                     self.fpath_hs_data =  self.fdir + '/' \
                                     + self.__FNAME_HS_DATA.replace('****.csv', 'cam{:0=4}.jpg'.format(w013))
-
+                    
                     ###
                     # - byte_string
                     byte_idx_offset = 0
