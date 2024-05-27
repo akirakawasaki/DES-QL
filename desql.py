@@ -126,8 +126,10 @@ if __name__ == "__main__":
         
         print('----- DEBUG MODE -----')
         # sp_pcm = subprocess.Popen(['python', './tlmsvsim.py', 'pcm', start_time], stdout=subprocess.DEVNULL)
-        sp_smt = subprocess.Popen(['python', './tlmsvsim.py', 'smt', start_time], stdout=subprocess.DEVNULL)
-        sp_pcm = subprocess.Popen(['python', './tlmsvsim.py', 'pcm', start_time], stdout=subprocess.DEVNULL)
+        sp_smt = subprocess.Popen(['python', './tlmsvsim.py', 'smt', start_time], \
+                                        stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+        sp_pcm = subprocess.Popen(['python', './tlmsvsim.py', 'pcm', start_time], \
+                                        stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 
 
     # generate FIFO queues for inter-process communication

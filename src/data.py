@@ -607,8 +607,8 @@ class DataHandler :
 
                     # check sensor number
                     # - W006 : sensor number
-                    byte_idx_dd = 2 * 6 + byte_idx_head
-                    byte_length = 2
+                    byte_idx_dd = self.BPW * 6 + byte_idx_head
+                    byte_length = self.BPW
                     byte_string = data[byte_idx_dd:byte_idx_dd+byte_length]
 
                     w006 = byte_string
@@ -619,14 +619,15 @@ class DataHandler :
                     # print('TLM DCD: PCB data is detected!')
                     
                     # - W032 : frame counter
-                    # byte_idx_dd = 2 * 32 + byte_idx_head
-                    # byte_length = 2
+                    # byte_idx_dd = self.BPW * 32 + byte_idx_head
+                    # byte_length = self.BPW
                     # byte_string = data[byte_idx_dd:byte_idx_dd+byte_length]
 
-                    # w032 = int.from_bytes(byte_string, byteorder='big', signed=signed)
+                    # w032 = int.from_bytes(byte_string, byteorder='big', signed=False)
 
-                    # if     (w032 % 8 == 0) and (strItem == 'PCB PL01'):
-                    #     NN = 0
+                    # if (w032 % 8 == 0) and (strItem == 'PCB PL01'):
+                    if strItem == 'PCB PL01':
+                        NN = 0
 
                     self.fpath_hs_data =  self.fdir + '/' \
                                         + self.__FNAME_HS_DATA.replace('****', 'pcb')
@@ -663,12 +664,12 @@ class DataHandler :
                                                     * 2**(-fractional_bit_length)
                         #####
                         
-                        # pcb_time = gse_time + NN * 19.536e-6
-                        # NN += 1
+                        pcb_time = gse_time + NN * 19.536e-6
+                        NN += 1
 
-                        # hs_data.append([format(pcb_time,'.6f'), decoded_value])
+                        hs_data.append([format(pcb_time,'.6f'), decoded_value])
 
-                        hs_data.append([format(gse_time,'.6f'), decoded_value])
+                        # hs_data.append([format(gse_time,'.6f'), decoded_value])
 
                     continue
 
