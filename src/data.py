@@ -609,7 +609,7 @@ class DataHandler :
                 ### PCB data
                 # - PCB data
                 if self.dictTlmItemAttr[strItem]['type'] == 'pcb': 
-
+                    
                     # skip below when ***
                     # if iFrame % self.dictTlmItemAttr[strItem]['sub com mod'] != self.dictTlmItemAttr[strItem]['sub com res']:
                     #     continue
@@ -697,16 +697,26 @@ class DataHandler :
 
                     w014 = byte_string
 
-                    # skip when ***
-                    if w006 != b'\x00\x04':     continue
+                    # switch high_speed_data_is_active
+                    if self.file_receiver_is_avtive == False:
+                        
+                        # detect start of file when NOT ACTIVE
+                        if      (w006 == b'\x00\x04') \
+                            and (w014 == b'\x00\x01'):
 
-                    # print('TLM DCD: CAM data is detected!')
-                    if w014 == b'\x00\x01':     
-                        print('TLM DCD: CAM data is detected!')
-                        hs_data = bytearray()
+                            self.file_receiver_is_avtive = True
+                            self.fpath_hs_data =  self.fdir + '/' \
+                                                + self.__FNAME_HS_DATA.replace('****', '{:0=4}'.format(w013))
+                            print('TLM DCD: Start of high-speed data is detected!')
 
-                    self.fpath_hs_data =  self.fdir + '/' \
-                                        + self.__FNAME_HS_DATA.replace('****.csv', 'cam'+'{:0=4}'.format(w013)+'.jpg')
+                    else:
+                        
+                        # detect end of high-speed data when ACTIVE
+                        if      (w006 == b'\x00\x04') \
+                            and (w014 == b'\x04\xc4'):
+
+                            self.file_receiver_is_avtive = False
+                            print('TLM DCD: End of high-speed data detected!')
 
 
                     ###
@@ -721,12 +731,70 @@ class DataHandler :
 
 
                     # output history to an external file
-                    byte_idx_offset = 0
-                    byte_length = int(self.dictTlmItemAttr[strItem]['word len'])
-                    byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]
+                    for j in range(word_len):
+                        # decode 1 word
+                        byte_idx_offset = self.BPW * j
+                        byte_length = 2
+                        byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]                            
+                                                
+                        hs_data.append(byte_string)
 
-                    hs_data = hs_data + bytearray(byte_string)
+                    ###
+                    byte_idx = 34
+                    word_len = 6
 
+                    # output history to an external file
+                    for j in range(word_len):
+                        # decode 1 word
+                        byte_idx_offset = self.BPW * j
+                        byte_length = 2
+                        byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]                            
+                                                
+                        hs_data.append(byte_string)
+
+                    ###
+                    byte_idx = 41
+                    word_len = 7
+
+                    # output history to an external file
+                    for j in range(word_len):
+                        # decode 1 word
+                        byte_idx_offset = self.BPW * j
+                        byte_length = 2
+                        byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]                            
+                                                
+                        hs_data.append(byte_string)
+
+                    ###
+                    byte_idx = 49
+                    word_len = 7
+
+                    # output history to an external file
+                    for j in range(word_len):
+                        # decode 1 word
+                        byte_idx_offset = self.BPW * j
+                        byte_length = 2
+                        byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]                            
+                                                
+                        hs_data.append(byte_string)
+
+                    ###
+                    byte_idx = 57
+                    word_len = 7
+
+                    # output history to an external file
+                    for j in range(word_len):
+                        # decode 1 word
+                        byte_idx_offset = self.BPW * j
+                        byte_length = 2
+                        byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]                            
+                                                
+                        hs_data.append(byte_string)
+
+                    continue
+                
+                else:
+                    pass
 
 
                 ### Ordinary items
