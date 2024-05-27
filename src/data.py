@@ -682,6 +682,8 @@ class DataHandler :
                     byte_length = 2
                     byte_string = data[byte_idx_dd:byte_idx_dd+byte_length]
                     
+                    w006 = byte_string 
+
                     # skip below when ***
                     if w006 != b'\x00\x04':     continue
 
@@ -698,9 +700,10 @@ class DataHandler :
                     byte_length = 2
                     byte_string = data[byte_idx_dd:byte_idx_dd+byte_length]
 
-                    w014 = int.from_bytes(byte_string, byteorder='big', signed=signed)
+                    w014 = byte_string
                     
-                    if w014 == 1:
+                    if w014 == b'\x00\x01':
+                        print('TLM DCD: CAM data is detected!')
                         hs_data = bytearray()
 
                     self.fpath_hs_data =  self.fdir + '/' \
@@ -717,6 +720,7 @@ class DataHandler :
                     ###
 
                     # output history to an external file
+                    byte_idx_offset = 0
                     byte_length = self.BPW * int(self.dictTlmItemAttr[strItem]['word len'])
                     byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]                            
                                                 
