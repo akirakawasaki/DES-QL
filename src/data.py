@@ -717,7 +717,7 @@ class DataHandler :
                     ###
                     # - byte_string
                     byte_idx_offset = 0
-                    byte_length = 2
+                    byte_length = self.BPW
                     byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]
                     
                     decoded_value = byte_string
@@ -729,7 +729,7 @@ class DataHandler :
                     byte_length = self.BPW * int(self.dictTlmItemAttr[strItem]['word len'])
                     byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]                            
                                                 
-                    hs_data_data = bytearray(byte_string)
+                    hs_data_data.extend(bytearray(byte_string))
 
 
                     continue
