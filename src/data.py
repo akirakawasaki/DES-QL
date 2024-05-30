@@ -155,9 +155,10 @@ class DataHandler :
                 try:
                     with open(file_path, 'ab') as f:
                         f.write(write_data)
-                    print(f'DAT {self.tlm_type}: {file_path} saved!')
-                except:
-                    print(f'DAT {self.tlm_type}: {file_path} save failed!') 
+                    # print(f'DAT {self.tlm_type}: {file_path} saved!')
+                except Exception as e:
+                    print(f'DAT {self.tlm_type}: {file_path} saving failed!') 
+                    print(e)
                     print(write_data)
  
             self.q_write_data.task_done()
@@ -173,6 +174,9 @@ class DataHandler :
         print(f'DAT {self.tlm_type}: Starting data decoder...')
 
         Decoder_Task_Is_Canceled = False
+
+        # initialize file number for camera
+        self.i_cam_file = 0
 
         while True:
             # poll task cacellation
@@ -214,7 +218,8 @@ class DataHandler :
 
                 # high-speed data
                 if hs_data != []:
-                    self.q_write_data.put_nowait( (self.fpath_hs_data, hs_data) )
+                    for chunk in hs_data: 
+                        self.q_write_data.put_nowait( (chunk['fpath'], chunk['data']) )
 
                 # error history
                 if err_history != []:
@@ -297,10 +302,10 @@ class DataHandler :
         Vcjc = 0.0
         Vaz = 0.0
 
-        hs_data = []
         err_history = []
         
         dict_data_matrix = {}
+        hs_data = []
 
         # sweep frames in a major frame
         for iFrame in range(self.NUM_OF_FRAMES):
@@ -309,6 +314,8 @@ class DataHandler :
             # dict_data_row = dict.fromkeys(['Line#'] + self.listTlmItem, None)
 
             dict_data_row.update({'Line#':self.iLine})
+
+            hs_data_fpath = ''
 
             # byte index of the head of the frame (without header)
             byte_idx_head =   self.BPW * (self.LEN_HEADER + self.LEN_PAYLOAD) * iFrame \
@@ -603,8 +610,8 @@ class DataHandler :
 
                 ### PCB data
                 # - PCB data
-                if self.dictTlmItemAttr[strItem]['type'] == 'pcb': 
-
+                if self.dictTlmItemAttr[strItem]['type'] == 'pcb':  
+                    
                     # check sensor number
                     # - W006 : sensor number
                     byte_idx_dd = self.BPW * 6 + byte_idx_head
@@ -618,19 +625,11 @@ class DataHandler :
 
                     # print('TLM DCD: PCB data is detected!')
                     
-                    # - W032 : frame counter
-                    # byte_idx_dd = self.BPW * 32 + byte_idx_head
-                    # byte_length = self.BPW
-                    # byte_string = data[byte_idx_dd:byte_idx_dd+byte_length]
-
-                    # w032 = int.from_bytes(byte_string, byteorder='big', signed=False)
-
-                    # if (w032 % 8 == 0) and (strItem == 'PCB PL01'):
                     if strItem == 'PCB PL01':
-                        NN = 0
-
-                    self.fpath_hs_data =  self.fdir + '/' \
-                                        + self.__FNAME_HS_DATA.replace('****', 'pcb')
+                        hs_data_fpath =  self.fdir + '/' \
+                                       + self.__FNAME_HS_DATA.replace('****', 'pcb')
+                        hs_data_data = []
+                        i_datum = 0
 
                     ###
                     # - byte_string
@@ -652,22 +651,22 @@ class DataHandler :
                         
                         #####
                         signed = self.dictTlmItemAttr[strItem]['signed']
-                        integer_bit_length = int(self.dictTlmItemAttr[strItem]['integer bit len'])    # includes a sign bit if any
+                        decoded_value = int.from_bytes(byte_string, byteorder='big', signed=signed)
+                                                
                         a_coeff = self.dictTlmItemAttr[strItem]['a coeff']
                         b_coeff = self.dictTlmItemAttr[strItem]['b coeff']
-
+                        
                         total_bit_length = 8 * byte_length
+                        integer_bit_length = int(self.dictTlmItemAttr[strItem]['integer bit len'])    # includes a sign bit if any
                         fractional_bit_length = total_bit_length - integer_bit_length
 
-                        decoded_value =  b_coeff \
-                                       + a_coeff * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
-                                                    * 2**(-fractional_bit_length)
+                        scaled_value = a_coeff * decoded_value * 2**(-fractional_bit_length) + b_coeff
                         #####
                         
-                        pcb_time = gse_time + NN * 19.536e-6
-                        NN += 1
+                        pcb_time = gse_time + i_datum * 19.536e-6
+                        i_datum += 1
 
-                        hs_data.append([format(pcb_time,'.6f'), decoded_value])
+                        hs_data_data.append([format(pcb_time,'.7f'), scaled_value])
 
                         # hs_data.append([format(gse_time,'.6f'), decoded_value])
 
@@ -677,7 +676,7 @@ class DataHandler :
                 ### Camera data
                 # - camera data
                 if self.dictTlmItemAttr[strItem]['type'] == 'cam':
-                    
+
                     # - W006: Sens No
                     byte_idx_dd = 2 * 6 + byte_idx_head
                     byte_length = 2
@@ -688,13 +687,13 @@ class DataHandler :
                     # skip below when ***
                     if w006 != b'\x00\x04':     continue
 
-                    
+
                     # - W013: Cam No
                     byte_idx_dd = 2 * 13 + byte_idx_head
                     byte_length = 2
                     byte_string = data[byte_idx_dd:byte_idx_dd+byte_length]
                     
-                    w013 = int.from_bytes(byte_string, byteorder='big', signed=signed)
+                    w013 = int.from_bytes(byte_string, byteorder='big', signed=True)
 
                     # - W014 : Fram No
                     byte_idx_dd = 2 * 14 + byte_idx_head
@@ -702,13 +701,18 @@ class DataHandler :
                     byte_string = data[byte_idx_dd:byte_idx_dd+byte_length]
 
                     w014 = byte_string
-                    
-                    if w014 == b'\x00\x01':
-                        print('TLM DCD: CAM data is detected!')
-                        hs_data = bytearray()
 
-                    self.fpath_hs_data =  self.fdir + '/' \
-                                    + self.__FNAME_HS_DATA.replace('****.csv', 'cam{:0=4}.jpg'.format(w013))
+
+                    if strItem == 'Cam PL01':
+                        if w014 == b'\x00\x01':
+                            self.i_cam_file +=1
+                            print('TLM DCD: CAM data is detected!')
+
+                        hs_data_fpath =  self.fdir + '/' \
+                                       + self.__FNAME_HS_DATA.replace('****.csv', 'cam{:0=4}.jpg'.format(self.i_cam_file))
+                        hs_data_data = bytearray()
+
+
                     
                     ###
                     # - byte_string
@@ -725,14 +729,11 @@ class DataHandler :
                     byte_length = self.BPW * int(self.dictTlmItemAttr[strItem]['word len'])
                     byte_string = data[byte_idx+byte_idx_offset:byte_idx+byte_idx_offset+byte_length]                            
                                                 
-                    hs_data += bytearray(byte_string)
+                    hs_data_data = bytearray(byte_string)
 
-                    
+
                     continue
                 
-                else:
-                    pass
-
 
                 ### Ordinary items
                 # decoded_value = self.get_physical_value(self.dictTlmItemAttr[strItem], data, byte_idx)
@@ -803,6 +804,9 @@ class DataHandler :
                 dict_data_row.update({strItem:decoded_value})
 
             dict_data_matrix[iFrame] = dict_data_row
+            
+            if hs_data_fpath != '':
+                hs_data.append({'fpath': hs_data_fpath, 'data': hs_data_data})
 
             self.iLine += 1
 
@@ -829,20 +833,25 @@ class DataHandler :
     def get_physical_value(self, itemAttr, byte_string):        
 
         ###
-        byte_length = self.BPW * int(itemAttr['word len']) 
-        signed = itemAttr['signed']
-        integer_bit_length = int(itemAttr['integer bit len'])    # include sign bit if any
+        signed = itemAttr['signed']        
+        try:
+            decoded_value = int.from_bytes(byte_string, byteorder='big', signed=signed)
+        except Exception as e:
+            print('ERROR@get_physical_value:')
+            print(e)
+        
         a_coeff = itemAttr['a coeff']
         b_coeff = itemAttr['b coeff']
 
+        byte_length = self.BPW * int(itemAttr['word len'])
         total_bit_length = 8 * byte_length
+        integer_bit_length = int(itemAttr['integer bit len'])    # include sign bit if any
         fractional_bit_length = total_bit_length - integer_bit_length
-        decoded_value =  b_coeff \
-                       + a_coeff * (int.from_bytes(byte_string, byteorder='big', signed=signed)) \
-                                    * 2**(-fractional_bit_length)
+        
+        scaled_value = a_coeff * decoded_value * 2**(-fractional_bit_length) + b_coeff
         ###
 
-        return decoded_value
+        return scaled_value
 
 
     # Convert thermoelectric voltage (in uV) to temperature (in K)

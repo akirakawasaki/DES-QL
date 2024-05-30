@@ -161,6 +161,7 @@ if __name__ == "__main__":
     # GUI handler in the main process/thread <BLOCKING>
     gui_handler(g_state, g_lval, q_msg_smt, q_msg_pcm)
 
+    
     ### Wait for GUI to be closed ###
 
 
