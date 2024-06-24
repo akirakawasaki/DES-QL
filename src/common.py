@@ -11,7 +11,7 @@ import pandas as pd
 #
 # Common Constants
 #
-class CommonConstans:
+class CommonConstants:
     W2B = 2                     # conversion coefficient from Word to Byte
     
     NUM_OF_FRAMES = 8           # number of Frames in a Major Frame
@@ -21,8 +21,8 @@ class CommonConstans:
     # length of a Major Frame
     LEN_MF = W2B * NUM_OF_FRAMES * (LEN_HEADER + LEN_PAYLOAD)       # 1088 bytes
 
-    DIST_PORT_SMT = 49157       # port number to receive SMT datagram
-    DIST_PORT_PCM = 49158       # port number to receive PCM datagram
+    DIST_PORT_SMT = 52011       # port number to receive SMT datagram
+    DIST_PORT_PCM = 52010       # port number to receive PCM datagram
 
 #
 # Shared Variables

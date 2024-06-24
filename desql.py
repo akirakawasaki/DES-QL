@@ -15,7 +15,7 @@ import wx
 from src import telemeter
 from src import data
 from src import gui
-# from src import common
+from src import common
 
 
 #
@@ -26,12 +26,12 @@ def telemeter_handler_wrapper(tlm_type, q_msg, q_dgram):
 
     # configure datagram server
     
-    # HOST = '172.20.140.255'                                # mac
+    # HOST = '192.168.20.255'                                # mac
     # HOST = '192.168.11.255'                                # mac (Shiraoi)
     HOST = socket.gethostbyname(socket.gethostname())      # windows / mac(debug)
     
-    PORT =      60142 if (tlm_type == 'smt') \
-           else 60140
+    PORT =      common.CommonConstants.DIST_PORT_SMT if (tlm_type == 'smt') \
+           else common.CommonConstants.DIST_PORT_PCM
 
     tlm = telemeter.TelemeterHandler(tlm_type, HOST, PORT, q_msg, q_dgram)
 

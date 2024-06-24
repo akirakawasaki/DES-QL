@@ -7,7 +7,7 @@ import time
 # n/a
 
 ### Local libraries
-# n/a
+from src import common
 
 
 def tlmsvsim(dist_host, dist_port, file_path, slp_time, start_time):
@@ -81,7 +81,8 @@ if __name__ == "__main__":
     dist_host = socket.gethostbyname(socket.gethostname())
     
     if tlm_type == 'smt':
-        dist_port = 60142
+        dist_port = common.CommonConstants.DIST_PORT_SMT
+        # dist_port = 60142
         # dist_port = 49157       # old
 
         # slp_time = 0.005        # 
@@ -91,7 +92,8 @@ if __name__ == "__main__":
         # n_lb = 0                # 20210205 full sequence
         # n_lb = 67000            # 20201020 shortened sequence
     elif tlm_type == 'pcm':
-        dist_port = 60140
+        dist_port = common.CommonConstants.DIST_PORT_PCM
+        # dist_port = 60140
         # dist_port = 49158       # old
 
         # slp_time = 0.0025       # 
