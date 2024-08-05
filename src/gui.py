@@ -657,11 +657,11 @@ class pnlDigitalIndicator(wx.Panel):
         N_ITEM_PER_ROW = 6
         self.dictGroupAttr = {
             'Time':          {'gidx': 0, 'rows': 1, 'cols': N_ITEM_PER_ROW},
-            'DES State':     {'gidx': 1, 'rows': 3, 'cols': N_ITEM_PER_ROW+2},
+            'DES State':     {'gidx': 1, 'rows': 2, 'cols': N_ITEM_PER_ROW+2},
             'Pressure':      {'gidx': 2, 'rows': 2, 'cols': N_ITEM_PER_ROW},
             'Temperature':   {'gidx': 3, 'rows': 2, 'cols': N_ITEM_PER_ROW},
-            'IMU':           {'gidx': 4, 'rows': 3, 'cols': N_ITEM_PER_ROW},
-            'House Keeping': {'gidx': 5, 'rows': 3, 'cols': N_ITEM_PER_ROW}
+            'IMU':           {'gidx': 4, 'rows': 2, 'cols': N_ITEM_PER_ROW},
+            'House Keeping': {'gidx': 5, 'rows': 2, 'cols': N_ITEM_PER_ROW}
         }
 
         # Prepare hash: Group name -> {Item order -> Item name}
@@ -681,7 +681,7 @@ class pnlDigitalIndicator(wx.Panel):
             self.dictIndID2Item[strGroupName] = dict_temp
 
 
-    # Lay out Pane
+    # Layout Pane
     def layoutPane(self):
 
         '''
@@ -789,7 +789,7 @@ class pnlDigitalIndicator(wx.Panel):
                        else strItemName
                 self.tbtnLabel.append( wx.ToggleButton(self.pnlIndPair[-1], wx.ID_ANY, label=label) )
                 # self.tbtnLabel[-1].SetFont(
-                #   wx.Font(13, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL) )
+                #   wx.Font(14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL) )
                 self.tbtnLabel[-1].SetFont(
                     wx.Font(70, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL) )     # 70 is a　magic # in wx
                 # - add the Window to the parent Sizer
@@ -803,7 +803,7 @@ class pnlDigitalIndicator(wx.Panel):
                 self.stxtIndicator.append(
                     wx.StaticText(self.pnlIndPair[-1], wx.ID_ANY, label=str(i*100 + j), style=wx.ALIGN_CENTRE | wx.ST_NO_AUTORESIZE))
                 self.stxtIndicator[-1].SetFont(
-                    wx.Font(15, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL) )     ### T.B.REFAC. ###
+                    wx.Font(18, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL) )     ### T.B.REFAC. ###
                 # self.stxtIndicator[-1].SetFont(
                 #   wx.Font(70, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL) )     # 70 is a　magic # in wx
                 self.stxtIndicator[-1].SetBackgroundColour('BLACK')
