@@ -661,7 +661,7 @@ class pnlDigitalIndicator(wx.Panel):
             'Pressure':      {'gidx': 2, 'rows': 2, 'cols': N_ITEM_PER_ROW},
             'Temperature':   {'gidx': 3, 'rows': 2, 'cols': N_ITEM_PER_ROW},
             'IMU':           {'gidx': 4, 'rows': 2, 'cols': N_ITEM_PER_ROW},
-            'House Keeping': {'gidx': 5, 'rows': 2, 'cols': N_ITEM_PER_ROW}
+            'House Keeping': {'gidx': 5, 'rows': 3, 'cols': N_ITEM_PER_ROW}
         }
 
         # Prepare hash: Group name -> {Item order -> Item name}
